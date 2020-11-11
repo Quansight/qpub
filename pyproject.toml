@@ -1,0 +1,31 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "dgaf"
+author = "deathbeds"
+author-email = "tony.fast@gmail.com"
+home-page = "http://github.com/deathbeds/dgaf"
+classifiers = ["License :: OSI Approved :: MIT License"]
+requires = ["doit"]
+
+[tool.flit.metadata.requires-extra]
+mamba = ["mamba"]
+test = ["pytest", "nbval"]
+doc = ["jupyter-book"]
+
+[tool.flit.entrypoints.console_scripts]
+dgaf = "tingle.__main__:main"
+
+[tool.pytest.ini_options]
+addopts = """\
+--nbval docs tingle/docs readme.md \
+--sanitize-with docs/sanitize.cfg \
+-p no:warnings -p no:importnb -pno:pidgy\
+--doctest-glob="*.md" \
+--doctest-glob="*.ipynb" \
+-v\
+"""
+python_files = "*.py"
+norecursedirs="sample .ipynb_checkpoints"
