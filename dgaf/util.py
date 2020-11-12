@@ -35,7 +35,9 @@ class File(Path):
             dotenv.load_dotenv(dotenv_path=self)
             return dict(os.environ)
         try:
-            return __import__("anyconfig").load(self, self.suffix.lstrip('.'))
+            suffix = self.suffix.lstrip('.')
+            suffix = {"yml": "yaml"}.get(suffix, suffix)
+            return __import__("anyconfig").load(self, )
         except FileNotFoundError:
             return {}
 
