@@ -16,7 +16,7 @@ test = ["pytest", "nbval"]
 doc = ["jupyter-book"]
 
 [tool.flit.entrypoints.console_scripts]
-dgaf = "dgaf.__main__:main"
+dgaf = "dgaf:main"
 
 [tool.flit.entrypoints."nbconvert.exporters"]
 nikola = "dgaf.exporters:Nikola"
