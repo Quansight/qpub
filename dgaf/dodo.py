@@ -115,9 +115,9 @@ def task_populate():
 def task_update_env():
     """If an environment file exists, install it."""
     file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
-    alias = dgaf.Module("mamba") or "conda env"
+    alias = dgaf.Module("mamba") or "conda"
     return dict(actions=[
-        F"{alias} update --file {file}"
+        F"{alias} env update --file {file}"
     ], file_dep=[file])
 
 
