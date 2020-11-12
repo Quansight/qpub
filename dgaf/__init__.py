@@ -2,3 +2,7 @@
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 from . import util
 from .util import *
+
+
+def main():
+    from . import __main__
