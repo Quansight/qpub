@@ -22,7 +22,7 @@ def split_envs():
     if not env.get("dependencies", []):
         return
     cmd = doit.tools.CmdAction(
-        " ".join(["conda install --offline --dry-run --json"]+[
+        " ".join(["conda install --dry-run --json"]+[
             x for x in env.get("dependencies", []) if isinstance(x, str)]))
     cmd.execute()
     result = json.loads(cmd.out)
