@@ -18,13 +18,12 @@ doc = ["jupyter-book"]
 [tool.flit.entrypoints.console_scripts]
 dgaf = "tingle.__main__:main"
 
+[tool.flit.entrypoints."nbconvert.exporters"]
+nikola = "dgaf.exporters:Nikola"
+
 [tool.pytest.ini_options]
 addopts = """\
---nbval docs tingle/docs readme.md \
---sanitize-with docs/sanitize.cfg \
 -p no:warnings -p no:importnb -pno:pidgy\
---doctest-glob="*.md" \
---doctest-glob="*.ipynb" \
 -v\
 """
 python_files = "*.py"
