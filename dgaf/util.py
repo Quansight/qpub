@@ -37,7 +37,7 @@ class File(Path):
         try:
             suffix = self.suffix.lstrip('.')
             suffix = {"yml": "yaml"}.get(suffix, suffix)
-            return __import__("anyconfig").load(self, )
+            return __import__("anyconfig").load(self, suffix)
         except FileNotFoundError:
             return {}
 

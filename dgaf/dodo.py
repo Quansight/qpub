@@ -21,7 +21,6 @@ def split_envs():
     env = file.load()
     if not env.get("dependencies", []):
         return
-    print(env)
     cmd = doit.tools.CmdAction(
         " ".join(["conda install --offline --dry-run --json"]+[
             x for x in env.get("dependencies", []) if isinstance(x, str)]))
@@ -44,7 +43,7 @@ def split_envs():
             else:
                 pip = dict(pip=[])
                 env["dependencies"].append(pip)
-            pip["pip"] = set(pip["pip"]).union(result["packages"])
+            pip["pip"] = list(set(pip["pip"]).union(result["packages"]))
 
             if "pip" not in env["dependencies"]:
                 env["dependencies"] += ["pip"]
