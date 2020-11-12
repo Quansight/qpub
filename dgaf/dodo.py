@@ -139,8 +139,12 @@ def task_postBuild():
 
 
 def task_docs():
+    def config():
+        dgaf.File("_config.yml").dump(dgaf.template._config)
     return dict(
-        actions=["jb build --path-output docs ."],
+        actions=[
+            config, "jb build --path-output docs ."
+        ],
         file_dep=["_toc.yml", "_config.yml"],
         targets=["docs/index.html"]
     )
