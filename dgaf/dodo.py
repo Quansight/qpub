@@ -101,7 +101,7 @@ def make_env():
         channels = ['pyviz'] + channels
 
     file.dump(
-        dgaf.merge(file.load(), dict(name="dgaf", channels=channels,
+        dgaf.merge(file.load(), dict(name="notebook", channels=channels,
                                      dependencies=list(dependencies)))
     )
 
