@@ -17,6 +17,7 @@ def split_envs():
     import json
     file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
     reqs = dgaf.File("requirements.txt")
+    reqs.touch()
     env = file.load()
     if not env.get("dependencies", []):
         return
