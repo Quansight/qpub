@@ -37,6 +37,9 @@ class File(Path):
             dotenv.load_dotenv(dotenv_path=self)
             return dict(os.environ)
         try:
+            suffix = self.suffix.lstrip('.')
+            suffix = compat.get(suffix, suffix)
+
             return __import__("anyconfig").load(self, suffix)
         except FileNotFoundError:
             return {}
