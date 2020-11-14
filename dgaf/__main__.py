@@ -233,7 +233,7 @@ def grayskull() -> (File("build/*.tar.gz"), File("recipes/{{ package.name }}/met
             meta = {
                 "name": Settings.name,
                 "version": Settings.version,
-                "requires_dist": [FLIT["requires"]],
+                "requires_dist": [],
                 "requires_python": [],
                 "summary": Settings.summary,
                 "project_url": FLIT["home-page"],
