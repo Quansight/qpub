@@ -9,10 +9,12 @@ author-email = "tony.fast@gmail.com"
 license = "MIT"
 home-page = "http://github.com/deathbeds/dgaf"
 classifiers = ["License :: OSI Approved :: MIT License"]
-requires = ["doit", "gitpython", "flit", "anyconfig", "python-dotenv", "toml", "depfinder", "jupyter-book", "grayskull"]
+requires = ["doit", "gitpython", "anyconfig", "python-dotenv", "toml", "depfinder"]
 
 [tool.flit.metadata.requires-extra]
 mamba = ["mamba"]
+conda = ["grayskull"]
+flit = ["flit"]
 test = ["pytest", "nbval", "pytest-click"]
 doc = ["jupyter-book"]
 
