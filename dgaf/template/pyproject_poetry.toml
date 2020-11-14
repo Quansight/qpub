@@ -1,0 +1,24 @@
+# https://python-poetry.org/
+
+[tool.pytest.ini_options]
+[tool.dgaf.env]
+[tool.semantic_release]
+
+[tool.poetry]
+name = ""
+version = ""
+description = ""
+authors = []
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+[tool.coverage]
+[tool.tox]
