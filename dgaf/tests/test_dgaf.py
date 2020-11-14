@@ -1,4 +1,5 @@
 import doit
+import typer
 import dgaf
 
 
@@ -29,3 +30,9 @@ def test_dot_env(tmpdir):
     assert file.load() == dict(os.environ)
     file.write_text("FOO=42")
     assert file.load()["FOO"] == "42"
+
+
+def test_cli(cli_runner):
+    import dgaf.__main__
+    cli_runner.invoke(typer.main.get_command(
+        dgaf.__main__.app), "--help".split())
