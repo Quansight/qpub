@@ -6,13 +6,14 @@ build-backend = "flit_core.buildapi"
 module = "dgaf"
 author = "deathbeds"
 author-email = "tony.fast@gmail.com"
+license = "MIT"
 home-page = "http://github.com/deathbeds/dgaf"
 classifiers = ["License :: OSI Approved :: MIT License"]
-requires = ["doit", "gitpython", "flit", "anyconfig", "python-dotenv", "toml", "depfinder", "jupyter-book"]
+requires = ["doit", "gitpython", "flit", "anyconfig", "python-dotenv", "toml", "depfinder", "jupyter-book", "grayskull"]
 
 [tool.flit.metadata.requires-extra]
 mamba = ["mamba"]
-test = ["pytest", "nbval"]
+test = ["pytest", "nbval", "pytest-click"]
 doc = ["jupyter-book"]
 
 [tool.flit.entrypoints.console_scripts]

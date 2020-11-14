@@ -62,3 +62,5 @@ commonly, binders are created post hoc from code for the sake of reproducible no
 https://mozillascience.github.io/working-open-workshop/contributing/
 https://gist.github.com/bollwyvl/f6aac8d4e68e5594fad2ae7a3cacc74b
 https://gist.github.com/tonyfast/f74eb42f2a998d8e428a752ceb0cb1d1
+
+should we pre install a bunch of different pytest opinions?
