@@ -56,6 +56,10 @@ def split_envs():
 
 def task_local_dev_install():
     """use flit install a development version of the code."""
+    if dgaf.File("setup.py"):
+        return dict(actions=[
+            "pip install -e."
+        ], file_dep=["setup.py"])
     return dict(actions=[
         "flit install -s"
     ], file_dep=["pyproject.toml"])
@@ -153,6 +157,14 @@ def task_test():
     return dict(
         actions=["pip install dgaf[test]", "pytest"]
     )
+
+
+def task_nikola():
+    """represent the content as a blog format."""
+    # nikola init and add metadata
+    return dict(actions=[
+        "jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb"
+    ])
 
 
 def task_toc():
