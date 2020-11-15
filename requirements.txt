@@ -1,0 +1,8 @@
+doit
+gitpython
+flit
+anyconfig
+python-dotenv
+toml
+depfinder
+jsonpointer
