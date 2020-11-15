@@ -57,7 +57,7 @@ commonly, binders are created post hoc from code for the sake of reproducible no
         pip install -rrequirments.txt
         python -m dgaf
         python -m dgaf install
-        """.strip().splitlines(), targets=["pyproject.toml"], file_deps["requirements.txt]
+        """.strip().splitlines(), targets=["pyproject.toml"], file_deps["requirements.txt"]
         )
 
 https://mozillascience.github.io/working-open-workshop/contributing/
