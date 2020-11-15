@@ -27,13 +27,9 @@ the dgaf api. an opinionated cli of cli's.
     WORKFLOWS = GITHUB / "workflows"
     REPO = git.Repo()
 
-    CONDA_ENV = ENV["CONDA_DEFAULT_ENV"]
-    CONDA_EXE = ENV.get("CONDA_EXE", None)
-    CONDA = bool(CONDA_EXE)
-
 ## `doit`
 
-    DOIT_CFG = File(".doit.cfg").load
+    DOIT_CFG = File(".doit.cfg")
 
 ## configure the `"pyproject.toml"`
 
