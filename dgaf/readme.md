@@ -120,12 +120,13 @@ discover the dependencies for project.
 
 split conda dependencies from pip dependencies.
 
-        if CONDA: return
+        if not CONDA: return
 
         CONFIG = PYPROJECT.load()
         ENVIRONMENT.dump(
             ENVIRONMENT.load(), dependencies=REQUIREMENTS.load(), name=CONFIG["/tool/poetry/name"]
         )
+        env = ENVIRONMENT.load()
         cmd = doit.tools.CmdAction(
             " ".join(
                 ["conda install --dry-run --json"]
