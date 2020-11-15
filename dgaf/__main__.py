@@ -1,2 +1,3 @@
-from . import readme
-readme.app()
+from . import main
+
+main()
