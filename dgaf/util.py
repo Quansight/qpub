@@ -76,7 +76,11 @@ class File(Path):
 
         if self.is_txt():
             try:
-                return list(filter(bool, map(str.strip, self.read_text().splitlines())))
+                return [
+                    line for line in map(str.strip, self.read_text().splitlines())
+                    if line and not line.startswith("# ")
+                ]
+                list(filter(bool, map(str.strip, self.read_text().splitlines())))
             except FileNotFoundError:
                 return []
 
@@ -92,6 +96,8 @@ class File(Path):
         object = functools.reduce(merge, object)
         suffix = self.suffix.lstrip('.')
         suffix = compat.get(suffix, suffix)
+        if self.is_txt():
+            return self.write_text("\n".join(object))
 
         return __import__("anyconfig").dump(object, self, suffix)
 
@@ -227,40 +233,37 @@ def typer_to_doit(app):
             # def f()-> (..., "foo.txt")
             # def g()-> ("foo.txt", ["bar.txt"])
             # def h()-> (["foo.txt", g], [])
-            file_deps, targets = returns
+            file_dep, targets = returns
         else:
-            file_deps, targets = [], returns
-        if not isinstance(file_deps, list):
-            file_deps = [file_deps]
+            file_dep, targets = [], returns
+
+        if not isinstance(file_dep, list):
+            file_dep = [file_dep]
 
         if not isinstance(targets, list):
             targets = [targets]
 
-        file_deps == [...] and file_deps.pop()
+        file_dep == [...] and file_dep.pop()
         targets == [...] and targets.pop()
 
-        task_deps = []
+        task_dep = []
         # split callable tasks from file dependencies
-        for file_dep in file_deps:
-            if callable(file_dep):
-                task_deps += [file_dep.__name__]
+        pop = []
+        for i, x in enumerate(file_dep):
+            if callable(x):
+                task_dep += [x.__name__]
+                pop.append(i)
+        for x in reversed(pop):
+            file_dep.pop(x)
 
         # do something about globs
         ...
 
-        # pop tasks from the file deps
-        if task_deps:
-            for task_dep in task_deps:
-                try:
-                    file_deps.pop(file_deps.index(task_dep))
-                except ValueError:
-                    ...
-
         # decorate the function according to the doit specification
         command.callback.create_doit_tasks = lambda: dict(
             actions=[command.callback],
-            file_deps=file_deps,
-            task_deps=task_deps,
+            file_dep=file_dep,
+            task_dep=task_dep,
             targets=targets
         )
 
