@@ -134,7 +134,7 @@ split conda dependencies from pip dependencies.
             )
         )
         cmd.execute()
-        result = dgaf.util.Dict(json.loads(cmd.out))
+        result = dgaf.util.Dict(__import__("json").loads(cmd.out))
         if "success" in result:
             ...
         if "error" in result:
