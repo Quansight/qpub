@@ -54,7 +54,7 @@ commonly, binders are created post hoc from code for the sake of reproducible no
 
     def task_dev():
         return dict(actions="""
-        pip install -rrequirments.txt
+        pip install -rrequirements.txt
         python -m dgaf
         python -m dgaf install
         """.strip().splitlines(), 
