@@ -1,9 +1,29 @@
 import dgaf
 import pathlib
 import functools
+import jsonpointer
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
+
+
+class Dict(dict):
+    def __getitem__(self, object):
+        try:
+            return jsonpointer.JsonPointer(object).resolve(self)
+        except jsonpointer.JsonPointerException:
+            return super().__getitem__(object)
+
+    def get(self, object, default=None):
+        if object in self:
+            return self[object]
+        return default
+
+    def __setitem__(self, object, value):
+        try:
+            return jsonpointer.JsonPointer(object).set(self, value)
+        except jsonpointer.JsonPointerException:
+            return super().__setitem__(object, value)
 
 
 def squash_depfinder(object):
@@ -31,17 +51,30 @@ class File(Path):
             deps = {}
         return squash_depfinder(deps)
 
+    def is_txt(self):
+        return self.suffix == ".txt"
+
+    def is_env(self):
+        return self.suffix == '.env' or self.stem == '.env'
+
     def load(self):
-        if self.suffix == '.env' or self.stem == '.env':
+        if self.is_env():
             import os
             import dotenv
             dotenv.load_dotenv(dotenv_path=self)
-            return dict(os.environ)
+            return Dict(os.environ)
+
+        if self.is_txt():
+            try:
+                return list(filter(bool, map(str.strip, self.read_text().splitlines())))
+            except FileNotFoundError:
+                return []
+
         try:
             suffix = self.suffix.lstrip('.')
             suffix = compat.get(suffix, suffix)
 
-            return __import__("anyconfig").load(self, suffix)
+            return Dict(__import__("anyconfig").load(self, suffix))
         except FileNotFoundError:
             return {}
 
@@ -69,9 +102,12 @@ class Module(str):
             return False
 
 
-def merge(a, b):
+def merge(a, b, *extras):
     """merge dictionaries.  """
     a, b = a or {}, b or {}
+
+    if extras:  # reduce the arity until we have a binop
+        b = merge(b, *extras)
     for k in set(a).union(b):
         kind = type(a[k] if k in a else b[k])
         if k not in a:
@@ -85,7 +121,7 @@ def merge(a, b):
             a[k] += [x for x in b.get(k, kind()) if x not in a[k]]
         else:
             a[k] = a[k] or b.get(k, kind())
-    return a
+    return Dict(a)
 
 
 def make_conda_pip_envs():
@@ -172,8 +208,8 @@ def depfinder() -> set:
 
 
 def typer_to_doit(app):
-    app.registered_commands()
-    for command in commands:
+    import doit
+    for command in app.registered_commands:
         returns = command.callback.__annotations__.get("return", [])
 
         # the return annotation only gets complication if it is a tuple.
@@ -217,3 +253,7 @@ def typer_to_doit(app):
             task_deps=task_deps,
             targets=targets
         )
+
+    return doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader({
+        x.callback.__name__: x.callback for x in app.registered_commands
+    }))
