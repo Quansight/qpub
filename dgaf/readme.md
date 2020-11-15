@@ -88,22 +88,15 @@ infer version and description information from the existing content.
             "/tool/poetry/description"
         ] = CONFIG["/tool/poetry/description"]
 
-        if README:
-            CONFIG[
-                "/tool/flit/metadata/description-file"
-            ] = CONFIG["/tool/flit/metadata/description-file"] or str(README)
-
-        if REQUIREMENTS:
-            LongRunning("poetry config virtualenvs.create false --local").execute()
-            LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
-
 
 if author information from git.
 
         
         CONFIG[
             "/tool/poetry/authors"
-        ] = CONFIG["/tool/poetry/authors"] or [REPO.commit().author.email]
+        ] = CONFIG["/tool/poetry/authors"] or [
+            F"{REPO.commit().author.name} <{REPO.commit().author.email}>"
+        ]
 
         # find the projects and append them to the configuration.
 
@@ -111,7 +104,7 @@ if author information from git.
 
 ## initialize the configured `"pyproject.toml"` file
 
-    def init() -> PYPROJECT:
+    def init() -> (REQUIREMENTS, PYPROJECT):
 
 `dgaf` relies on `git` and `File("pyproject.toml")` to initialize a project.
 
@@ -119,12 +112,13 @@ if author information from git.
 
         CONFIG = configure()
         PYPROJECT.dump(CONFIG)
+        if REQUIREMENTS:
+            LongRunning("poetry config virtualenvs.create false --local").execute()
+            LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
 
     def install() -> (PYPROJECT, ...):
         CONFIG = PYPROJECT.load()
-        backend = CONFIG["/build-system/build-backend"]
-        if backend.startswith("flit_core"):
-            [LongRunning("flit install -s").execute()]
+        LongRunning("poetry install").execute()
 
 
 
