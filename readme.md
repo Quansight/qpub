@@ -53,14 +53,18 @@ commonly, binders are created post hoc from code for the sake of reproducible no
 # development
 
     def task_dev():
-        return dict(actions="""
-        #pip install -rrequirements.txt
-        python -m dgaf
-        python -m dgaf install
+
+install the requirements and use `dgaf` to generate and install dependencies.
+
+        return dict(
+            actions="""
+    pip install -rrequirements.txt
+    python -m dgaf
+    python -m dgaf install
         """.strip().splitlines(), 
-        targets=["pyproject.toml"], 
-        file_dep=["requirements.txt"],
-        uptodate=[False]
+            targets=["pyproject.toml"], 
+            file_dep=["requirements.txt"],
+            uptodate=[False]
         )
 
 https://mozillascience.github.io/working-open-workshop/contributing/
