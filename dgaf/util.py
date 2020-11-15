@@ -2,9 +2,11 @@ import dgaf
 import pathlib
 import functools
 import jsonpointer
+
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
+pkg2pip = dict(git="GitPython")
 
 
 class Dict(dict):
@@ -38,13 +40,17 @@ class Dict(dict):
 
 def squash_depfinder(object):
     import depfinder
+
     if isinstance(object, tuple):
         object = object[-1]
     if isinstance(object, depfinder.main.ImportFinder):
         object = object.describe()
-    return set(object.get('required', set())).union(
-        object.get('questionable', set()))
-    return object
+    return set(
+        map(
+            lambda x: pkg2pip.get(x, x),
+            set(object.get("required", set())).union(object.get("questionable", set())),
+        )
+    )
 
 
 class File(Path):
@@ -53,9 +59,10 @@ class File(Path):
 
     def imports(self):
         import depfinder
-        if self.suffix == '.py':
+
+        if self.suffix == ".py":
             deps = depfinder.parse_file(self)
-        elif self.suffix == '.ipynb':
+        elif self.suffix == ".ipynb":
             deps = depfinder.notebook_path_to_dependencies(self)
         else:
             deps = {}
@@ -65,19 +72,21 @@ class File(Path):
         return self.suffix == ".txt"
 
     def is_env(self):
-        return self.suffix == '.env' or self.stem == '.env'
+        return self.suffix == ".env" or self.stem == ".env"
 
     def load(self):
         if self.is_env():
             import os
             import dotenv
+
             dotenv.load_dotenv(dotenv_path=self)
             return Dict(os.environ)
 
         if self.is_txt():
             try:
                 return [
-                    line for line in map(str.strip, self.read_text().splitlines())
+                    line
+                    for line in map(str.strip, self.read_text().splitlines())
                     if line and not line.startswith("# ")
                 ]
                 list(filter(bool, map(str.strip, self.read_text().splitlines())))
@@ -85,19 +94,20 @@ class File(Path):
                 return []
 
         try:
-            suffix = self.suffix.lstrip('.')
+            suffix = self.suffix.lstrip(".")
             suffix = compat.get(suffix, suffix)
 
             return Dict(__import__("anyconfig").load(self, suffix))
         except FileNotFoundError:
             return {}
 
-    def dump(self, *object):
-        object = functools.reduce(merge, object)
-        suffix = self.suffix.lstrip('.')
-        suffix = compat.get(suffix, suffix)
+    def dump(self, *object, **kwargs):
         if self.is_txt():
             return self.write_text("\n".join(object))
+        object += (kwargs,)
+        object = merge(*object)
+        suffix = self.suffix.lstrip(".")
+        suffix = compat.get(suffix, suffix)
 
         return __import__("anyconfig").dump(object, self, suffix)
 
@@ -143,6 +153,7 @@ def merge(a, b, *extras):
 def make_conda_pip_envs():
     import json
     import doit
+
     file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
     file or make_prior_env()
     reqs = dgaf.File("requirements.txt")
@@ -151,8 +162,11 @@ def make_conda_pip_envs():
     if not env.get("dependencies", []):
         return
     cmd = doit.tools.CmdAction(
-        " ".join(["conda install --dry-run --json"]+[
-            x for x in env.get("dependencies", []) if isinstance(x, str)]))
+        " ".join(
+            ["conda install --dry-run --json"]
+            + [x for x in env.get("dependencies", []) if isinstance(x, str)]
+        )
+    )
     cmd.execute()
     result = json.loads(cmd.out)
     if "success" in result:
@@ -160,8 +174,13 @@ def make_conda_pip_envs():
     if "error" in result:
         if result.get("packages"):
             reqs = dgaf.File("requirements.txt")
-            reqs.write_text("\n".join(set(filter(str.strip, reqs.read_text().splitlines())).union(
-                result['packages'])))
+            reqs.write_text(
+                "\n".join(
+                    set(filter(str.strip, reqs.read_text().splitlines())).union(
+                        result["packages"]
+                    )
+                )
+            )
 
             env["dependencies"] = [
                 x for x in env["dependencies"] if x not in result["packages"]
@@ -177,8 +196,9 @@ def make_conda_pip_envs():
             if "pip" not in env["dependencies"]:
                 env["dependencies"] += ["pip"]
 
-            env["dependencies"] = list(set(x for x in env["dependencies"]
-                                           if isinstance(x, str))) + [pip]
+            env["dependencies"] = list(
+                set(x for x in env["dependencies"] if isinstance(x, str))
+            ) + [pip]
 
             file.dump(env)
 
@@ -186,24 +206,26 @@ def make_conda_pip_envs():
 def make_prior_env():
     """create and write conda environment file."""
     dependencies = depfinder()
-    channels = ['conda-forge']
+    channels = ["conda-forge"]
     file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
 
     if any(x in dependencies for x in ("panel", "holoviews", "hvplot")):
-        channels = ['pyviz'] + channels
+        channels = ["pyviz"] + channels
 
     file.dump(
-        dgaf.merge(file.load(), dict(name="notebook", channels=channels,
-                                     dependencies=list(dependencies)))
+        dgaf.merge(
+            file.load(),
+            dict(name="notebook", channels=channels, dependencies=list(dependencies)),
+        )
     )
 
 
 def make_pyproject():
     import git
+
     author = git.Repo().commit().author
 
-    metadata = dgaf.dodo.PYPROJECT.get(
-        "tool", {}).get("flit", {}).get("metadata", {})
+    metadata = dgaf.dodo.PYPROJECT.get("tool", {}).get("flit", {}).get("metadata", {})
     metadata["module"] = metadata.get("module", "") or "readme"
     metadata["author"] = metadata.get("author", "") or author.name
     metadata["author-email"] = metadata.get("author", "") or author.email
@@ -212,28 +234,33 @@ def make_pyproject():
     dgaf.File("pyproject.toml").dump(dgaf.dodo.PYPROJECT)
 
 
-def depfinder() -> set:
+def depfinder(*files) -> set:
     """Find the dependencies for all of the content."""
     import depfinder
+
     object = {}
     deps = set()
-    for file in dgaf.File().iterdir():
+    for file in files:
         deps = deps.union(file.imports())
-    deps.discard('dgaf')
+    deps.discard("dgaf")
     return deps
 
 
 def typer_to_doit(app):
     import doit
+
     for command in app.registered_commands:
         returns = command.callback.__annotations__.get("return", [])
-
         # the return annotation only gets complication if it is a tuple.
+        file_dep, targets, extras = {}, {}, {}
         if isinstance(returns, tuple):
             # def f()-> (..., "foo.txt")
             # def g()-> ("foo.txt", ["bar.txt"])
             # def h()-> (["foo.txt", g], [])
             file_dep, targets = returns
+        elif isinstance(returns, bool):
+            # def h()-> False
+            extras.update(updatetodate=[returns])
         else:
             file_dep, targets = [], returns
 
@@ -264,9 +291,12 @@ def typer_to_doit(app):
             actions=[command.callback],
             file_dep=file_dep,
             task_dep=task_dep,
-            targets=targets
+            targets=targets,
+            **extras
         )
 
-    return doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader({
-        x.callback.__name__: x.callback for x in app.registered_commands
-    }))
+    return doit.doit_cmd.DoitMain(
+        doit.cmd_base.ModuleTaskLoader(
+            {x.callback.__name__: x.callback for x in app.registered_commands}
+        )
+    )

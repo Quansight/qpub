@@ -30,7 +30,7 @@ the dgaf api. an opinionated cli of cli's.
 
 ## configure the `"pyproject.toml"`
 
-    def configure():
+    def configure() -> False:
 
 Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s base templates.
 
@@ -52,14 +52,6 @@ Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s b
         top_level = [
             x for x in directories if x.parent == File()
         ]
-        
-infer names from the directories.
-
-        USE_FLIT = False
-        if len(top_level) == 1:
-            USE_FLIT = True
-            name = str(top_level[0])
-
         
 
 find the name from the python files.
@@ -96,25 +88,22 @@ if author information from git.
 
         # find the projects and append them to the configuration.
 
-        return CONFIG
+        PYPROJECT.dump(CONFIG)
 
 ## initialize the configured `"pyproject.toml"` file
 
-    def init() -> (REQUIREMENTS, PYPROJECT):
+    def init() -> ([configure, REQUIREMENTS], PYPROJECT):
 
 `dgaf` relies on `git` and `File("pyproject.toml")` to initialize a project.
 
 `init` builds the `File("pyproject.toml")` configuration for `flit` and `poetry`
-
-        CONFIG = configure()
-        PYPROJECT.dump(CONFIG)
+        
         if REQUIREMENTS:
             LongRunning("poetry config virtualenvs.create false --local").execute()
             LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
 
     def install() -> (PYPROJECT, ...):
-        CONFIG = PYPROJECT.load()
-        LongRunning("poetry install").execute()
+        return LongRunning("poetry install").execute()
 
 
 
