@@ -59,7 +59,6 @@ install the requirements and use `dgaf` to generate and install dependencies.
         return dict(
             actions="""
     pip install -rrequirements.txt
-    python -m dgaf
     python -m dgaf install
         """.strip().splitlines(), 
             targets=["pyproject.toml"], 
