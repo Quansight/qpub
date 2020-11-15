@@ -6,7 +6,7 @@ import jsonpointer
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
-pkg2pip = dict(git="GitPython")
+pkg2pip = dict(git="GitPython", dotenv="python-dotenv")
 
 
 class Dict(dict):
@@ -75,13 +75,6 @@ class File(Path):
         return self.suffix == ".env" or self.stem == ".env"
 
     def load(self):
-        if self.is_env():
-            import os
-            import dotenv
-
-            dotenv.load_dotenv(dotenv_path=self)
-            return Dict(os.environ)
-
         if self.is_txt():
             try:
                 return [
