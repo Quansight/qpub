@@ -15,16 +15,12 @@ the deathbeds generalized automation framework provides opinionated tools for de
 
 the first goal of `dgaf` is to make it easy to deploy development environments on binders. often binders are composed to be reproducible; `dgaf` wants binder to be a reproducible development environment.
 
-    %%file postBuild
-    pip install dgaf && dgaf postBuild
-
 ## conventions
 
 
 
 dgaf is a project automation system built around a pyproject.toml. it automates setting up interactive python environments on binder.
 
-        dgaf add pyproject flit doit datasette binder pytest pyreverse jb
 
 
 # rely on high-level tools
@@ -50,14 +46,18 @@ dgaf is a project automation system built around a pyproject.toml. it automates 
 
 set up a development environment too.
 
-        pip install dgaf[mamba]
-        dgaf postBuild
-
-        dgaf add -i # interactively add things
-
 # development binders
 
 commonly, binders are created post hoc from code for the sake of reproducible notebooks. reproducability is a minimum requirements for binder. binder can be more useful if a proper development environments is installed.
+
+# development
+
+    def task_dev():
+        return dict(actions="""
+        python -m dgaf
+        python -m dgaf install
+        """.strip().splitlines(), targets=["pyproject.toml"]
+        )
 
 https://mozillascience.github.io/working-open-workshop/contributing/
 https://gist.github.com/bollwyvl/f6aac8d4e68e5594fad2ae7a3cacc74b

@@ -18,11 +18,8 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install
       run: |
-        pip install -rrequirements.txt
-        # install the requirements and local packages.
-        # at the end of this, the dgaf cli is exposed.
-        python -m dgaf # list the commands
-        python -m dgaf install
+        pip install doit
+        doit dev
     - name: Test
       run: |
         dgaf test        
