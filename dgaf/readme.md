@@ -20,7 +20,8 @@ the dgaf api. an opinionated cli of cli's.
     PYPROJECT = File("pyproject.toml") 
     GITIGNORE = File(".gitignore")
     POSTBUILD = File("postBuild")
-    POSTBUILD = File("postBuild")
+    README = File("readme.md")
+    REQUIREMENTS = File("requirements.txt")
     DOCS = File("docs") # a convention with precedence from github
     GITHUB = File(".github")
     ENV = File(".env").load()
@@ -33,7 +34,7 @@ the dgaf api. an opinionated cli of cli's.
 
 ## configure the `"pyproject.toml"`
 
-    def configure(name="_"):
+    def configure():
 
 Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s base templates.
 
@@ -71,53 +72,46 @@ find the name from the python files.
 
 load in the existing configuration with other `dgaf` defaults.
 
-        CONFIG = merge(
-            merge(PYPROJECT.load(), dgaf.template.flit), dgaf.template.poetry
-        )
+        CONFIG = merge(PYPROJECT.load(), dgaf.template.poetry)
 
-        CONFIG[
-            "/tool/flit/metadata/name"
-        ] = CONFIG[
-            "/tool/poetry/name"
-        ] = CONFIG.get(
-            "/tool/flit/metadata/name", 
-            CONFIG.get("/tool/poetry/name", name)
-        )
+        CONFIG["/tool/poetry/name"] = CONFIG["/tool/poetry/name"] or name
 
 infer version and description information from the existing content.
 
-        info = flit.common.get_info_from_module(flit.common.Module(name, File()))
+
         CONFIG[
             "/tool/poetry/version"
-        ] = CONFIG.get("/tool/poetry/version", info.get("version"))
+        ] = CONFIG["/tool/poetry/version"] or __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 
         CONFIG[
             "/tool/poetry/description"
-        ] = CONFIG.get("/tool/poetry/description", info.get("summary"))
+        ] = CONFIG["/tool/poetry/description"]
+
+        if README:
+            CONFIG[
+                "/tool/flit/metadata/description-file"
+            ] = CONFIG["/tool/flit/metadata/description-file"] or str(README)
+
+        if REQUIREMENTS:
+            LongRunning("poetry config virtualenvs.create false --local").execute()
+            LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
+
 
 if author information from git.
 
-        CONFIG["/tool/flit/metadata/author"] = CONFIG.get(
-            "/tool/flit/metadata/author", REPO.commit().author.name)
         
         CONFIG[
             "/tool/poetry/authors"
-        ] = CONFIG.get("/tool/poetry/authors", [CONFIG["/tool/flit/metadata/author"]])
+        ] = CONFIG["/tool/poetry/authors"] or [REPO.commit().author.email]
 
         # find the projects and append them to the configuration.
 
-        CONFIG["build-system"] = (
-            dgaf.template.flit["build-system"] 
-            if USE_FLIT else dgaf.template.poetry["build-system"] )
-
-        
-        print(CONFIG)
         return CONFIG
 
 ## initialize the configured `"pyproject.toml"` file
 
-    def init():
+    def init() -> PYPROJECT:
 
 `dgaf` relies on `git` and `File("pyproject.toml")` to initialize a project.
 
@@ -126,34 +120,19 @@ if author information from git.
         CONFIG = configure()
         PYPROJECT.dump(CONFIG)
 
+    def install() -> (PYPROJECT, ...):
+        CONFIG = PYPROJECT.load()
+        backend = CONFIG["/build-system/build-backend"]
+        if backend.startswith("flit_core"):
+            [LongRunning("flit install -s").execute()]
+
+
+
 load in all the configuration details we can.
 
     CONDA_ENV = ENV["/CONDA_DEFAULT_ENV"]
     CONDA_EXE = ENV["/CONDA_EXE"]
     CONDA = bool(CONDA_EXE)
-
-    def make_pyproject():
-
-make or ammend a `pyproject.toml` file. we choose between `flit` and `poetry` for build conventions. `flit` for small/flat projects and `poetry` deeply nested works.
-
-        author = REPO.commit().author
-        FLIT["module"] = FLIT.get("module", "") or "readme"
-        FLIT["author"] = FLIT.get("author", "") or author.name
-        FLIT["author-email"] = FLIT.get("author", "") or author.email
-        FLIT["homepage"] = "http://"
-        # add requirements
-        File("pyproject.toml").dump(PYPROJECT)
-
-
-    def pyproject(flit: bool = True, poetry: bool = True, setuptools: bool = False) -> File("pyproject.toml"):
-        """Create a pyproject or setuptools configuration file. We need setuptools with multiple packages.
-        everything is a package unless ignored"""
-        if flit:
-            return make_pyproject()
-        if setuptools:
-            # what conditions need to exist to get here.
-            return
-        return
 
 
     def python():
@@ -234,7 +213,7 @@ make or ammend a `pyproject.toml` file. we choose between `flit` and `poetry` fo
         return
 
 
-    def grayskull() -> (File("build/*.tar.gz"), File("recipes/{{ package.name }}/meta.yaml")):
+    def grayskull() -> [File("build/*.tar.gz"), File("recipes/{{ package.name }}/meta.yaml")]:
         """grayskull infers a conda build recipe from a pip compatible package/build.
 
 
@@ -358,7 +337,7 @@ make or ammend a `pyproject.toml` file. we choose between `flit` and `poetry` fo
 
 
     def postBuild() -> (
-        [calculate_deps, pyproject, build], ...
+        [calculate_deps, build], ...
     ): 
 
 the postBuild command is assists in building development environments on binders.
@@ -368,8 +347,8 @@ the postBuild command is assists in building development environments on binders
 
 
     app = typer.Typer()
-    [app.command()(x) for x in [configure, make_pyproject, pyproject, python, test, lint,
-                                calculate_deps, docs, blog, update, build, jupyter, js, grayskull]
+    [app.command()(x) for x in [configure, python, test, lint,
+                                calculate_deps, docs, blog, update, build, jupyter, js, init, install] #grayskull
     ]
 
 [`flit`]: #
