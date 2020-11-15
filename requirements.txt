@@ -1,3 +1,4 @@
+# dgaf relies on high level packages do acheive large units of work
 doit
 gitpython
 flit
@@ -6,3 +7,5 @@ python-dotenv
 toml
 depfinder
 jsonpointer
+typer
+git+https://github.com/deathbeds/tingle
