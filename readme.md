@@ -56,7 +56,7 @@ commonly, binders are created post hoc from code for the sake of reproducible no
         return dict(actions="""
         #pip install -rrequirements.txt
         python -m dgaf
-        python -m dgaf init
+        python -m dgaf install
         """.strip().splitlines(), 
         targets=["pyproject.toml"], 
         file_dep=["requirements.txt"],
