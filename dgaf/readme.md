@@ -132,8 +132,8 @@ if author information from git.
 
 load in all the configuration details we can.
 
-    CONDA_ENV = ENV["CONDA_DEFAULT_ENV"]
-    CONDA_EXE = ENV.get("CONDA_EXE", None)
+    CONDA_ENV = ENV["/CONDA_DEFAULT_ENV"]
+    CONDA_EXE = ENV["/CONDA_EXE"]
     CONDA = bool(CONDA_EXE)
 
     def make_pyproject():
