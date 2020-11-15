@@ -16,7 +16,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install
       run: |
-        pip install doit
+        pip install -rrequirements.txt
         doit dev
         dgaf
     - name: Test
