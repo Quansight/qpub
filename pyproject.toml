@@ -1,7 +1,3 @@
-[build-system]
-requires = ["flit_core >=2,<4"]
-build-backend = "flit_core.buildapi"
-
 [tool.flit.metadata.requires-extra]
 mamba = [ "mamba",]
 conda = ["grayskull"]
