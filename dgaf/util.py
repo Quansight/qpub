@@ -10,20 +10,30 @@ compat = {"yml": "yaml", "cfg": "ini"}
 class Dict(dict):
     def __getitem__(self, object):
         try:
-            return jsonpointer.JsonPointer(object).resolve(self)
+            pointer = jsonpointer.JsonPointer(object)
         except jsonpointer.JsonPointerException:
             return super().__getitem__(object)
+        else:
+            try:
+                return pointer.resolve(self)
+            except (KeyError, jsonpointer.JsonPointerException):
+                return
 
     def get(self, object, default=None):
-        if object in self:
+        try:
             return self[object]
+        except (KeyError, jsonpointer.JsonPointerException):
+            ...
         return default
 
     def __setitem__(self, object, value):
         try:
-            return jsonpointer.JsonPointer(object).set(self, value)
+            pointer = jsonpointer.JsonPointer(object)
         except jsonpointer.JsonPointerException:
-            return super().__setitem__(object, value)
+            ...
+        else:
+            return pointer.set(self, value)
+        return super().__setitem__(object, value)
 
 
 def squash_depfinder(object):
