@@ -54,9 +54,10 @@ commonly, binders are created post hoc from code for the sake of reproducible no
 
     def task_dev():
         return dict(actions="""
+        pip install -rrequirments.txt
         python -m dgaf
         python -m dgaf install
-        """.strip().splitlines(), targets=["pyproject.toml"]
+        """.strip().splitlines(), targets=["pyproject.toml"], file_deps["requirements.txt]
         )
 
 https://mozillascience.github.io/working-open-workshop/contributing/

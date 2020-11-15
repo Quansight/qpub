@@ -1,6 +1,4 @@
 # python github action
-
-
 name: Python package
 on: push
 jobs:
@@ -20,9 +18,10 @@ jobs:
       run: |
         pip install doit
         doit dev
+        dgaf
     - name: Test
       run: |
-        dgaf test        
+        dgaf test 
     - name: Build
       run: |
         dgaf build
