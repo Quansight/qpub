@@ -1,11 +1,7 @@
 the dgaf api. an opinionated cli of cli's.
 
     import git
-    import flit
     import typing
-    import anyconfig
-    import dgaf.template
-    import pathlib
     import dgaf
     import doit
     import shutil
