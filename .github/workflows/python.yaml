@@ -20,10 +20,9 @@ jobs:
     - name: Dev Install
       run: | 
         doit dev
-        dgaf
     - name: Test
       run: |
-        dgaf test 
+        python -m dgaf test 
     - name: Build
       run: |
         dgaf build
