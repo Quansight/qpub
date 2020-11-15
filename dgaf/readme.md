@@ -18,10 +18,19 @@ the dgaf api. an opinionated cli of cli's.
     POSTBUILD = File("postBuild")
     README = File("readme.md")
     REQUIREMENTS = File("requirements.txt")
+    ENVIRONMENT = File("environment.yml") or File("environment.yaml")
     DOCS = File("docs") # a convention with precedence from github
     GITHUB = File(".github")
-    ENV = File(".env").load()
     WORKFLOWS = GITHUB / "workflows"
+    ENV = dgaf.util.Dict(__import__("os").environ)
+    CONDA_ENV = ENV["/CONDA_DEFAULT_ENV"]
+    CONDA_EXE = ENV["/CONDA_EXE"]
+    CONDA = bool(CONDA_EXE)
+    FILES = [
+        x for x in (
+            File(x) for x in git.Git().ls_files().splitlines()
+        ) if x not in (POSTBUILD,)
+    ]
     REPO = git.Repo()
 
 ## `doit`
@@ -30,28 +39,26 @@ the dgaf api. an opinionated cli of cli's.
 
 ## configure the `"pyproject.toml"`
 
-    def configure() -> False:
+    def configure():
 
 Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s base templates.
 
         submodules = [
             File(x.path) for x in REPO.submodules
         ]
-
-        files = [
-            x for x in (
-                File(x) for x in git.Git().ls_files().splitlines()
-            ) if x not in (POSTBUILD,)
-        ]
         
         directories = list(set(
-            x.parent for x in files if (x.parent not in submodules) 
+            x.parent for x in FILES if (x.parent not in submodules) 
             and (x.parent != File()) and (x.parent not in (DOCS, WORKFLOWS, GITHUB))
         ))
         
         top_level = [
             x for x in directories if x.parent == File()
         ]
+
+        if top_level:
+            if len(top_level) == 1:
+                name = str(top_level[0])
         
 
 find the name from the python files.
@@ -92,32 +99,109 @@ if author information from git.
 
 ## initialize the configured `"pyproject.toml"` file
 
-    def init() -> ([configure, REQUIREMENTS], PYPROJECT):
+    def discover():
+
+discover the dependencies for project.
+        
+        REQUIREMENTS.dump(*dgaf.util.depfinder(*FILES).union(REQUIREMENTS.load()))
+
+    def calculate() -> False:
 
 `dgaf` relies on `git` and `File("pyproject.toml")` to initialize a project.
 
 `init` builds the `File("pyproject.toml")` configuration for `flit` and `poetry`
         
+        configure()
         if REQUIREMENTS:
             LongRunning("poetry config virtualenvs.create false --local").execute()
             LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
 
-    def install() -> (PYPROJECT, ...):
-        return LongRunning("poetry install").execute()
+    def split_dependencies():
+
+split conda dependencies from pip dependencies.
+
+        if CONDA: return
+
+        CONFIG = PYPROJECT.load()
+        ENVIRONMENT.dump(
+            ENVIRONMENT.load(), dependencies=REQUIREMENTS.load(), name=CONFIG["/tool/poetry/name"]
+        )
+        cmd = doit.tools.CmdAction(
+            " ".join(
+                ["conda install --dry-run --json"]
+                + [x for x in env.get("dependencies", []) if isinstance(x, str)]
+            )
+        )
+        cmd.execute()
+        result = dgaf.util.Dict(json.loads(cmd.out))
+        if "success" in result:
+            ...
+        if "error" in result:
+            if result["/packages"]:
+                REQUIREMENTS.dump(*result["/packages"])
+                env = ENVIRONMENT.load()
+                env["dependencies"] = [
+                    x for x in env["dependencies"] if x not in result["packages"]
+                ]
+                for dep in env["dependencies"]:
+                    if isinstance(dep, dict) and "pip" in dep:
+                        pip = dep
+                else:
+                    pip = dict(pip=[])
+                    env["dependencies"].append(pip)
+                
+                pip["pip"] = list(set(pip["pip"]).union(result["packages"]))
+
+                if "pip" not in env["dependencies"]:
+                    env["dependencies"] += ["pip"]
+
+                env["dependencies"] = list(
+                    set(x for x in env["dependencies"] if isinstance(x, str))
+                ) + [pip]
+
+                ENVIRONMENT.dump(env)
 
 
+    def install():
+        [
 
-load in all the configuration details we can.
+            discover(),
+            split_dependencies(),
+            calculate(),
+            LongRunning("poetry install").execute()
+        ]
 
-    CONDA_ENV = ENV["/CONDA_DEFAULT_ENV"]
-    CONDA_EXE = ENV["/CONDA_EXE"]
-    CONDA = bool(CONDA_EXE)
+    def build(poetry: bool = True, setuptools: bool = True):
+        if poetry:
+            return LongRunning("poetry build").execute()
+
+    def postbuild():
+
+`postbuild` is used to make binders.
+
+        return [install(), build(), docs()]
+
+    def docs():
+        """build the docs."""
+        File('docs').mkdir(parents=True, exist_ok=True)
+        LongRunning("jb toc . ").execute()
+        CONFIG = File("_config.yml")
+        CONFIG.dump(
+            CONFIG.load(), dgaf.template._config,
+            repository=dict(url=REPO.remote("origin").url[:-len(".git")])
+        )
+        LongRunning("jb build .").execute()
+        File("html").symlink_to(File("_build/html"), True)
 
 
-    def python():
-        """walk through the directory and add init files and main files."""
-        return
+    def blog(jb: bool = True) -> File("conf.py"):
+        """configure a blog with nikola."""
+        return [
+            LongRunning("nikola init").execute(),
+            LongRunning("jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb"
+                        ).execute()  # should add markup to rst and markdown.
 
+        ]        
 
     def test(unittest: bool = False, pytest: bool = True, tox: bool = False):
         """test the project."""
@@ -137,49 +221,6 @@ load in all the configuration details we can.
         return
 
 
-    def calculate_deps(conda: bool = True, pip: bool = True) -> (
-        File("environment.yml") or File("environment.yaml"),
-        File("requirements.txt")
-    ):
-        """calculate dependencies for a project using depfinder."""
-        if conda:
-            dgaf.util.make_conda_pip_envs()
-        return
-
-
-    def docs() -> []:
-        """build the docs."""
-        return [LongRunning("jb init && jb toc").execute(), LongRunning("jb build").execute()]
-
-
-    def blog(jb: bool = True) -> File("conf.py"):
-        """configure a blog with nikola."""
-        return [
-            LongRunning("nikola init").execute(),
-            LongRunning("jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb"
-                        ).execute()  # should add markup to rst and markdown.
-
-        ]
-
-
-    def update(pip: bool = True,  conda: bool = True, mamba: bool = False,
-            poetry: bool = False):
-        """update the environment.
-        what file can be produced here?"""
-        if conda:
-            file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
-            if file:
-                return LongRunning(F"conda env update --file {file}").execute()
-        if pip:
-            file = dgaf.File("requirements.txt")
-            if file:
-                return LongRunning(F"pip install -r {file}").execute()
-        return
-
-
-    def build(flit: bool = True, setuptools: bool = True):
-        if flit:
-            return LongRunning("flit build").execute()
 
 
     def jupyter():
@@ -314,20 +355,9 @@ load in all the configuration details we can.
 
         """
 
-
-    def postBuild() -> (
-        [calculate_deps, build], ...
-    ): 
-
-the postBuild command is assists in building development environments on binders.
-
-    # doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader(
-    # vars(dodo))).run(sys.argv[1:])
-
-
     app = typer.Typer()
-    [app.command()(x) for x in [configure, python, test, lint,
-                                calculate_deps, docs, blog, update, build, jupyter, js, init, install] #grayskull
+    [app.command()(x) for x in [configure, test, lint,
+                                docs, blog, build, jupyter, js, calculate, install, postbuild] #grayskull
     ]
 
 [`flit`]: #

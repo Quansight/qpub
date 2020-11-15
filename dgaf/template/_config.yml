@@ -1,2 +1,19 @@
+title: ""
+author: ""
+logo: ""
+
 execute:
-  execute_notebooks: 'off'
+  execute_notebooks: "off"
+
+latex:
+  latex_documents:
+    targetname: book.tex
+
+repository:
+  url: 
+  path_to_book: docs  # Optional path to your book, relative to the repository root
+  branch: ""
+
+html:
+  use_issues_button: true
+  use_repository_button: true

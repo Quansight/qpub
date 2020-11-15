@@ -97,7 +97,7 @@ class File(Path):
     def dump(self, *object, **kwargs):
         if self.is_txt():
             return self.write_text("\n".join(object))
-        object += (kwargs,)
+        object = (kwargs,) + object
         object = merge(*object)
         suffix = self.suffix.lstrip(".")
         suffix = compat.get(suffix, suffix)
