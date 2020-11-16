@@ -1,11 +1,6 @@
 name: test
 
-on:
-  pull_request:
-    branches: ["*"]
-  push:
-    branches: [master]
-
+on: [push, pull_request]
 jobs:
   test:
     name: ${{ matrix.os }} ${{ matrix.python-version }}
