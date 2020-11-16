@@ -41,8 +41,8 @@ def pip_to_conda(write=True, to=None):
     return data
 
 
-def to_flit(write=True, to=PYPROJECT):
-    current = to.load()
+def to_pyproject(write=True, to=PYPROJECT):
+    current = merge(to.load(), dgaf.template.poetry)
     metadata = {
         "author": current["/tool/flit/metadata/author"] or REPO.commit().author.name,
         "author-email": current["/tool/flit/metadata/author-email"]
