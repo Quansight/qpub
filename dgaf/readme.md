@@ -43,6 +43,7 @@ split conda dependencies from pip dependencies.
 
     def install():
         discover()
+        configure()
         split_dependencies()
         data = PYPROJECT.load()
         if data['/build-system/build-backend']:
