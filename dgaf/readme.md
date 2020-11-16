@@ -7,7 +7,7 @@
     from doit.tools import LongRunning
     from dgaf.files import *
 
-    __all__ = "infer preinstall develop install postbuild conda docs blog action_test".split()
+    __all__ = "infer preinstall develop install postbuild conda docs blog".split()
 
 ## infer the environment
 
@@ -106,12 +106,6 @@ build a blog with nikola
                         ).execute()  # should add markup to rst and markdown.
 
         ]
-
-    def action_test():
-
-an action to test a package on github.
-
-        return infer(), preinstall(), install(), test()
 
     def test():
         """test the project."""
