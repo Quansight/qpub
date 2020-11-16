@@ -2,7 +2,7 @@
 
 `dgaf` expands compact content into development, documentation, and testing environments.
 
-    import git, typing, dgaf, doit, shutil, typer, sys
+    import git, typing, dgaf, doit, shutil, typer, sys, is
     from dgaf import File, merge
     from doit.tools import LongRunning
     from dgaf.files import *
@@ -108,7 +108,15 @@ build a blog with nikola
         ]
 
     def test():
-        """test the project."""
+
+test the project
+
+        if os.getenv("CI"):
+
+install a package that interfaces pytest with github actions annotations.
+
+              LongRunning("python -m pip install pytest-github-actions-annotate-failures").execute()
+
         return LongRunning("pytest").execute()
         return LongRunning("tox").execute()
 
