@@ -12,30 +12,7 @@ the dgaf api. an opinionated cli of cli's.
     from doit.tools import LongRunning
     import typing
 
-
-    PYPROJECT = File("pyproject.toml") 
-    GITIGNORE = File(".gitignore")
-    POSTBUILD = File("postBuild")
-    README = File("readme.md")
-    REQUIREMENTS = File("requirements.txt")
-    ENVIRONMENT = File("environment.yml") or File("environment.yaml")
-    DOCS = File("docs") # a convention with precedence from github
-    GITHUB = File(".github")
-    WORKFLOWS = GITHUB / "workflows"
-    ENV = dgaf.util.Dict(__import__("os").environ)
-    CONDA_ENV = ENV["/CONDA_DEFAULT_ENV"]
-    CONDA_EXE = ENV["/CONDA_EXE"]
-    CONDA = bool(CONDA_EXE)
-    FILES = [
-        x for x in (
-            File(x) for x in git.Git().ls_files().splitlines()
-        ) if x not in (POSTBUILD,)
-    ]
-    REPO = git.Repo()
-
-## `doit`
-
-    DOIT_CFG = File(".doit.cfg")
+    from dgaf.files import *
 
 ## configure the `"pyproject.toml"`
 
@@ -43,138 +20,40 @@ the dgaf api. an opinionated cli of cli's.
 
 Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s base templates.
 
-        submodules = [
-            File(x.path) for x in REPO.submodules
-        ]
-        
-        directories = list(set(
-            x.parent for x in FILES if (x.parent not in submodules) 
-            and (x.parent != File()) and (x.parent not in (DOCS, WORKFLOWS, GITHUB))
-        ))
-        
-        top_level = [
-            x for x in directories if x.parent == File()
-        ]
-
-        if top_level:
-            if len(top_level) == 1:
-                name = str(top_level[0])
-        
-
 find the name from the python files.
-
-        PYPROJECT = File("pyproject.toml") 
-
-load in the existing configuration with other `dgaf` defaults.
-
-        CONFIG = merge(PYPROJECT.load(), dgaf.template.poetry)
-
-        CONFIG["/tool/poetry/name"] = CONFIG["/tool/poetry/name"] or name
-
-infer version and description information from the existing content.
-
-
-        CONFIG[
-            "/tool/poetry/version"
-        ] = CONFIG["/tool/poetry/version"] or __import__("datetime").date.today().strftime("%Y.%m.%d")
-
-
-        CONFIG[
-            "/tool/poetry/description"
-        ] = CONFIG["/tool/poetry/description"]
-
-
-if author information from git.
-
         
-        CONFIG[
-            "/tool/poetry/authors"
-        ] = CONFIG["/tool/poetry/authors"] or [
-            F"{REPO.commit().author.name} <{REPO.commit().author.email}>"
-        ]
+        dgaf.converters.to_flit()
 
-        # find the projects and append them to the configuration.
+## discover dependencies
 
-        PYPROJECT.dump(CONFIG)
-
-## initialize the configured `"pyproject.toml"` file
+discover dependencies and hard code them to the requirements.txt file.
 
     def discover():
 
-discover the dependencies for project.
+discover the dependencies for project using `depfinder`
         
         REQUIREMENTS.dump(*dgaf.util.depfinder(*FILES).union(REQUIREMENTS.load()))
-
-    def calculate() -> False:
-
-`dgaf` relies on `git` and `File("pyproject.toml")` to initialize a project.
-
-`init` builds the `File("pyproject.toml")` configuration for `flit` and `poetry`
-        
-        configure()
-        if REQUIREMENTS:
-            LongRunning("poetry config virtualenvs.create false --local").execute()
-            LongRunning(F"poetry add {' '.join(REQUIREMENTS.load())}").execute()
 
     def split_dependencies():
 
 split conda dependencies from pip dependencies.
 
         if not CONDA: return
-
-        CONFIG = PYPROJECT.load()
-        ENVIRONMENT.dump(
-            ENVIRONMENT.load(), dependencies=REQUIREMENTS.load(), name=CONFIG["/tool/poetry/name"]
-        )
-        env = ENVIRONMENT.load()
-        cmd = doit.tools.CmdAction(
-            " ".join(
-                ["conda install --dry-run --json"]
-                + [x for x in env.get("dependencies", []) if isinstance(x, str)]
-            )
-        )
-        cmd.execute()
-        result = dgaf.util.Dict(__import__("json").loads(cmd.out))
-        if "success" in result:
-            ...
-        if "error" in result:
-            if result["/packages"]:
-                REQUIREMENTS.dump(*result["/packages"])
-                env = ENVIRONMENT.load()
-                env["dependencies"] = [
-                    x for x in env["dependencies"] if x not in result["packages"]
-                ]
-                for dep in env["dependencies"]:
-                    if isinstance(dep, dict) and "pip" in dep:
-                        pip = dep
-                else:
-                    pip = dict(pip=[])
-                    env["dependencies"].append(pip)
-                
-                pip["pip"] = list(set(pip["pip"]).union(result["packages"]))
-
-                if "pip" not in env["dependencies"]:
-                    env["dependencies"] += ["pip"]
-
-                env["dependencies"] = list(
-                    set(x for x in env["dependencies"] if isinstance(x, str))
-                ) + [pip]
-
-                ENVIRONMENT.dump(env)
-
+        dgaf.converters.pip_to_conda()
 
     def install():
-        [
+        discover()
+        split_dependencies()
+        data = PYPROJECT.load()
+        if data['/build-system/build-backend'].startswith("flit_core"):
+            LongRunning("flit install -s").execute()
 
-            discover(),
-            split_dependencies(),
-            calculate(),
-            LongRunning("poetry install").execute()
-        ]
-
-    def build(poetry: bool = True, setuptools: bool = True):
+    def build(flit: bool = True,poetry: bool = True, setuptools: bool = True):
         if poetry:
             return LongRunning("poetry build").execute()
+
+        if poetry:
+            return LongRunning("flit build").execute()
 
     def postbuild():
 
@@ -358,7 +237,7 @@ split conda dependencies from pip dependencies.
 
     app = typer.Typer()
     [app.command()(x) for x in [configure, test, lint,
-                                docs, blog, build, jupyter, js, calculate, install, postbuild] #grayskull
+                                docs, blog, build, jupyter, js, install, postbuild] #grayskull
     ]
 
 [`flit`]: #
