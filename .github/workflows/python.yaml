@@ -31,6 +31,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
-      - run: python -m dgaf preinstall
+      - run: python -m dgaf infer preinstall
       - run: python -m dgaf install
+      - run: python -m pip install pytest-github-actions-annotate-failures
       - run: dgaf test
