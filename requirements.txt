@@ -1,7 +1,7 @@
 # dgaf relies on high level packages do acheive large units of work
 doit
 gitpython
-poetry
+flit
 anyconfig
 python-dotenv
 toml
