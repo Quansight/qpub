@@ -7,7 +7,7 @@
     from doit.tools import LongRunning
     from dgaf.files import *
 
-    __all__ = "infer preinstall develop install postbuild conda docs blog".split()
+    __all__ = "infer preinstall develop install postbuild conda test docs blog".split()
 
 ## infer the environment
 
