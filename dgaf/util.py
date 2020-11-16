@@ -6,7 +6,6 @@ import jsonpointer
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
-pkg2pip = dict(git="GitPython")
 
 
 class Dict(dict):

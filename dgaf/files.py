@@ -19,6 +19,7 @@ FILES = [
 ]
 GITHUB = File(".github")
 GITIGNORE = File(".gitignore")
+INDEX = File("index.html")
 POSTBUILD = File("postBuild")
 PYPROJECT = File("pyproject.toml")
 README = File("readme.md")

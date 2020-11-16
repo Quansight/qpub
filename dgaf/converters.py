@@ -4,6 +4,23 @@ from dgaf import File, merge
 from dgaf.files import *
 
 
+def to_deps():
+    pyproject = PYPROJECT.load()
+    dependencies = (
+        set(dgaf.util.depfinder(*FILES))
+        .union(pyproject["/tool/flit/metadata/requires"] or [])
+        .union(list(pyproject["/tool/poetry/dependencies"] or []))
+        .union(REQUIREMENTS.load())
+    )
+    # .union(ENVIRONMENT.load())
+    # .union(SETUP.load())
+
+    for x in "python".split():
+        x in dependencies and dependencies.remove(x)
+
+    return list(dependencies)
+
+
 def pip_to_conda(write=True, to=None):
     to = to or ENVIRONMENT
     data = dict(dependencies=list(REQUIREMENTS.load()))
@@ -73,3 +90,74 @@ def to_flit(write=True, to=PYPROJECT):
     if write:
         to.dump(data)
     return data
+
+
+def flit_to_setup():
+    """convert flit metadata to an executable setuptools fiile."""
+    metadata = PYPROJECT.load()["/tool/flit/metadata"]
+    ep = PYPROJECT.load()["/tool/flit/entrypoints"]
+    if ep:
+        for k, v in ep.items():
+            ep[k] = list(map(" = ".join, v.items()))
+    setup = dict(
+        name=metadata["module"],
+        version=__import__("datetime").date.today().strftime("%Y.%m.%d"),
+        author=metadata["author"],
+        author_email=metadata["author-email"],
+        description="",
+        long_description=README.read_text(),
+        long_description_content_type="text/markdown",
+        url=metadata["home-page"],
+        # license="BSD-3-Clause",
+        install_requires=metadata["requires"],
+        # include_package_data=True,
+        packages=[metadata["module"]],
+        classifiers=[],
+        cmdclass={},
+        entry_points=ep,
+    )
+
+    SETUP.write_text(
+        f"""__name__ == "__main__" and __import__("setuptools").setup(**{
+        __import__("json").dumps(setup)
+    })"""
+    )
+
+
+def to_conda():
+    import json
+    import doit
+
+    pip = REQUIREMENTS.load()
+    cmd = doit.tools.CmdAction(" ".join(["conda install --dry-run --json"] + pip))
+
+    cmd.execute()
+    result = json.loads(cmd.out)
+    env = merge(
+        ENVIRONMENT.load(),
+        dict(name="notebook", channels=["conda-forge"], dependencies=pip),
+    )
+    if "success" in result:
+        ENVIRONMENT.dump(env)
+        return
+    if "error" in result:
+        if result.get("packages"):
+            env["dependencies"] = [
+                x for x in env["dependencies"] if x not in result["packages"]
+            ]
+            for dep in env["dependencies"]:
+                if isinstance(dep, dict) and "pip" in dep:
+                    pip = dep
+            else:
+                pip = dict(pip=[])
+                env["dependencies"].append(pip)
+            pip["pip"] = list(set(pip["pip"]).union(result["packages"]))
+
+            if pip["pip"] and "pip" not in env["dependencies"]:
+                env["dependencies"] += ["pip"]
+
+            env["dependencies"] = list(
+                set(x for x in env["dependencies"] if isinstance(x, str))
+            ) + [pip]
+
+            ENVIRONMENT.dump(env)
