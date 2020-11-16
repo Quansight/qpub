@@ -74,15 +74,26 @@ class File(Path):
     def is_env(self):
         return self.suffix == ".env" or self.stem == ".env"
 
+    def read_text_lines(self):
+        return [
+            line
+            for line in map(str.strip, self.read_text().splitlines())
+            if line and not line.startswith("# ")
+        ]
+
+    def is_gitignore(self):
+        return (
+            self.suffix == ".gitignore" if self.suffix else self == dgaf.files.GITIGNORE
+        )
+
     def load(self):
+        if self.is_gitignore():
+
+            return self.read_text_lines()
+
         if self.is_txt():
             try:
-                return [
-                    line
-                    for line in map(str.strip, self.read_text().splitlines())
-                    if line and not line.startswith("# ")
-                ]
-                list(filter(bool, map(str.strip, self.read_text().splitlines())))
+                return self.read_text_lines(self)
             except FileNotFoundError:
                 return []
 
@@ -95,7 +106,7 @@ class File(Path):
             return {}
 
     def dump(self, *object, **kwargs):
-        if self.is_txt():
+        if self.is_txt() or self.is_gitignore():
             return self.write_text("\n".join(object))
         object = (kwargs,) + object
         object = merge(*object)
@@ -123,12 +134,21 @@ class Module(str):
 
 def merge(a, b, *extras):
     """merge dictionaries.  """
-    a, b = a or {}, b or {}
-
     if extras:  # reduce the arity until we have a binop
         b = merge(b, *extras)
-    for k in set(a).union(b):
-        kind = type(a[k] if k in a else b[k])
+
+    if isinstance(a or b, (str, int, float)):
+        return a or b
+    if isinstance(a or b, (tuple, list)):
+        return type(a or b)(a + b)
+
+    a, b = a or {}, b or {}
+
+    for k in iter:
+        if isinstance(a or b, dict):
+            kind = type(a[k] if k in a else b[k])
+        else:
+            kind = type(a or b)
         if k not in a:
             a[k] = kind()
         if issubclass(kind, dict):
@@ -237,59 +257,3 @@ def depfinder(*files) -> set:
         deps = deps.union(file.imports())
     deps.discard("dgaf")
     return deps
-
-
-def typer_to_doit(app):
-    import doit
-
-    for command in app.registered_commands:
-        returns = command.callback.__annotations__.get("return", [])
-        # the return annotation only gets complication if it is a tuple.
-        file_dep, targets, extras = {}, {}, {}
-        if isinstance(returns, tuple):
-            # def f()-> (..., "foo.txt")
-            # def g()-> ("foo.txt", ["bar.txt"])
-            # def h()-> (["foo.txt", g], [])
-            file_dep, targets = returns
-        elif isinstance(returns, bool):
-            # def h()-> False
-            extras.update(updatetodate=[returns])
-        else:
-            file_dep, targets = [], returns
-
-        if not isinstance(file_dep, list):
-            file_dep = [file_dep]
-
-        if not isinstance(targets, list):
-            targets = [targets]
-
-        file_dep == [...] and file_dep.pop()
-        targets == [...] and targets.pop()
-
-        task_dep = []
-        # split callable tasks from file dependencies
-        pop = []
-        for i, x in enumerate(file_dep):
-            if callable(x):
-                task_dep += [x.__name__]
-                pop.append(i)
-        for x in reversed(pop):
-            file_dep.pop(x)
-
-        # do something about globs
-        ...
-
-        # decorate the function according to the doit specification
-        command.callback.create_doit_tasks = lambda: dict(
-            actions=[command.callback],
-            file_dep=file_dep,
-            task_dep=task_dep,
-            targets=targets,
-            **extras
-        )
-
-    return doit.doit_cmd.DoitMain(
-        doit.cmd_base.ModuleTaskLoader(
-            {x.callback.__name__: x.callback for x in app.registered_commands}
-        )
-    )
