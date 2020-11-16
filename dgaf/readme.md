@@ -22,7 +22,7 @@ Read in any existing `"pyproject.toml"` information and merge it with `dgaf`'s b
 
 find the name from the python files.
         
-        dgaf.converters.to_flit()
+        dgaf.converters.to_pyproject()
 
 ## discover dependencies
 
