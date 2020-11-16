@@ -51,11 +51,12 @@ split conda dependencies from pip dependencies.
                 LongRunning("flit install -s").execute()
 
     def build(flit: bool = True,poetry: bool = True, setuptools: bool = True):
+        if flit:
+            return LongRunning("flit build").execute()
+
         if poetry:
             return LongRunning("poetry build").execute()
 
-        if poetry:
-            return LongRunning("flit build").execute()
 
     def postbuild():
 
