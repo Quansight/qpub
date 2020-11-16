@@ -24,12 +24,27 @@ the deathbeds generalized automation framework provides opinionated tools for ex
 
     def task_dev():
 
-install the requirements and use `dgaf` to generate and install dependencies.
+install dgaf in development mode.
 
         return dict(
             actions="""
     pip install -rrequirements.txt
-    python -m dgaf install
+    python -m dgaf infer develop
+        """.strip().splitlines(), 
+            targets=["pyproject.toml"], 
+            file_dep=["requirements.txt"],
+            uptodate=[False]
+        )
+
+
+    def task_preinstall():
+
+install the built dgaf.
+
+        return dict(
+            actions="""
+    pip install -rrequirements.txt
+    python -m dgaf infer preinstall
         """.strip().splitlines(), 
             targets=["pyproject.toml"], 
             file_dep=["requirements.txt"],
