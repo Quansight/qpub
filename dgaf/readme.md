@@ -2,7 +2,7 @@
 
 `dgaf` expands compact content into development, documentation, and testing environments.
 
-    import git, typing, dgaf, doit, shutil, typer, sys, is
+    import git, typing, dgaf, doit, shutil, typer, sys, os
     from dgaf import File, merge
     from doit.tools import LongRunning
     from dgaf.files import *
