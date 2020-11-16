@@ -31,6 +31,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
-      - run: pip install doit git+https://github.com/deathbeds/tingle && doit preinstall
+      - run: pip install doit git+http://github.com/deathbeds/tingle && doit preinstall
       - run: python -m dgaf install
       - run: dgaf test
