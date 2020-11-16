@@ -45,8 +45,9 @@ split conda dependencies from pip dependencies.
         discover()
         split_dependencies()
         data = PYPROJECT.load()
-        if data['/build-system/build-backend'].startswith("flit_core"):
-            LongRunning("flit install -s").execute()
+        if data['/build-system/build-backend']:
+            if data['/build-system/build-backend'].startswith("flit_core"):
+                LongRunning("flit install -s").execute()
 
     def build(flit: bool = True,poetry: bool = True, setuptools: bool = True):
         if poetry:
