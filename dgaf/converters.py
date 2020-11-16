@@ -65,7 +65,7 @@ def to_pyproject(write=True, to=PYPROJECT):
             metadata["module"] = current["/tool/flit/metadata/module"] or str(
                 TOP_LEVEL[0]
             )
-    data = merge(dict(tool=dict(flit=dict(metadata=metadata))), to.load())
+    data = merge(current, dict(tool=dict(flit=dict(metadata=metadata))))
 
     data["/tool/flit/metadata/requires"] = [
         x for x in data["/tool/flit/metadata/requires"] if not x.startswith("git+")
