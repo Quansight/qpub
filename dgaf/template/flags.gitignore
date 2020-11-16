@@ -1,6 +1,7 @@
 requirements.txt
 environment.y*ml
 pyproject.toml
+!setup.py
 !poetry.lock
 !dodo.py
 postBuild

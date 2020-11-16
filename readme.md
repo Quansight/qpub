@@ -1,54 +1,24 @@
 # deathbeds generalized automation framework
 
-the deathbeds generalized automation framework provides opinionated tools for deploying build, testing, and documentation tools for interactive python environments.
+the deathbeds generalized automation framework provides opinionated tools for expanding content into development and documentation tools. `dgaf` sources opinions across the python/jupyter ecosystem so folks can focus on content without contest and context.
 
-`dgaf` infers package information from the content in a repo and unites it with the git history to compose 
+## what does `dgaf` do?
 
-## Installation
+`dgaf` is a designed to be a compact CLI that will expands content into different environments for development, testing, and documentation. 
 
-`dgaf` can infer packages from the content provided; it will generate.
-
-* git backed
-
-
-## postBuild
-
-the first goal of `dgaf` is to make it easy to deploy development environments on binders. often binders are composed to be reproducible; `dgaf` wants binder to be a reproducible development environment.
-
-## conventions
+1. infer and export the environment from existing content.
+2. install the dependencies
+3. install the development package
+4. build the package as a wheel
+5. build a blog and documentation
 
 
+## everything is documentation
 
-dgaf is a project automation system built around a pyproject.toml. it automates setting up interactive python environments on binder.
+### expanding environments
 
 
 
-# rely on high-level tools
-
-1. pre-build
-    1. Discover and install dependencies from existing content.
-    2. Autoformatting
-    3. Discover and install a local development version of the module.
-    4. Build and install the module.
-2. post-build
-    1. Test the module
-    2. Build documentation
-
-
-
-
-
-## flit and pip native
-
-
-        
-# deploy binder
-
-set up a development environment too.
-
-# development binders
-
-commonly, binders are created post hoc from code for the sake of reproducible notebooks. reproducability is a minimum requirements for binder. binder can be more useful if a proper development environments is installed.
 
 # development
 

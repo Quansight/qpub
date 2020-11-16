@@ -83,7 +83,7 @@ class File(Path):
 
     def is_gitignore(self):
         return (
-            self.suffix == ".gitignore" if self.suffix else self == dgaf.files.GITIGNORE
+            self.suffix == ".gitignore" if self.suffix else self == File(".gitignore")
         )
 
     def load(self):
@@ -93,7 +93,7 @@ class File(Path):
 
         if self.is_txt():
             try:
-                return self.read_text_lines(self)
+                return self.read_text_lines()
             except FileNotFoundError:
                 return []
 
@@ -107,6 +107,7 @@ class File(Path):
 
     def dump(self, *object, **kwargs):
         if self.is_txt() or self.is_gitignore():
+            object = object[0] if object else []
             return self.write_text("\n".join(object))
         object = (kwargs,) + object
         object = merge(*object)
@@ -144,7 +145,7 @@ def merge(a, b, *extras):
 
     a, b = a or {}, b or {}
 
-    for k in iter:
+    for k in set(a).union(b):
         if isinstance(a or b, dict):
             kind = type(a[k] if k in a else b[k])
         else:

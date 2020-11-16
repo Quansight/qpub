@@ -39,5 +39,5 @@ DIRECTORIES = list(
 )
 TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
 
-IGNORED = merge(template.flags, template.gitignore, GITIGNORE.load())
-FLAGGED = [x for x in ignored if x.startswith("!")]
+IGNORED = dgaf.merge(dgaf.template.flags, dgaf.template.gitignore, GITIGNORE.load())
+FLAGGED = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
