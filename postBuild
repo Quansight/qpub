@@ -1,1 +1,1 @@
-python -m dgaf postBuild
+python -m dgaf postbuild
