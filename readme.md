@@ -31,7 +31,6 @@ install dgaf in development mode.
     pip install -rrequirements.txt
     python -m dgaf infer develop
         """.strip().splitlines(), 
-            targets=["pyproject.toml"], 
             file_dep=["requirements.txt"],
             uptodate=[False]
         )
@@ -46,7 +45,6 @@ install the built dgaf.
     pip install -rrequirements.txt
     python -m dgaf infer preinstall
         """.strip().splitlines(), 
-            targets=["pyproject.toml"], 
             file_dep=["requirements.txt"],
             uptodate=[False]
         )
