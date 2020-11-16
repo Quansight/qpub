@@ -140,7 +140,7 @@ build a wheel the python module
         """install javascript environment and dependencies."""
         return
 
-    [dgaf.app.command()(x) for x in map(local().get, __all__)]
+    [dgaf.app.command()(x) for x in map(locals().get, __all__)]
 
 [`flit`]: #
 [`poetry`]: #
