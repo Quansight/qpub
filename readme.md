@@ -1,17 +1,22 @@
 # deathbeds generalized automation framework
 
-the deathbeds generalized automation framework provides opinionated tools for publishing python. `dgaf` is an opinionated command line interface for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `dgaf` tries to aggregate best present and future practices for publishing different code artifacts.
+the deathbeds generalized automation framework provides opinionated tools for publishing python.
 
-`dgaf` is good for small project where content is the paramount focus. for older projects, `dgaf` may be a good test for posting old build chains to modern python conventions.
+`dgaf` is a consistent CLI for publishing different forms of content in different environments (eg. local develop/install, github actions testing, publishing to github pages, deploying binders). it encodes different opinions for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `dgaf` tries to aggregate best present and future practices for publishing different code artifacts.
+
+`dgaf` is good for small project where content is :crown:. for older projects, `dgaf` may be a good test for transitioning old build chains to modern python conventions.
 
 ## what does `dgaf` do?
 
-`dgaf` works across different environments like conda, pip, and tox. it can infer these environment conditions from partial information in canonical configuration files and tracked content. with the configuration files, it can execute difference services for publishing facets of the project.
+`dgaf` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `dgaf` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or 
+
+
+ works across different environments like conda, pip, and tox. it can infer these environment conditions from partial information in canonical configuration files and tracked content. with the configuration files, it can execute difference services for publishing facets of the project.
 
 some features of `dgaf` are:
 
 * `dgaf infer` discovers dependencies and updates the requirements in different configuration files.
-* `dgaf preinstall` installs the environment dependencies
+* `dgaf setup` installs the environment dependencies
 * `dgaf develop` makes a development package of the project
 * `dgaf install` installs the project.
 * `dgaf test` run the tests
@@ -50,14 +55,14 @@ install dgaf in development mode.
         )
 
 
-    def task_preinstall():
+    def task_setup():
 
 install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux.
 
         return dict(
             actions="""
     pip install -rrequirements.txt
-    python -m dgaf infer preinstall
+    python -m dgaf infer setup
         """.strip().splitlines(), 
             file_dep=["requirements.txt"],
             uptodate=[False]
