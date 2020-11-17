@@ -1,1 +1,1 @@
-python -m dgaf postbuild
+python -m dgaf binder
