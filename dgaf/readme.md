@@ -3,7 +3,7 @@
 `dgaf` expands compact content into development, documentation, and testing environments.
 
     import git, typing, dgaf, doit, shutil, typer, sys, os
-    from dgaf import File, merge
+    from dgaf import File, merge, files as f
     from doit.tools import LongRunning
     from dgaf.files import *
     $RAISE_SUBPROC_ERROR = True
@@ -22,11 +22,21 @@ infer the dependencies from the existings repository contents.
 
 inference looks through common python and conda files along with using depfinder to infer the contents of notebooks and scripts. the contents are written to `REQUIREMENTS`.
 
-        REQUIREMENTS.dump(dgaf.converters.to_deps())
+        requirements = dgaf.converters.to_deps()
+        if f.REQUIREMENTS not in f.INCLUDE:
+            f.REQUIREMENTS.dump(requirements)
 
 `PYPROJECT and SETUP` files are then generated from the requirements.
 
-        dgaf.converters.to_flit(), dgaf.converters.flit_to_setup()
+        if f.PYPROJECT not in f.INCLUDE:
+            
+            dgaf.converters.to_flit(requirements)
+            
+        if f.SETUPPY not in f.INCLUDE:
+            dgaf.converters.flit_to_setup()
+
+        if f.CONDA and f.ENVIRONMENT not in f.INCLUDE:
+            conda()            
 
     def conda():
 
@@ -39,17 +49,18 @@ when `CONDA` is available, `ENVIRONMENT` files created. for example, we'll prefe
 install dependencies from `CONDA, REQUIREMENTS` before building the package.
 
         if CONDA and ENVIRONMENT:
-            LongRunning(F"conda env update {ENVIRONMENT}")
+            ![conda env update @(ENVIRONMENT)]
+
         if REQUIREMENTS:
-            LongRunning(F"pip install {REQUIREMENTS}")
+            ![pip install @(REQUIREMENTS)]
 
         
     def develop():
 
 install development versions of the local packages.
 
-        if SETUP:
-            return $[pip install -e.]
+        if f.SETUPPY:
+            return $[pip install -e. ]
 
         data = PYPROJECT.load()
         if data['/build-system/build-backend']:

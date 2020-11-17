@@ -58,7 +58,7 @@ def pip_to_conda(write=True, to=None):
     return data
 
 
-def to_flit(write=True, to=PYPROJECT):
+def to_flit(requirements, write=True, to=PYPROJECT):
     current = merge(to.load(), dgaf.template.poetry)
     metadata = {
         "author": current["/tool/flit/metadata/author"] or REPO.commit().author.name,
@@ -72,7 +72,7 @@ def to_flit(write=True, to=PYPROJECT):
         "requires": list(
             set(
                 (current["/tool/flit/metadata/requires"] or [])
-                + [x for x in REQUIREMENTS.load() if not x.startswith("git+")]
+                + [x for x in requirements if not x.startswith("git+")]
             )
         ),
     }
@@ -117,10 +117,44 @@ def flit_to_setup():
         entry_points=ep,
     )
 
-    SETUP.write_text(
+    SETUPPY.write_text(
         f"""__name__ == "__main__" and __import__("setuptools").setup(**{
         __import__("json").dumps(setup)
     })"""
+    )
+
+
+def flit_to_setupcfg(requirements=None):
+    """convert flit metadata to an executable setuptools fiile."""
+    metadata = PYPROJECT.load()["/tool/flit/metadata"]
+    ep = PYPROJECT.load()["/tool/flit/entrypoints"]
+
+    SETUPCFG.dump(
+        {},
+        metadata=dict(
+            name=metadata["module"],
+            version=__import__("datetime").date.today().strftime("%Y.%m.%d"),
+            author=metadata["author"],
+            description="",
+            url=metadata["home-page"],
+            packages=[metadata["module"]],
+            classifiers=[],
+            cmdclass={},
+            **{
+                "author-email": metadata["author-email"],
+                "long-description": README,
+                "long-description-content-type": "text/markdown",
+                "requires-dist": "setuptools",
+            },
+        ),
+        options={"install_requires": requirements, "entry_points": ep},
+    )
+
+    SETUP.with_suffix(".py").write_text(
+        f"""__import__("setuptools").setup(
+            setup_requires=['setup.cfg'],
+            setup_cfg=True
+        )"""
     )
 
 
