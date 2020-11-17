@@ -52,7 +52,7 @@ install dependencies from `CONDA, REQUIREMENTS` before building the package.
             ![conda env update @(ENVIRONMENT)]
 
         if f.REQUIREMENTS:
-            ![pip install @(REQUIREMENTS)]
+            ![pip install -r @(REQUIREMENTS)]
 
         
     def develop():
