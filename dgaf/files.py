@@ -11,7 +11,7 @@ CONDA_EXE = os.getenv("CONDA_EXE")
 DOCS = File("docs")  # a convention with precedence from github
 DOIT_CFG = File(".doit.cfg")
 ENV = dgaf.util.Dict()
-ENVIRONMENT = File("environment.yml") or File("environment.yaml")
+ENVIRONMENT = File("environment.yaml") or File("environment.yml")
 FILES = [
     x
     for x in (File(x) for x in git.Git().ls_files().splitlines())
@@ -27,6 +27,7 @@ REPO = git.Repo()
 REQUIREMENTS = File("requirements.txt")
 SETUP = File("setup.py")
 SUBMODULES = [File(x.path) for x in REPO.submodules]
+TOX = File("tox.ini")
 
 WORKFLOWS = GITHUB / "workflows"
 DIRECTORIES = list(

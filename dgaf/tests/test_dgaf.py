@@ -28,4 +28,7 @@ def test_merge():
 def test_cli(cli_runner):
     import dgaf
 
-    cli_runner.invoke(typer.main.get_command(dgaf.readme.app), "--help".split())
+    with __import__("tingle").Markdown():
+        import dgaf.readme
+
+    cli_runner.invoke(typer.main.get_command(dgaf.app), "--help".split())

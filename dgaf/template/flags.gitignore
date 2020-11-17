@@ -1,6 +1,8 @@
 requirements.txt
-environment.y*ml
+environment.yml
 pyproject.toml
+!tox.ini
+setup.cfg
 !setup.py
 !poetry.lock
 !dodo.py
