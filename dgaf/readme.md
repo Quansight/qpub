@@ -6,11 +6,10 @@
     from dgaf import File, merge, files as f
     from doit.tools import LongRunning
     from dgaf.files import *
-    $RAISE_SUBPROC_ERROR = True
 
 all of the CLI commands need to be defined in `__all__`.
 
-    __all__ = "infer preinstall develop install binder conda test docs blog".split()
+    __all__ = "infer setup develop install binder conda test docs blog".split()
 
 ## infer the environment
 
@@ -18,45 +17,60 @@ all of the CLI commands need to be defined in `__all__`.
 
 infer the dependencies from the existings repository contents. 
 
-        #
+a common need in reproducible environments is to define environment files for pip in a `REQUIREMENTS` or python configuration file; in scientific computing worlds `CONDA` requirements become important.
 
-inference looks through common python and conda files along with using depfinder to infer the contents of notebooks and scripts. the contents are written to `REQUIREMENTS`.
+the `infer` method uses existing configuration files like `PYPROJECT, SETUPCFG or SETUPPY`. `dgaf.converters.to_dep` walks the `git` content then uses notebooks, python scripts, and markdown to infer environment parameters.
 
-        requirements = dgaf.converters.to_deps()
-        requirements = [
-            x for x in requirements if all(
-                y.isalnum() or y in "-_" for y in x
-            )
-        ]
+        deps = dgaf.converters.to_deps()
+
         if f.REQUIREMENTS not in f.INCLUDE:
-            f.REQUIREMENTS.dump(requirements)
 
-`PYPROJECT and SETUP` files are then generated from the requirements.
+write then `REQUIREMENTS` file from the inferred dependencies
+
+            f.REQUIREMENTS.dump(deps)
 
         if f.PYPROJECT not in f.INCLUDE:
-            dgaf.converters.to_flit(requirements)
-            
+
+write the `"/tool/flit/metadata/"` to the `PYPROJECT` file
+
+            dgaf.converters.to_flit(deps)
+
         if f.SETUPPY not in f.INCLUDE:
-            dgaf.converters.flit_to_setup()
+
+create a `SETUPPY` file from the `PYPROJECT` configuration
+
+            dgaf.converters.flit_to_setup(deps)
 
         if f.CONDA and f.ENVIRONMENT not in f.INCLUDE:
-            dgaf.converters.to_conda(requirements)
 
-    def conda():
+expand the requirements into things `CONDA` can solve, and things that we need to defer `REQUIREMENTS` for
 
-when `CONDA` is available, `ENVIRONMENT` files created. for example, we'll prefer `CONDA` when creating binders.
+            conda(deps)
 
-        dgaf.converters.to_conda()
+    def conda(deps=None):
 
-    def preinstall():
+infer `CONDA` environments from different configuration files.
 
-install dependencies from `CONDA, REQUIREMENTS` before building the package.
+        deps = deps or REQUIREMENTS and REQUIREMENTS.load()
+        dgaf.converters.to_conda(deps)
+
+    def setup():
+
+setup the environment with `CONDA` or `pip`
 
         if f.CONDA and f.ENVIRONMENT:
+
+if conda is available and an `ENVIRONMENT` is available then we update the environment; this is practical on jupyterhub and binder.
+
             ![conda env update @(ENVIRONMENT)]
 
         if f.REQUIREMENTS:
+
+we fallback to install the `REQUIREMENTS` with `pip`. 
+
             ![pip install -r @(REQUIREMENTS)]
+
+these patterns are practical for developing in `CONDA` and testing in Github Actions.
 
         
     def develop():
@@ -64,17 +78,25 @@ install dependencies from `CONDA, REQUIREMENTS` before building the package.
 install development versions of the local packages.
 
         if f.SETUPPY:
+
+the `SETUPPY` is still the best way to install development versions.
+
             return $[pip install -e. ]
 
         data = f.PYPROJECT.load()
         if data['/build-system/build-backend']:
+
+if `SETUPPY` is ignored then we use flit if that backend is specified
+
             if data['/build-system/build-backend'].startswith("flit_core"):
                 $[flit install -s]
+
+> i haven't figured out how `poetry` works in develop mode.
         
 
     def install():
 
-install built versions of the local packages.
+install built versions of the local packages  with `pip`
 
         $[pip install .]
 
@@ -83,12 +105,19 @@ install built versions of the local packages.
 build a wheel the python module
 
         if f.PYPROJECT:
+
+use `flit or poetry` builds if they are the specified build backend.
+
             data = f.PYPROJECT.load()
             if data['/build-system/build-backend'].startswith("flit_core"):
                 return ![flit build]
             if data['/build-system/build-backend'].startswith("poetry"):
                 return ![poetry build]
-        if f.SETUP:
+
+        if f.SETUPPY:
+
+use `SETUPPY` as a last resort
+
             return ![python setup.py sdist bdist_wheel]
 
 
@@ -96,7 +125,7 @@ build a wheel the python module
 
 use this command to build binder environments.
 
-        return [infer(), conda(), preinstall(), develop(), build()]
+        return [infer(), setup(), develop(), build()]
 
     def docs():
 
@@ -139,7 +168,16 @@ install a package that interfaces pytest with github actions annotations.
 
 append all of the methods to the `dgaf` cli.
 
+## `dgaf` application
+
+add commands to the CLI based on the contents of `__all__`
+
     [dgaf.app.command()(x) for x in map(locals().get, __all__)]
+
+set `xonsh` to raise errors when subprocess fail.
+
+    $RAISE_SUBPROC_ERROR = True
+
 
 [`flit`]: #
 [`poetry`]: #
