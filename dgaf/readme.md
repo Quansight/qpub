@@ -23,20 +23,24 @@ infer the dependencies from the existings repository contents.
 inference looks through common python and conda files along with using depfinder to infer the contents of notebooks and scripts. the contents are written to `REQUIREMENTS`.
 
         requirements = dgaf.converters.to_deps()
+        requirements = [
+            x for x in requirements if all(
+                y.isalnum() or y in "-_" for y in x
+            )
+        ]
         if f.REQUIREMENTS not in f.INCLUDE:
             f.REQUIREMENTS.dump(requirements)
 
 `PYPROJECT and SETUP` files are then generated from the requirements.
 
         if f.PYPROJECT not in f.INCLUDE:
-            
             dgaf.converters.to_flit(requirements)
             
         if f.SETUPPY not in f.INCLUDE:
             dgaf.converters.flit_to_setup()
 
         if f.CONDA and f.ENVIRONMENT not in f.INCLUDE:
-            conda()            
+            dgaf.converters.to_conda(requirements)
 
     def conda():
 
