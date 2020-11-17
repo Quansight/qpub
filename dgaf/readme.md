@@ -135,10 +135,10 @@ build documentation with [jupyter book].
 
 
         data = PYPROJECT.load()
-        INSTALLED = is_site_package(data["/tool/flit/metadata/module"])
+        INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
-                $[pip @("install") @(".[docs]")]
+                $[@("pip") @("install") @(".[docs]")]
 
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
