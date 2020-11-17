@@ -2,6 +2,8 @@
 
 the deathbeds generalized automation framework provides opinionated tools for publishing python. `dgaf` is an opinionated command line interface for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `dgaf` tries to aggregate best present and future practices for publishing different code artifacts.
 
+`dgaf` is good for small project where content is the paramount focus. for older projects, `dgaf` may be a good test for posting old build chains to modern python conventions.
+
 ## what does `dgaf` do?
 
 `dgaf` works across different environments like conda, pip, and tox. it can infer these environment conditions from partial information in canonical configuration files and tracked content. with the configuration files, it can execute difference services for publishing facets of the project.
