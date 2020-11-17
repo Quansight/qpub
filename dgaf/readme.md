@@ -56,7 +56,7 @@ infer `CONDA` environments from different configuration files.
 
     def setup():
 
-setup the environment with `CONDA` or `pip`
+install the environment with `CONDA` or `pip` dependencies
 
         if f.CONDA and f.ENVIRONMENT:
 

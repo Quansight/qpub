@@ -1,0 +1,30 @@
+name: Python package
+on:
+  release:
+    types: [published,]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip wheel doit git+http://github.com/deathbeds/tingle
+        doit install
+    - name: Install local package
+      run: |
+        dgaf install
+    - name: Test  
+      run: dgaf test
+    - name: Build
+      run: |
+        dgaf build
+    - name: Publish package
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        user: docfast
+        password: ${{ secrets.pypi_password }}
