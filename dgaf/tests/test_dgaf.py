@@ -28,7 +28,8 @@ def test_merge():
 def test_cli(cli_runner):
     import dgaf
 
-    with __import__("tingle").Markdown():
+    __import__("tingle").loaders.XO.extensions += [".md"]
+    with __import__("tingle").loaders.XO():
         import dgaf.readme
 
     cli_runner.invoke(typer.main.get_command(dgaf.app), "--help".split())

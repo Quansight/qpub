@@ -9,7 +9,8 @@ from . import template, files, converters
 
 
 def main():
-    with __import__("tingle").Markdown():
+    __import__("tingle").loaders.XO.extensions += [".md"]
+    with __import__("tingle").loaders.XO():
         from . import readme
     cmd = typer.main.get_command(app)
     cmd.chain = True

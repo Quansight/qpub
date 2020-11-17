@@ -6,6 +6,7 @@
     from dgaf import File, merge
     from doit.tools import LongRunning
     from dgaf.files import *
+    $RAISE_SUBPROC_ERROR = True
 
 all of the CLI commands need to be defined in `__all__`.
 
@@ -48,20 +49,19 @@ install dependencies from `CONDA, REQUIREMENTS` before building the package.
 install development versions of the local packages.
 
         if SETUP:
-            LongRunning("pip install -e.").execute()
-            return
+            return $[pip install -e.]
 
         data = PYPROJECT.load()
         if data['/build-system/build-backend']:
             if data['/build-system/build-backend'].startswith("flit_core"):
-                LongRunning("flit install -s").execute()
+                $[flit install -s]
         
 
     def install():
 
 install built versions of the local packages.
 
-        LongRunning("pip install .").execute()
+        $[pip install .]
 
     def build():
 
@@ -70,16 +70,16 @@ build a wheel the python module
         if PYPROJECT:
             data = PYPROJECT.load()
             if data['/build-system/build-backend'].startswith("flit_core"):
-                return LongRunning("flit build").execute()
+                return ![flit build]
             if data['/build-system/build-backend'].startswith("poetry"):
-                return LongRunning("poetry build").execute()
+                return ![poetry build]
         if SETUP:
-            return LongRunning("python setup.py build")
+            return ![python setup.py sdist bdist_wheel]
 
 
-    def postbuild():
+    def binder():
 
-`postbuild` is used to make binders.
+use this command to build binder environments.
 
         return [infer(), conda(), preinstall(), develop(), build()]
 
@@ -88,13 +88,13 @@ build a wheel the python module
 build documentation with [jupyter book].
 
         File('docs').mkdir(parents=True, exist_ok=True)
-        LongRunning("jb toc . ").execute()
+        ![jb toc .]
         CONFIG = File("_config.yml")
         CONFIG.dump(
             CONFIG.load(), dgaf.template._config,
             repository=dict(url=REPO.remote("origin").url[:-len(".git")])
         )
-        LongRunning("jb build .").execute()
+        ![jb build .]
         if not File("html").exists():
             File("html").symlink_to(File("_build/html"), True)
 
@@ -105,9 +105,8 @@ build a blog with nikola
 
         # make decisions backed on content
         return [
-            LongRunning("nikola init").execute(),
-            LongRunning("jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb"
-                        ).execute()  # should add markup to rst and markdown.
+            $[nikola init],
+            $[jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb]
         ]
 
     def test():
@@ -118,13 +117,10 @@ test the project
 
 install a package that interfaces pytest with github actions annotations.
 
-              LongRunning("python -m pip install pytest-github-actions-annotate-failures").execute()
+              $[python -m pip install pytest-github-actions-annotate-failures]
 
-        return LongRunning("pytest").execute()
+        return $[pytest]
         
-include tox compatability for testing different environment constraints.
-
-        return LongRunning("tox").execute()
 
 append all of the methods to the `dgaf` cli.
 
