@@ -18,7 +18,7 @@ def to_deps():
     for x in "python".split():
         x in dependencies and dependencies.remove(x)
 
-    return list(dependencies)
+    return list([x for x in dependencies if all(y.isalnum() or y in "-_" for y in x)])
 
 
 def pip_to_conda(write=True, to=None):
@@ -84,15 +84,12 @@ def to_flit(requirements, write=True, to=PYPROJECT):
             )
     data = merge(current, dict(tool=dict(flit=dict(metadata=metadata))))
 
-    data["/tool/flit/metadata/requires"] = [
-        x for x in data["/tool/flit/metadata/requires"] if not x.startswith("git+")
-    ]
     if write:
         to.dump(data)
     return data
 
 
-def flit_to_setup():
+def flit_to_setup(requirements):
     """convert flit metadata to an executable setuptools fiile."""
     metadata = PYPROJECT.load()["/tool/flit/metadata"]
     ep = PYPROJECT.load()["/tool/flit/entrypoints"]
@@ -109,7 +106,7 @@ def flit_to_setup():
         long_description_content_type="text/markdown",
         url=metadata["home-page"],
         # license="BSD-3-Clause",
-        install_requires=metadata["requires"],
+        install_requires=requirements,
         # include_package_data=True,
         packages=[metadata["module"]],
         classifiers=[],
@@ -158,12 +155,14 @@ def flit_to_setupcfg(requirements=None):
     )
 
 
-def to_conda():
+def to_conda(dependencies):
     import json
     import doit
 
-    pip = REQUIREMENTS.load()
-    cmd = doit.tools.CmdAction(" ".join(["conda install --dry-run --json"] + pip))
+    pip = dependencies
+    cmd = doit.tools.CmdAction(
+        " ".join(["conda install --dry-run --json"] + dependencies)
+    )
 
     cmd.execute()
     result = json.loads(cmd.out)

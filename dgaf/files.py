@@ -8,6 +8,7 @@ import git
 CONDA = bool(os.getenv("CONDA_EXE"))
 CONDA_ENV = os.getenv("CONDA_DEFAULT_ENV")
 CONDA_EXE = os.getenv("CONDA_EXE")
+CONF = File("conf.py")
 DOCS = File("docs")  # a convention with precedence from github
 DOIT_CFG = File(".doit.cfg")
 ENV = dgaf.util.Dict()

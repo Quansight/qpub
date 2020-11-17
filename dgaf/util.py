@@ -258,3 +258,7 @@ def depfinder(*files) -> set:
         deps = deps.union(file.imports())
     deps.discard("dgaf")
     return deps
+
+
+def is_site_package(object):
+    return any(x.startswith(object) for x in __import__("site").getsitepackages())
