@@ -98,7 +98,7 @@ if `SETUPPY` is ignored then we use flit if that backend is specified
 
 install built versions of the local packages with `pip`
 
-        $[pip @("install") .]
+        pip install .
 
     def build():
 
@@ -110,15 +110,17 @@ use `flit or poetry` builds if they are the specified build backend.
 
             data = f.PYPROJECT.load()
             if data['/build-system/build-backend'].startswith("flit_core"):
-                return ![flit build]
+                flit build
+                return
             if data['/build-system/build-backend'].startswith("poetry"):
-                return ![poetry build]
+                poetry build
+                return
 
         if f.SETUPPY:
 
 use `SETUPPY` as a last resort
 
-            return ![python setup.py sdist bdist_wheel]
+            python setup.py sdist bdist_wheel
 
 
     def binder():
@@ -133,8 +135,8 @@ build documentation with [jupyter book].
 
 
         data = PYPROJECT.load()
-        if 'docs' in data["/tool/flit/requires-extra"]:
-            $[pip install @(".[docs]")]
+        if 'docs' in data["/tool/flit/metadata/requires-extra"]:
+            $[pip @("install") @(".[docs]")]
 
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
@@ -143,7 +145,7 @@ build documentation with [jupyter book].
             f.CONFIG.load(), dgaf.template._config,
             repository=dict(url=f.REPO.remote("origin").url[:-len(".git")])
         )
-        ![jb build .]
+        jb build .
         if not File("html").exists():
             File("html").symlink_to(File("_build/html"), True)
 
