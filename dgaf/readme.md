@@ -131,6 +131,11 @@ use this command to build binder environments.
 
 build documentation with [jupyter book].
 
+
+        data = PYPROJECT.load()
+        if 'docs' in data["/tool/flit/requires-extra"]:
+            $[pip install @(".[docs]")]
+
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
         f.CONFIG = File("_config.yml")
@@ -163,6 +168,25 @@ install a package that interfaces pytest with github actions annotations.
 
               $[python -m pip install pytest-github-actions-annotate-failures]
 
+        data = PYPROJECT.load()
+        INSTALLED:bool
+
+the module we're build should be installed at this point. we determine how the main package being developed is installed
+
+        
+        INSTALLED = is_site_package(
+            __import__("importlib").find_loader(
+                data["/tool/flit/metadata/module"]
+            ).path
+        )
+
+        if 'test' in data["/tool/flit/metadata/requires-extra"]:
+            if INSTALLED:
+
+if it is in site-packages, install the extra test dependencies if they are specified.
+
+                $[pip install @(".[test]")]
+
         return $[pytest]
         
 
@@ -170,7 +194,7 @@ append all of the methods to the `dgaf` cli.
 
 ## `dgaf` application
 
-add commands to the CLI based on the contents of `__all__`
+add commands to the CLI based on the contents of `__all__`. the `app` is initialized in the `"__init__.py"` using `typer.`
 
     [dgaf.app.command()(x) for x in map(locals().get, __all__)]
 
