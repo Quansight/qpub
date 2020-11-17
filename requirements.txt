@@ -7,4 +7,5 @@ toml
 depfinder
 jsonpointer
 typer
+xonsh
 git+https://github.com/deathbeds/tingle
