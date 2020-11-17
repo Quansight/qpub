@@ -4,7 +4,7 @@ gitpython
 flit
 anyconfig
 toml
-git+https://github.com/ericdill/depfinder
+depfinder<2.5
 jsonpointer
 typer
 xonsh
