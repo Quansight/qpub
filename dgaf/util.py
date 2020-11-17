@@ -260,5 +260,7 @@ def depfinder(*files) -> set:
     return deps
 
 
-def is_site_package(object):
-    return any(x.startswith(object) for x in __import__("site").getsitepackages())
+def is_site_package(name):
+    path = __import__("importlib").find_loader(name).path
+
+    return any(path.startswith(x) for x in __import__("site").getsitepackages())

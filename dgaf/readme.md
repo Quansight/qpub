@@ -135,8 +135,10 @@ build documentation with [jupyter book].
 
 
         data = PYPROJECT.load()
+        INSTALLED = is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
-            $[pip @("install") @(".[docs]")]
+            if INSTALLED:
+                $[pip @("install") @(".[docs]")]
 
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
@@ -176,11 +178,7 @@ install a package that interfaces pytest with github actions annotations.
 the module we're build should be installed at this point. we determine how the main package being developed is installed
 
         
-        INSTALLED = is_site_package(
-            __import__("importlib").find_loader(
-                data["/tool/flit/metadata/module"]
-            ).path
-        )
+        INSTALLED = is_site_package(data["/tool/flit/metadata/module"])
 
         if 'test' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
