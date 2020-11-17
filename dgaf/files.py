@@ -25,7 +25,8 @@ PYPROJECT = File("pyproject.toml")
 README = File("readme.md")
 REPO = git.Repo()
 REQUIREMENTS = File("requirements.txt")
-SETUP = File("setup.py")
+SETUPPY = File("setup.py")
+SETUPCFG = File("setup.cfg")
 SUBMODULES = [File(x.path) for x in REPO.submodules]
 TOX = File("tox.ini")
 
@@ -41,5 +42,5 @@ DIRECTORIES = list(
 )
 TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
 
-IGNORED = dgaf.merge(dgaf.template.flags, dgaf.template.gitignore, GITIGNORE.load())
-FLAGGED = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
+IGNORED = dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
+INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
