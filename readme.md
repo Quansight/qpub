@@ -24,8 +24,10 @@ some features of `dgaf` are:
 
 `dgaf` uses the `.gitignore` files to control different features. a default `dgaf` `.gitignore` will specify the configuration files that `dgaf` generates; a specific process is ignored by prepending an `!` to a configuration
 
-    tox.ini # generates tox configuration
-    !tox.ini # skips tox configuration
+```bash
+tox.ini # generates tox configuration
+!tox.ini # skips tox configuration
+```
 
 ## requirements
 
