@@ -170,15 +170,14 @@ test the project
 
 install a package that interfaces pytest with github actions annotations.
 
-              $[python -m pip install pytest-github-actions-annotate-failures]
+              python -m pip install pytest-github-actions-annotate-failures
 
         data = PYPROJECT.load()
-        INSTALLED:bool
 
 the module we're build should be installed at this point. we determine how the main package being developed is installed
 
         
-        INSTALLED = is_site_package(data["/tool/flit/metadata/module"])
+        INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
 
         if 'test' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
