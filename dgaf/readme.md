@@ -10,7 +10,7 @@
 
 all of the CLI commands need to be defined in `__all__`.
 
-    __all__ = "infer preinstall develop install postbuild conda test docs blog".split()
+    __all__ = "infer preinstall develop install binder conda test docs blog".split()
 
 ## infer the environment
 
