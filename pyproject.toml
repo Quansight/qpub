@@ -1,11 +1,48 @@
+[build-system]
+requires = [ "flit_core >=2,<4",]
+build-backend = "flit_core.buildapi"
+
+[tool.black]
+
+[tool.tox]
+
+[tool.semantic_release]
+
+[tool.poetry]
+version = ""
+name = ""
+authors = []
+description = ""
+
+[tool.coverage]
+
+[tool.dgaf.env]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+[tool.poetry.dev-dependencies]
+
+[tool.flit.metadata]
+keywords = ""
+author = "tonyfast"
+requires = [ "flit", "nbformat", "GitPython", "gitpython", "anyconfig", "xonsh", "traitlets", "jsonpointer", "toml", "typer", "doit", "depfinder", "readme", "grayskull", "nbconvert",]
+home-page = "https://github.com/deathbeds/dgaf"
+license = ""
+description-file = "readme.md"
+module = "dgaf"
+author-email = "tony.fast@gmail.com"
+
+[tool.pytest.ini_options]
+
 [tool.flit.metadata.requires-extra]
 mamba = [ "mamba",]
-conda = ["grayskull"]
+docs = [ "jupyter-book",]
 test = [ "pytest", "nbval", "pytest-click",]
-doc = [ "jupyter-book"]
-
-[tool.flit.entrypoints.console_scripts]
-dgaf = "dgaf:main"
+conda = [ "grayskull",]
 
 [tool.flit.entrypoints."nbconvert.exporters"]
 nikola = "dgaf.exporters:Nikola"
+
+[tool.flit.entrypoints.console_scripts]
+dgaf = "dgaf:main"
