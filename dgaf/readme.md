@@ -92,13 +92,13 @@ if `SETUPPY` is ignored then we use flit if that backend is specified
                 $[flit install -s]
 
 > i haven't figured out how `poetry` works in develop mode.
-        
+
 
     def install():
 
-install built versions of the local packages  with `pip`
+install built versions of the local packages with `pip`
 
-        $[pip install .]
+        $[pip @("install") .]
 
     def build():
 
