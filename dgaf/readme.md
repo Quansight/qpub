@@ -48,10 +48,10 @@ when `CONDA` is available, `ENVIRONMENT` files created. for example, we'll prefe
 
 install dependencies from `CONDA, REQUIREMENTS` before building the package.
 
-        if CONDA and ENVIRONMENT:
+        if f.CONDA and f.ENVIRONMENT:
             ![conda env update @(ENVIRONMENT)]
 
-        if REQUIREMENTS:
+        if f.REQUIREMENTS:
             ![pip install @(REQUIREMENTS)]
 
         
@@ -62,7 +62,7 @@ install development versions of the local packages.
         if f.SETUPPY:
             return $[pip install -e. ]
 
-        data = PYPROJECT.load()
+        data = f.PYPROJECT.load()
         if data['/build-system/build-backend']:
             if data['/build-system/build-backend'].startswith("flit_core"):
                 $[flit install -s]
@@ -78,13 +78,13 @@ install built versions of the local packages.
 
 build a wheel the python module
 
-        if PYPROJECT:
-            data = PYPROJECT.load()
+        if f.PYPROJECT:
+            data = f.PYPROJECT.load()
             if data['/build-system/build-backend'].startswith("flit_core"):
                 return ![flit build]
             if data['/build-system/build-backend'].startswith("poetry"):
                 return ![poetry build]
-        if SETUP:
+        if f.SETUP:
             return ![python setup.py sdist bdist_wheel]
 
 
@@ -100,10 +100,10 @@ build documentation with [jupyter book].
 
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
-        CONFIG = File("_config.yml")
-        CONFIG.dump(
-            CONFIG.load(), dgaf.template._config,
-            repository=dict(url=REPO.remote("origin").url[:-len(".git")])
+        f.CONFIG = File("_config.yml")
+        f.CONFIG.dump(
+            f.CONFIG.load(), dgaf.template._config,
+            repository=dict(url=f.REPO.remote("origin").url[:-len(".git")])
         )
         ![jb build .]
         if not File("html").exists():
