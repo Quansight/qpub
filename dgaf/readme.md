@@ -188,7 +188,7 @@ the module we're build should be installed at this point. we determine how the m
 
 if it is in site-packages, install the extra test dependencies if they are specified.
 
-                if f.OS == "nt":'
+                if f.OS == "nt":
                     python -m pip install ".[test]" "--user"
                 else:
                     python -m pip install ".[test]" 
