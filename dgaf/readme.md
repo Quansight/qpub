@@ -139,7 +139,7 @@ build documentation with [jupyter book]
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
-                if f.OS == "nt":'
+                if f.OS == "nt":
                     python -m pip install ".[docs]" "--user"
                 else:
                     python -m pip install ".[docs]" 
