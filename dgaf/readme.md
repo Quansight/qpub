@@ -81,7 +81,7 @@ install development versions of the local packages.
 
 the `SETUPPY` is still the best way to install development versions.
 
-            return $[pip install -e. ]
+            return $[pip install -e.]
 
         data = f.PYPROJECT.load()
         if data['/build-system/build-backend']:
@@ -138,7 +138,7 @@ build documentation with [jupyter book].
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
-                $[@("pip") @("install") @(".[docs]")]
+                $["pip" "install" ".[docs]"]
 
         File('docs').mkdir(parents=True, exist_ok=True)
         ![jb toc .]
@@ -184,9 +184,10 @@ the module we're build should be installed at this point. we determine how the m
 
 if it is in site-packages, install the extra test dependencies if they are specified.
 
-                $[@("pip") @("install") @(".[test]")]
+                $["pip" "install" ".[test]"]
 
-        return $[pytest]
+        pytest
+
         
 
 append all of the methods to the `dgaf` cli.
