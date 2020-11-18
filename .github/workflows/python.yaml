@@ -16,7 +16,7 @@ jobs:
         doit setup
     - name: Install local package
       run: |
-        dgaf install
+        python -m dgaf install
     - name: Test  
       run: dgaf test
   test:
