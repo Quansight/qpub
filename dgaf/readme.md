@@ -62,13 +62,13 @@ install the environment with `CONDA` or `pip` dependencies
 
 if conda is available and an `ENVIRONMENT` is available then we update the environment; this is practical on jupyterhub and binder.
 
-            ![conda env update @(ENVIRONMENT)]
+            conda env update @(ENVIRONMENT)
 
         if f.REQUIREMENTS:
 
 we fallback to install the `REQUIREMENTS` with `pip`. 
 
-            ![pip install -r @(REQUIREMENTS)]
+            pip install -r @(REQUIREMENTS)
 
 these patterns are practical for developing in `CONDA` and testing in Github Actions.
 
@@ -81,7 +81,8 @@ install development versions of the local packages.
 
 the `SETUPPY` is still the best way to install development versions.
 
-            return $[pip install -e.]
+            pip install -e.
+            return
 
         data = f.PYPROJECT.load()
         if data['/build-system/build-backend']:
@@ -89,7 +90,7 @@ the `SETUPPY` is still the best way to install development versions.
 if `SETUPPY` is ignored then we use flit if that backend is specified
 
             if data['/build-system/build-backend'].startswith("flit_core"):
-                $[flit install -s]
+                flit install -s
 
 > i haven't figured out how `poetry` works in develop mode.
 
@@ -98,7 +99,7 @@ if `SETUPPY` is ignored then we use flit if that backend is specified
 
 install built versions of the local packages with `pip`
 
-        pip install .
+        python -m pip install .
 
     def build():
 
@@ -131,17 +132,17 @@ use this command to build binder environments.
 
     def docs():
 
-build documentation with [jupyter book].
+build documentation with [jupyter book]
 
-
+        
         data = PYPROJECT.load()
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
-                $["pip" "install" ".[docs]"]
+                python -m pip install ".[docs]"
 
         File('docs').mkdir(parents=True, exist_ok=True)
-        ![jb toc .]
+        jb toc .
         f.CONFIG = File("_config.yml")
         f.CONFIG.dump(
             f.CONFIG.load(), dgaf.template._config,
@@ -157,10 +158,9 @@ build documentation with [jupyter book].
 build a blog with nikola
 
         # make decisions backed on content
-        return [
-            $[nikola init],
-            $[jupyter nbconvert --to dgaf.exporters.Nikola **/*.ipynb]
-        ]
+        nikola init
+        jupyter nbconvert --to dgaf.exporters.Nikola "**/*.ipynb"
+
 
     def test():
 
@@ -184,7 +184,7 @@ the module we're build should be installed at this point. we determine how the m
 
 if it is in site-packages, install the extra test dependencies if they are specified.
 
-                $["pip" "install" ".[test]"]
+                python -m pip install ".[test]"
 
         pytest
 
