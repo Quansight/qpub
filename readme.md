@@ -1,66 +1,77 @@
 # deathbeds generalized automation framework
 
-the deathbeds generalized automation framework provides opinionated tools for deploying build, testing, and documentation tools for interactive python environments.
+the deathbeds generalized automation framework provides opinionated tools for publishing python.
 
-`dgaf` infers package information from the content in a repo and unites it with the git history to compose 
+`dgaf` is a consistent CLI for publishing different forms of content in different environments (eg. local develop/install, github actions testing, publishing to github pages, deploying binders). it encodes different opinions for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `dgaf` tries to aggregate best present and future practices for publishing different code artifacts.
 
-## Installation
+`dgaf` is good for small project where content is :crown:. for older projects, `dgaf` may be a good test for transitioning old build chains to modern python conventions.
 
-`dgaf` can infer packages from the content provided; it will generate.
+## what does `dgaf` do?
 
-* git backed
-
-
-## postBuild
-
-the first goal of `dgaf` is to make it easy to deploy development environments on binders. often binders are composed to be reproducible; `dgaf` wants binder to be a reproducible development environment.
-
-    %%file postBuild
-    pip install dgaf && dgaf postBuild
-
-## conventions
+`dgaf` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `dgaf` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or 
 
 
+ works across different environments like conda, pip, and tox. it can infer these environment conditions from partial information in canonical configuration files and tracked content. with the configuration files, it can execute difference services for publishing facets of the project.
 
-dgaf is a project automation system built around a pyproject.toml. it automates setting up interactive python environments on binder.
+some features of `dgaf` are:
 
-        dgaf add pyproject flit doit datasette binder pytest pyreverse jb
+* `dgaf infer` discovers dependencies and updates the requirements in different configuration files.
+* `dgaf setup` installs the environment dependencies
+* `dgaf develop` makes a development package of the project
+* `dgaf install` installs the project.
+* `dgaf test` run the tests
+* `dgaf docs` generates a table of contents and builds the docs with jupyter book
+* `dgaf postbuild` builds a development version of the package for binder
+
+### extra configuration
+
+`dgaf` will merge and append to existing configurations in smart ways. extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
+
+### `dgaf` flags
+
+`dgaf` uses the `.gitignore` files to control different features. a default `dgaf` `.gitignore` will specify the configuration files that `dgaf` generates; a specific process is ignored by prepending an `!` to a configuration
+
+```bash
+tox.ini # generates tox configuration
+!tox.ini # skips tox configuration
+```
+
+## requirements
+
+`dgaf` requires a git repository with content.
+# development
+
+    def task_dev():
+
+install dgaf in development mode.
+
+        return dict(
+            actions="""
+    pip install -rrequirements.txt
+    python -m dgaf infer develop
+        """.strip().splitlines(), 
+            file_dep=["requirements.txt"],
+            uptodate=[False]
+        )
 
 
-# rely on high-level tools
+    def task_setup():
 
-1. pre-build
-    1. Discover and install dependencies from existing content.
-    2. Autoformatting
-    3. Discover and install a local development version of the module.
-    4. Build and install the module.
-2. post-build
-    1. Test the module
-    2. Build documentation
+install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux.
 
-
-
-
-
-## flit and pip native
-
-
-        
-# deploy binder
-
-set up a development environment too.
-
-        pip install dgaf[mamba]
-        dgaf postBuild
-
-        dgaf add -i # interactively add things
-
-# development binders
-
-commonly, binders are created post hoc from code for the sake of reproducible notebooks. reproducability is a minimum requirements for binder. binder can be more useful if a proper development environments is installed.
+        return dict(
+            actions="""
+    pip install -rrequirements.txt
+    python -m dgaf infer setup
+        """.strip().splitlines(), 
+            file_dep=["requirements.txt"],
+            uptodate=[False]
+        )
 
 https://mozillascience.github.io/working-open-workshop/contributing/
 https://gist.github.com/bollwyvl/f6aac8d4e68e5594fad2ae7a3cacc74b
 https://gist.github.com/tonyfast/f74eb42f2a998d8e428a752ceb0cb1d1
 
 should we pre install a bunch of different pytest opinions?
+
+[github actions]: #
