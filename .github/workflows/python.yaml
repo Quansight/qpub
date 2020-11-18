@@ -13,7 +13,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip wheel doit git+http://github.com/deathbeds/tingle
-        doit install
+        doit setup
     - name: Install local package
       run: |
         dgaf install
