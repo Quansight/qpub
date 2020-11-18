@@ -139,7 +139,11 @@ build documentation with [jupyter book]
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
-                python -m pip install ".[docs]"
+                if f.OS == "nt":'
+                    python -m pip install ".[docs]" "--user"
+                else:
+                    python -m pip install ".[docs]" 
+
 
         File('docs').mkdir(parents=True, exist_ok=True)
         jb toc .
@@ -184,7 +188,10 @@ the module we're build should be installed at this point. we determine how the m
 
 if it is in site-packages, install the extra test dependencies if they are specified.
 
-                python -m pip install ".[test]"
+                if f.OS == "nt":'
+                    python -m pip install ".[test]" "--user"
+                else:
+                    python -m pip install ".[test]" 
 
         pytest
 

@@ -45,3 +45,5 @@ TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
 
 IGNORED = dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
 INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
+
+OS = os.name
