@@ -257,7 +257,7 @@ def depfinder(*files) -> set:
     for file in files:
         deps = deps.union(file.imports())
     deps.discard("dgaf")
-    return deps
+    return {x for x in deps if x not in "python"}
 
 
 def is_site_package(name):
