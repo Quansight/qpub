@@ -9,11 +9,13 @@ CONDA = bool(os.getenv("CONDA_EXE"))
 CONDA_ENV = os.getenv("CONDA_DEFAULT_ENV")
 CONDA_EXE = os.getenv("CONDA_EXE")
 CONF = File("conf.py")
+CONFIG = File("_config.yml") or File("docs/_config.yml")
+TOC = File("_toc.yml") or File("docs/_toc.yml")
 DOCS = File("docs")  # a convention with precedence from github
 DOIT_CFG = File(".doit.cfg")
 ENV = dgaf.util.Dict()
 ENVIRONMENT = File("environment.yaml") or File("environment.yml")
-FILES = [
+CONTENT = FILES = [
     x
     for x in (File(x) for x in git.Git().ls_files().splitlines())
     if x not in (File("postBuild"),)
@@ -47,3 +49,5 @@ IGNORED = dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
 INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
 
 OS = os.name
+
+BUILT_SPHINX = File("_build/sphinx")
