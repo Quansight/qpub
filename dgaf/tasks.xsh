@@ -21,10 +21,11 @@ def make_pyproject(task):
     """use poetry to make the pyproject"""
     data = PYPROJECT.load()
     if 'poetry' not in data['/tool']:
-        ![poetry init -n]
+        try:
+            ![poetry init --no-interaction]
+        except:pass
     
     ![poetry add @(REQUIREMENTS.load())]
-    dgaf.converters.to_flit()
 
 @task(PYPROJECT, SETUPPY)
 def make_python_setup(task):
