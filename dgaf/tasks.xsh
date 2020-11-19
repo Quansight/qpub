@@ -20,9 +20,8 @@ def make_requirements(task):
 def make_pyproject(task):
     """use poetry to make the pyproject"""
     data = PYPROJECT.load()
-    try:
+    if 'poetry' not in data['/tool']
         ![poetry init -n]
-    except: ...
     
     ![poetry add @(REQUIREMENTS.load())]
     dgaf.converters.to_flit()
