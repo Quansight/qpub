@@ -21,9 +21,11 @@ def make_pyproject(task):
     """use poetry to make the pyproject"""
     data = PYPROJECT.load()
     if 'poetry' not in data['/tool']:
-        try:
-            ![poetry init --no-interaction]
-        except:pass
+        poetry init --no-interaction --quiet
+
+@task([REQUIREMENTS, PYPROJECT], POETRYLOCK)
+def add_deps(task):
+    """add the dependencies to pyproject"""
     
     ![poetry add @(REQUIREMENTS.load())]
 
