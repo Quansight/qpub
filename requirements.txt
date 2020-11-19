@@ -1,11 +1,8 @@
 # dgaf relies on high level packages do acheive large units of work
 doit
+depfinder<2.5
+xonsh
+
 gitpython
-flit
 anyconfig
 toml
-depfinder<2.5
-jsonpointer
-typer
-xonsh
-git+https://github.com/deathbeds/tingle
