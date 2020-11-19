@@ -299,7 +299,7 @@ class Task:
             targets=self.output,
             verbosity=2,
             doc=self.callable.__doc__,
-            **self.extras
+            **self.extras,
         )
 
 
@@ -317,8 +317,8 @@ def action(*args):
 
     cmd = ""
     for arg in args:
-        if isinstance(arg, (tuple, list, dict)):
-            cmd += " ".join('"{x}"' for x in arg)
+        if isinstance(arg, (set, tuple, list, dict)):
+            cmd += " ".join(f'"{x}"' for x in arg)
         else:
             cmd += str(arg)
     return doit.tools.LongRunning(cmd)
