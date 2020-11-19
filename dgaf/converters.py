@@ -121,6 +121,41 @@ def flit_to_setup(requirements):
     )
 
 
+def poetry_to_setup():
+    """convert flit metadata to an executable setuptools fiile."""
+    metadata = PYPROJECT.load()["/tool/poetry"]
+    ep = PYPROJECT.load()["/entrypoints"] or {}
+    if ep:
+        for k, v in ep.items():
+            ep[k] = list(map(" = ".join, v.items()))
+
+    author, _, email = metadata["authors"][0].rpartition("<")
+    email = email.rstrip().rstrip(">")
+    setup = dict(
+        name=metadata["name"],
+        version=__import__("datetime").date.today().strftime("%Y.%m.%d"),
+        author=author,
+        author_email=email,
+        description=metadata["description"],
+        long_description=README.read_text(),
+        long_description_content_type="text/markdown",
+        # url=metadata["home-page"],
+        # license="BSD-3-Clause",
+        install_requires=list(metadata["dependencies"]),
+        # include_package_data=True,
+        packages=[metadata["name"]],
+        classifiers=[],
+        cmdclass={},
+        entry_points=ep,
+    )
+
+    SETUPPY.write_text(
+        f"""__name__ == "__main__" and __import__("setuptools").setup(**{
+        __import__("json").dumps(setup)
+    })"""
+    )
+
+
 def flit_to_setupcfg(requirements=None):
     """convert flit metadata to an executable setuptools fiile."""
     metadata = PYPROJECT.load()["/tool/flit/metadata"]
