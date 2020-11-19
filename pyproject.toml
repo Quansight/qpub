@@ -2,4 +2,4 @@
 nikola = "dgaf.exporters:Nikola"
 
 [entrypoints.console_scripts]
-dgaf = dgaf:main
+dgaf = "dgaf:main"
