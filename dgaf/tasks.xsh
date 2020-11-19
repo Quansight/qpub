@@ -20,7 +20,7 @@ def make_requirements(task):
 def make_pyproject(task):
     """use poetry to make the pyproject"""
     data = PYPROJECT.load()
-    if 'poetry' not in data['/tool']
+    if 'poetry' not in data['/tool']:
         ![poetry init -n]
     
     ![poetry add @(REQUIREMENTS.load())]
