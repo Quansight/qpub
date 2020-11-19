@@ -1,7 +1,7 @@
 # dgaf relies on high level packages do acheive large units of work
 doit
 depfinder<2.5
-
+jsonpointer
 gitpython
 anyconfig
 toml
