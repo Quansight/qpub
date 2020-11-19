@@ -16,17 +16,18 @@ def make_requirements(task):
     dependencies = dgaf.util.depfinder(*CONTENT)
     REQUIREMENTS.dump(list(dependencies.union(REQUIREMENTS.load())))
 
-@task(REQUIREMENTS, PYPROJECT)
-def make_pyproject(task):
+def make_pyproject():
     """use poetry to make the pyproject"""
     data = PYPROJECT.load()
+    import doit
     if 'poetry' not in data['/tool']:
-        poetry init --no-interaction --quiet
-
-@task([REQUIREMENTS, PYPROJECT], POETRYLOCK)
+        # a native doit wrapped because this method escapes the doit process.
+        doit.tools.LongRunning("poetry init --no-interaction").execute()
+        
+@task(REQUIREMENTS, [PYPROJECT, POETRYLOCK])
 def add_deps(task):
     """add the dependencies to pyproject"""
-    
+    make_pyproject()
     ![poetry add @(REQUIREMENTS.load())]
 
 @task(PYPROJECT, SETUPPY)
