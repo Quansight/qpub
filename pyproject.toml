@@ -1,5 +1,5 @@
-[tool.flit.entrypoints."nbconvert.exporters"]
+[entrypoints."nbconvert.exporters"]
 nikola = "dgaf.exporters:Nikola"
 
-[tool.flit.entrypoints.console_scripts]
-dgaf = "dgaf:main"
+[entrypoints.console_scripts]
+dgaf = dgaf:main
