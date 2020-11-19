@@ -141,7 +141,9 @@ def poetry_to_setup():
         long_description_content_type="text/markdown",
         # url=metadata["home-page"],
         # license="BSD-3-Clause",
-        install_requires=list(metadata["dependencies"]),
+        install_requires=list(
+            x for x in metadata["dependencies"] if x not in {"python"}
+        ),
         # include_package_data=True,
         packages=[metadata["name"]],
         classifiers=[],

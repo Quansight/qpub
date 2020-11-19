@@ -310,3 +310,15 @@ def task(input, output=None, **extras):
         return callable
 
     return wrapped
+
+
+def action(*args):
+    import doit
+
+    cmd = ""
+    for arg in args:
+        if isinstance(arg, (tuple, list, dict)):
+            cmd += " ".join('"{x}"' for x in arg)
+        else:
+            cmd += str(arg)
+    return doit.tools.LongRunning(cmd)

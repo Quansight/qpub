@@ -2,10 +2,8 @@
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 from . import util
-from .util import File, merge, Module, Path, task
+from .util import File, merge, Module, Path, task, action
 from . import template, files, converters
-
-__import__("xonsh.main").main.setup()
 
 
 def main():
