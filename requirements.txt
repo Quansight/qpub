@@ -1,10 +1,5 @@
-GitPython
-nbconvert
 gitpython
-black
-poetry
 anyconfig
-pytest
 depfinder<2.5
 doit
 jsonpointer

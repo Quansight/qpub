@@ -12,3 +12,5 @@ exclude=[".ipynb_checkpoints", "setup.py"]
 # include everything in pyflakes except F401
 pyflakes = ["-F405",]
 pycodestyle = ["-W503", "-E722"]
+
+[tool.pytest]
