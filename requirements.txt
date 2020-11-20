@@ -1,9 +1,12 @@
-# dgaf relies on high level packages do acheive large units of work
-doit
-depfinder<2.5
-jsonpointer
+GitPython
+nbconvert
 gitpython
-anyconfig
-toml
 black
 poetry
+anyconfig
+depfinder
+pytest
+depfinder<2.5
+doit
+jsonpointer
+toml
