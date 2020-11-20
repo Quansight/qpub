@@ -85,7 +85,11 @@ def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
     # can we foorce hypothesis testing
-    action("pytest").execute()
+    import pytest
+
+    pytest.main(
+        []
+    )  # parameters should be configured in pyproject, we should curate defaults
 
 
 @task(PYPROJECT)
