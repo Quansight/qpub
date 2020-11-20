@@ -74,7 +74,7 @@ def install_pip():
 setup_tasks = [install_pip]
 
 
-@task([PYPROJECT, POETRYLOCK])
+@task([make_pyproject, PYPROJECT, POETRYLOCK])
 def install_develop():
     """peek into PYPROJECT and install the dev tools"""
     extras = dgaf.converters.to_dev_requirements()
