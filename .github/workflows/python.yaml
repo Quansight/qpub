@@ -12,7 +12,7 @@ jobs:
         python-version: 3.8
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip wheel doit git+http://github.com/deathbeds/tingle
+        python -m pip install --upgrade pip wheel doit
         doit setup
     - name: Install local package
       run: |
@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - run: python -m pip install --upgrade pip wheel pyyaml
+      - run: python -m pip install --upgrade pip wheel pyyaml doit
       - name: Get pip cache dir
         id: pip-cache
         run: |
@@ -53,6 +53,6 @@ jobs:
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
       # setup things separate from the install to identify build problems.
-      - run: pip install doit git+http://github.com/deathbeds/tingle && doit setup
+      - run: doit setup
       - run: python -m dgaf install
       - run: dgaf test

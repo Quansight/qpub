@@ -1,12 +1,11 @@
 import doit
-import typer
 import dgaf
 
 
 def test_file():
     dgaf.File("dgaf/tests/test_dgaf.py")
     deps = dgaf.File("dgaf/tests/test_dgaf.py").imports()
-    assert deps == {"dgaf", "doit", "typer"}
+    assert deps == {"dgaf", "doit"}
 
 
 def test_load_dump(tmpdir):
@@ -23,13 +22,3 @@ def test_merge():
     assert dgaf.merge(dict(b=dict(a=[1])), dict(b=dict(a=[2]))) == dict(
         b=dict(a=[1, 2])
     )
-
-
-def test_cli(cli_runner):
-    import dgaf
-
-    __import__("tingle").loaders.XO.extensions += [".md"]
-    with __import__("tingle").loaders.XO():
-        import dgaf.readme
-
-    cli_runner.invoke(typer.main.get_command(dgaf.app), "--help".split())

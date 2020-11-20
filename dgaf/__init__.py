@@ -1,17 +1,12 @@
 """deathbeds generalized automation framework."""
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
-import typer
 
-app = typer.Typer()
 from . import util
-from .util import File, merge, Module, Path
-from . import template, files, converters
+from .util import File, merge, Module, Path, task, action
+from . import template, files, converters  # noqa
 
 
 def main():
-    __import__("tingle").loaders.XO.extensions += [".md"]
-    with __import__("tingle").loaders.XO():
-        from . import readme
-    cmd = typer.main.get_command(app)
-    cmd.chain = True
-    cmd()
+    from . import tasks, docs
+
+    __import__("doit").run({**vars(tasks), **vars(docs)})

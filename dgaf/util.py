@@ -2,6 +2,7 @@ import dgaf
 import pathlib
 import functools
 import jsonpointer
+import dataclasses
 
 Path = type(pathlib.Path())
 
@@ -133,8 +134,9 @@ class Module(str):
             return False
 
 
-def merge(a, b, *extras):
+def merge(a, b=None, *extras):
     """merge dictionaries.  """
+    b = {} if b is None else b
     if extras:  # reduce the arity until we have a binop
         b = merge(b, *extras)
 
@@ -257,10 +259,65 @@ def depfinder(*files) -> set:
     for file in files:
         deps = deps.union(file.imports())
     deps.discard("dgaf")
-    return deps
+    return {x for x in deps if x not in "python"}
 
 
 def is_site_package(name):
     path = __import__("importlib").find_loader(name).path
 
     return any(path.startswith(x) for x in __import__("site").getsitepackages())
+
+
+@dataclasses.dataclass(order=True)
+class Task:
+    callable: callable
+    input: None = None
+    output: None = None
+    extras: None = dataclasses.field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.input == ...:
+            self.input = None
+        self.input = self.input or []
+        if not isinstance(self.input, list):
+            self.input = [self.input]
+
+        if self.output == ...:
+            self.output = None
+        self.output = self.output or []
+        if not isinstance(self.output, list):
+            self.output = [self.output]
+
+    def __call__(self):
+        import doit
+
+        return dict(
+            actions=[self.callable],
+            file_dep=[x for x in self.input if isinstance(x, (Path, str))],
+            task_dep=[x.__name__ for x in self.input if callable(x)],
+            targets=self.output,
+            verbosity=2,
+            doc=self.callable.__doc__,
+            **self.extras,
+        )
+
+
+def task(input, output=None, **extras):
+    def wrapped(callable):
+        callable.task = Task(callable, input, output, extras)
+        callable.create_doit_tasks = callable.task.__call__
+        return callable
+
+    return wrapped
+
+
+def action(*args):
+    import doit
+
+    cmd = ""
+    for arg in args:
+        if isinstance(arg, (set, tuple, list, dict)):
+            cmd += " ".join(f'"{x}"' for x in arg)
+        else:
+            cmd += str(arg)
+    return doit.tools.LongRunning(cmd)

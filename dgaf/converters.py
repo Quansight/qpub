@@ -2,6 +2,7 @@
 import dgaf
 from dgaf import File, merge
 from dgaf.files import *
+import doit
 
 
 def to_deps():
@@ -121,6 +122,43 @@ def flit_to_setup(requirements):
     )
 
 
+def poetry_to_setup():
+    """convert flit metadata to an executable setuptools fiile."""
+    metadata = PYPROJECT.load()["/tool/poetry"]
+    ep = PYPROJECT.load()["/entrypoints"] or {}
+    if ep:
+        for k, v in ep.items():
+            ep[k] = list(map(" = ".join, v.items()))
+
+    author, _, email = metadata["authors"][0].rpartition("<")
+    email = email.rstrip().rstrip(">")
+    setup = dict(
+        name=metadata["name"],
+        version=__import__("datetime").date.today().strftime("%Y.%m.%d"),
+        author=author,
+        author_email=email,
+        description=metadata["description"],
+        long_description=README.read_text(),
+        long_description_content_type="text/markdown",
+        # url=metadata["home-page"],
+        # license="BSD-3-Clause",
+        install_requires=list(
+            x for x in metadata["dependencies"] if x not in {"python"}
+        ),
+        # include_package_data=True,
+        packages=[metadata["name"]],
+        classifiers=[],
+        cmdclass={},
+        entry_points=ep,
+    )
+
+    SETUPPY.write_text(
+        f"""__name__ == "__main__" and __import__("setuptools").setup(**{
+        __import__("json").dumps(setup)
+    })"""
+    )
+
+
 def flit_to_setupcfg(requirements=None):
     """convert flit metadata to an executable setuptools fiile."""
     metadata = PYPROJECT.load()["/tool/flit/metadata"]
@@ -147,7 +185,7 @@ def flit_to_setupcfg(requirements=None):
         options={"install_requires": requirements, "entry_points": ep},
     )
 
-    SETUP.with_suffix(".py").write_text(
+    SETUPPY.write_text(
         f"""__import__("setuptools").setup(
             setup_requires=['setup.cfg'],
             setup_cfg=True

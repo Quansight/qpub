@@ -1,11 +1,11 @@
-# dgaf relies on high level packages do acheive large units of work
-doit
+GitPython
+nbconvert
 gitpython
-flit
+black
+poetry
 anyconfig
-toml
+pytest
 depfinder<2.5
+doit
 jsonpointer
-typer
-xonsh
-git+https://github.com/deathbeds/tingle
+toml
