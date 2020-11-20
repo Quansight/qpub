@@ -5,6 +5,8 @@ from dgaf.util import task, action
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
 
+DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
+
 
 @task(CONTENT, REQUIREMENTS)
 def make_requirements(task):
