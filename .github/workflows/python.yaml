@@ -13,6 +13,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip wheel doit
+        doit setup
     - name: Install local package
       run: |
         python -m dgaf install
@@ -38,7 +39,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - run: python -m pip install --upgrade pip wheel pyyaml
+      - run: python -m pip install --upgrade pip wheel pyyaml doit
       - name: Get pip cache dir
         id: pip-cache
         run: |
@@ -52,6 +53,6 @@ jobs:
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
       # setup things separate from the install to identify build problems.
-      - run: pip install doit && doit setup
+      - run: doit setup
       - run: python -m dgaf install
       - run: dgaf test
