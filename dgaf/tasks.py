@@ -1,7 +1,7 @@
 import dgaf
 from dgaf.files import *
 from dgaf.util import task, action
-import subprocess
+from subprocess import run
 import doit
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
