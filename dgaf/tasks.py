@@ -97,7 +97,7 @@ def install():
     run("python -m pip install .".split(), check=True)
 
 
-@task(CONTENT)
+@task([install_develop] + CONTENT)
 def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
