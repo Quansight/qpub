@@ -21,7 +21,7 @@ def task_dev():
     """install dgaf in development mode."""
 
     return dict(
-        actions=[configure, dev],
+        actions=[dev],
         task_dep=["setup"],
         uptodate=[False],
     )
