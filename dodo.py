@@ -11,7 +11,9 @@ def configure():
 
 
 def dev():
+
     """we call the functions directly to avoid write conflicts"""
+
     import dgaf.tasks
 
     dgaf.tasks.develop()

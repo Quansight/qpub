@@ -23,6 +23,7 @@ ENVIRONMENT = Flagged("environment.yaml") or Flagged("environment.yml")
 GITHUB = File(".github")
 GITIGNORE = Flagged(".gitignore")
 INDEX = File("index.html")
+INIT = File("__init__.py")
 POETRYLOCK = File("poetry.lock")
 POSTBUILD = Flagged("postBuild")
 PYPROJECT = Flagged("pyproject.toml")
@@ -37,7 +38,7 @@ TOX = File("tox.ini")
 WORKFLOWS = GITHUB / "workflows"
 
 
-IGNORED = dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
+IGNORED = []  # dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
 INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
 
 OS = os.name
@@ -53,7 +54,9 @@ DIRECTORIES = list(
         for x in FILES
         if (x.parent not in SUBMODULES)
         and (x.parent != File())
-        and (x.parent not in (DOCS, WORKFLOWS, GITHUB))
+        and (x.parent not in (DOCS,))
+        and not any(y.startswith(("_", ".")) for y in x.parts)
     )
 )
 TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
+INITS = [x / INIT for x in DIRECTORIES if x / INIT not in CONTENT]

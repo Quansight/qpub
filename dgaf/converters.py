@@ -232,3 +232,19 @@ def to_conda(dependencies):
             ) + [pip]
 
             ENVIRONMENT.dump(env)
+
+
+def to_python_modules():
+    for directory in DIRECTORIES:
+        if str(directory).startswith((".", "_")):
+            continue
+        init = directory / "__init__.py"
+        if not init.exists():
+            init.touch()
+
+
+def to_dev_requirements(*extras):
+    tool = PYPROJECT.load()["/tool"]
+    for x in "black isort flakehell pytest".split():
+        extras += (x,)
+    return extras

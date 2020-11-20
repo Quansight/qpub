@@ -22,7 +22,7 @@ def make_requirements():
     REQUIREMENTS.dump(list(dependencies.union(REQUIREMENTS.load())))
 
 
-@task(REQUIREMENTS, PYPROJECT)
+@task([REQUIREMENTS] + INITS, PYPROJECT)
 def make_pyproject():
     """use poetry to make the pyproject
 
@@ -58,12 +58,10 @@ def make_python_setup():
     run("python -m black setup.py".split())
 
 
-@task(SETUPPY)
-def develop():
-    """install a package in development mode"""
-    # no way like the old way
-    run("python -m pip install setuptools".split())
-    run("python setup.py develop".split(), check=True)
+@task(CONTENT, INITS)
+def initialize_python():
+    """make all of the directies importable."""
+    dgaf.converters.to_python_modules()
 
 
 @task(REQUIREMENTS)
@@ -74,6 +72,22 @@ def install_pip():
 
 
 setup_tasks = [install_pip]
+
+
+@task([PYPROJECT, POETRYLOCK])
+def install_develop():
+    """peek into PYPROJECT and install the dev tools"""
+    extras = dgaf.converters.to_dev_requirements()
+    if extras:
+        run("poetry add -D".split() + list(extras), check=True)
+
+
+@task([install_develop, SETUPPY])
+def develop():
+    """install a package in development mode"""
+    # no way like the old way
+    run("python -m pip install setuptools".split())
+    run("python setup.py develop".split(), check=True)
 
 
 @task(CONTENT + [POETRYLOCK])
