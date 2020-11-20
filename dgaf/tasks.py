@@ -72,7 +72,7 @@ def install_pip():
 setup_tasks = [install_pip]
 
 
-@task(CONTENT + [PYPROJECT])
+@task(CONTENT + [POETRYLOCK])
 def install():
     """install a package.
 
