@@ -41,6 +41,7 @@ def make_pyproject():
 def make_python_setup(task):
     """make a setuppy to work in develop mode"""
     dgaf.converters.poetry_to_setup()
+    action("black setup.py").execute()
 
 
 @task(make_python_setup)
@@ -105,7 +106,7 @@ if CONDA:
     @task(ENVIRONMENT)
     def conda_update(task):
         """update a conda if conda is available."""
-        action(f"conda env update {ENVIRONMENT}").execute()
+        action(f"conda update -f {ENVIRONMENT}").execute()
 
     setup_tasks = [conda_update] + setup_tasks
 
