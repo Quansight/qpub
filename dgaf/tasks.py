@@ -11,7 +11,7 @@ dgaf.converters.content_to_deps = dgaf.converters.to_deps
 DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
 
 
-@task(CONTENT, REQUIREMENTS)
+@task(CONTENT, REQUIREMENTS, uptodate=[lambda: REQUIREMENTS.load()])
 def make_requirements():
     """generate requirements.txt files from partial package information.
 
@@ -22,7 +22,11 @@ def make_requirements():
     REQUIREMENTS.dump(list(dependencies.union(REQUIREMENTS.load())))
 
 
-@task([REQUIREMENTS] + INITS, PYPROJECT)
+@task(
+    [REQUIREMENTS] + INITS,
+    PYPROJECT,
+    uptodate=[lambda: PYPROJECT.load()["/tool/poetry"]],
+)
 def make_pyproject():
     """use poetry to make the pyproject
 
@@ -40,7 +44,7 @@ def make_pyproject():
             )
 
 
-@task(PYPROJECT, POETRYLOCK)
+@task(..., uptodate=[lambda: REQUIREMENTS.load()])
 def add_dependencies():
     """add dependencies with poetry"""
 
@@ -74,7 +78,10 @@ def install_pip():
 setup_tasks = [install_pip]
 
 
-@task([make_pyproject, PYPROJECT, POETRYLOCK])
+@task(
+    [make_pyproject, PYPROJECT, POETRYLOCK],
+    uptodate=[lambda: PYPROJECT.load()["/tool"]],
+)
 def install_develop():
     """peek into PYPROJECT and install the dev tools"""
     extras = dgaf.converters.to_dev_requirements()
@@ -90,7 +97,7 @@ def develop():
     run("python setup.py develop".split(), check=True)
 
 
-@task(CONTENT + [POETRYLOCK])
+@task(CONTENT + [PYPROJECT])
 def install():
     """install a package.
     this should use setup.cfg in the future."""
