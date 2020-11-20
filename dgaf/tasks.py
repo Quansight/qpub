@@ -28,6 +28,9 @@ def make_pyproject():
     data = PYPROJECT.load()
     import doit
 
+    action(
+        "poetry config virtualenvs.create false"
+    ).execute()  # pollute the environment
     if not data["/tool/poetry"]:
         # a native doit wrapped because this method escapes the doit process.
         doit.tools.LongRunning("poetry init --no-interaction").execute()
