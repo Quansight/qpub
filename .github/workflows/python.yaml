@@ -19,6 +19,8 @@ jobs:
         python -m dgaf install
     - name: Test  
       run: dgaf test
+    - name: Lint
+      run: dgaf lint
   test:
     name: ${{ matrix.os }} ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
