@@ -31,11 +31,11 @@ def make_pyproject():
 
     if not data["/build-system"]:
         subprocess.check_output(
-            "poetry config virtualenvs.create false"
+            "poetry config virtualenvs.create false".split()
         )  # pollute the environment
         if not data["/tool/poetry"]:
             # a native doit wrapped because this method escapes the doit process.
-            subprocess.check_output("poetry init --no-interaction")
+            subprocess.check_output("poetry init --no-interaction".split())
 
 
 @task(PYPROJECT, POETRYLOCK)
