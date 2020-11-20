@@ -5,7 +5,7 @@ from dgaf.util import task, action
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
 
-DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
+DOIT_CONFIG = {"backend": "json", "verbosity": 2, "par_type": "thread"}
 
 
 @task(CONTENT, REQUIREMENTS)
