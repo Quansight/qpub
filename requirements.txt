@@ -6,3 +6,4 @@ gitpython
 anyconfig
 toml
 black
+poetry
