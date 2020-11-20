@@ -12,8 +12,7 @@ jobs:
         python-version: 3.8
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip wheel doit git+http://github.com/deathbeds/tingle
-        doit setup
+        python -m pip install --upgrade pip wheel doit
     - name: Install local package
       run: |
         python -m dgaf install
@@ -53,6 +52,6 @@ jobs:
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
       # setup things separate from the install to identify build problems.
-      - run: pip install doit git+http://github.com/deathbeds/tingle && doit setup
+      - run: pip install doit && doit setup
       - run: python -m dgaf install
       - run: dgaf test
