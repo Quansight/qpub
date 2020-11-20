@@ -105,6 +105,15 @@ def test():
     run("python -m pytest".split(), check=True)
 
 
+@task([install_develop] + CONTENT)
+def lint():
+    tool = PYPROJECT.load()["/tool"]
+    if "flakehell" in tool:
+        run("python -m flakehell lint".split(), check=True)
+    elif "flake8" in tool:
+        ...
+
+
 @task(PYPROJECT)
 def build():
     """use either new or old python convetions to build a wheel."""
