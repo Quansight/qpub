@@ -30,12 +30,12 @@ def make_pyproject():
     data = PYPROJECT.load()
 
     if not data["/build-system"]:
-        subprocess.check_output(
+        subprocess.call(
             "python -m poetry config virtualenvs.create false".split()
         )  # pollute the environment
         if not data["/tool/poetry"]:
             # a native doit wrapped because this method escapes the doit process.
-            subprocess.check_output(
+            subprocess.call(
                 "python -m poetry init --no-interaction".split(),
             )
 
@@ -48,28 +48,28 @@ def add_dependencies():
     data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
     PYPROJECT.dump(data)
 
-    subprocess.check_output("python -m poetry add ".split() + list(REQUIREMENTS.load()))
+    subprocess.call("python -m poetry add ".split() + list(REQUIREMENTS.load()))
 
 
 @task(POETRYLOCK, SETUPPY)
 def make_python_setup():
     """make a setuppy to work in develop mode"""
     dgaf.converters.poetry_to_setup()
-    subprocess.check_output("python -m black setup.py".split())
+    subprocess.call("python -m black setup.py".split())
 
 
 @task(SETUPPY)
 def develop():
     """install a package in development mode"""
     # no way like the old way
-    subprocess.check_output("python -m pip install setuptools".split())
-    subprocess.check_output("python setup.py develop".split())
+    subprocess.call("python -m pip install setuptools".split())
+    subprocess.call("python setup.py develop".split())
 
 
 @task(REQUIREMENTS)
 def install_pip():
     """install packages from pypi."""
-    subprocess.check_output(f"python -m pip install -r {REQUIREMENTS}".split())
+    subprocess.call(f"python -m pip install -r {REQUIREMENTS}".split())
     # maybe use poetry in install mode?
 
 
@@ -80,7 +80,7 @@ setup_tasks = [install_pip]
 def install():
     """install a package.
     this should use setup.cfg in the future."""
-    subprocess.check_output("python -m pip install .".split())
+    subprocess.call("python -m pip install .".split())
 
 
 @task(CONTENT)
@@ -88,7 +88,7 @@ def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
     # can we foorce hypothesis testing
-    subprocess.check_output("python -m pytest".split())
+    subprocess.call("python -m pytest".split())
 
 
 @task(PYPROJECT)
@@ -96,9 +96,9 @@ def build():
     """use either new or old python convetions to build a wheel."""
     data = PYPROJECT.load()
     if data["/build-system/build-backend"].startswith("flit_core"):
-        subprocess.check_output("python -m flit build".split())
+        subprocess.call("python -m flit build".split())
     elif data["/build-system/build-backend"].startswith("poetry"):
-        subprocess.check_output("python -m poetry build".split())
+        subprocess.call("python -m poetry build".split())
     else:
         """make setuppy and build with setuptools"""
 
@@ -106,7 +106,7 @@ def build():
 @task(SETUPPY)
 def build_py():
     """build a python wheel with setup.py"""
-    subprocess.check_output("python setup.py sdist bdist_wheel".split())
+    subprocess.call("python setup.py sdist bdist_wheel".split())
 
 
 if CONDA:
@@ -119,7 +119,7 @@ if CONDA:
     @task(ENVIRONMENT)
     def conda_update():
         """update a conda if conda is available."""
-        subprocess.check_output(f"conda update -f {ENVIRONMENT}".split())
+        subprocess.call(f"conda update -f {ENVIRONMENT}".split())
 
     setup_tasks = [conda_update] + setup_tasks
 
