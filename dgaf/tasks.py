@@ -54,7 +54,7 @@ def make_python_setup():
     action("black setup.py").execute()
 
 
-@task(make_python_setup)
+@task(SETUPPY)
 def develop():
     """install a package in development mode"""
     # no way like the old way
