@@ -19,7 +19,7 @@ def make_requirements(task):
     REQUIREMENTS.dump(list(dependencies.union(REQUIREMENTS.load())))
 
 
-@task(REQUIREMENTS, [PYPROJECT, POETRYLOCK])
+@task(REQUIREMENTS, PYPROJECT)
 def make_pyproject():
     """use poetry to make the pyproject
 
@@ -35,6 +35,11 @@ def make_pyproject():
         # a native doit wrapped because this method escapes the doit process.
         doit.tools.LongRunning("poetry init --no-interaction").execute()
 
+
+@task(PYPROJECT, POETRYLOCK)
+def add_dependencies():
+    """add dependencies with poetry"""
+
     data = PYPROJECT.load()
     data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
     PYPROJECT.dump(data)
@@ -42,7 +47,7 @@ def make_pyproject():
     action("poetry add ", REQUIREMENTS.load()).execute()
 
 
-@task(PYPROJECT, SETUPPY)
+@task(POETRYLOCK, SETUPPY)
 def make_python_setup():
     """make a setuppy to work in develop mode"""
     dgaf.converters.poetry_to_setup()
