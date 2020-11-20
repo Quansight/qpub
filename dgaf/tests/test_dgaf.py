@@ -5,7 +5,7 @@ import dgaf
 def test_file():
     dgaf.File("dgaf/tests/test_dgaf.py")
     deps = dgaf.File("dgaf/tests/test_dgaf.py").imports()
-    assert deps == {"dgaf", "doit", "typer"}
+    assert deps == {"dgaf", "doit"}
 
 
 def test_load_dump(tmpdir):
