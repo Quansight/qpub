@@ -1,6 +1,8 @@
 import dgaf
 from dgaf.files import *
 from dgaf.util import task, action
+import subprocess
+import doit
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
 
@@ -10,7 +12,7 @@ DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
 
 
 @task(CONTENT, REQUIREMENTS)
-def make_requirements(task):
+def make_requirements():
     """generate requirements.txt files from partial package information.
 
     the requirements are inferred from content and other configuration files.
@@ -24,17 +26,16 @@ def make_requirements(task):
 def make_pyproject():
     """use poetry to make the pyproject
 
-
     is everything poetry related weird"""
     data = PYPROJECT.load()
-    import doit
 
-    action(
-        "poetry config virtualenvs.create false"
-    ).execute()  # pollute the environment
-    if not data["/tool/poetry"]:
-        # a native doit wrapped because this method escapes the doit process.
-        doit.tools.LongRunning("poetry init --no-interaction").execute()
+    if not data["/build-system"]:
+        subprocess.check_output(
+            "poetry config virtualenvs.create false"
+        )  # pollute the environment
+        if not data["/tool/poetry"]:
+            # a native doit wrapped because this method escapes the doit process.
+            subprocess.check_output("poetry init --no-interaction")
 
 
 @task(PYPROJECT, POETRYLOCK)
@@ -45,28 +46,28 @@ def add_dependencies():
     data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
     PYPROJECT.dump(data)
 
-    action("poetry add ", REQUIREMENTS.load()).execute()
+    subprocess.check_output("poetry add ".split() + list(REQUIREMENTS.load()))
 
 
 @task(POETRYLOCK, SETUPPY)
 def make_python_setup():
     """make a setuppy to work in develop mode"""
     dgaf.converters.poetry_to_setup()
-    action("black setup.py").execute()
+    subprocess.check_output("black setup.py".split())
 
 
 @task(SETUPPY)
 def develop():
     """install a package in development mode"""
     # no way like the old way
-    action("pip install setuptools").execute()
-    action("python setup.py develop").execute()
+    subprocess.check_output("pip install setuptools".split())
+    subprocess.check_output("python setup.py develop".split())
 
 
 @task(REQUIREMENTS)
 def install_pip():
     """install packages from pypi."""
-    action(f"pip install -r {REQUIREMENTS}").execute()
+    subprocess.check_output(f"pip install -r {REQUIREMENTS}".split())
     # maybe use poetry in install mode?
 
 
@@ -77,7 +78,7 @@ setup_tasks = [install_pip]
 def install():
     """install a package.
     this should use setup.cfg in the future."""
-    action("pip install .").execute()
+    subprocess.check_output("pip install .".split())
 
 
 @task(CONTENT)
@@ -85,11 +86,7 @@ def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
     # can we foorce hypothesis testing
-    import pytest
-
-    pytest.main(
-        []
-    )  # parameters should be configured in pyproject, we should curate defaults
+    subprocess.check_output(["pytest"])
 
 
 @task(PYPROJECT)
@@ -97,9 +94,9 @@ def build():
     """use either new or old python convetions to build a wheel."""
     data = PYPROJECT.load()
     if data["/build-system/build-backend"].startswith("flit_core"):
-        action("flit build").execute()
+        subprocess.check_output("flit build".split())
     elif data["/build-system/build-backend"].startswith("poetry"):
-        action("poetry build").execute()
+        subprocess.check_output("poetry build".split())
     else:
         """make setuppy and build with setuptools"""
 
@@ -107,7 +104,7 @@ def build():
 @task(SETUPPY)
 def build_py():
     """build a python wheel with setup.py"""
-    action("python setup.py sdist bdist_wheel").execute()
+    subprocess.check_output("python setup.py sdist bdist_wheel".split())
 
 
 if CONDA:
@@ -120,7 +117,7 @@ if CONDA:
     @task(ENVIRONMENT)
     def conda_update():
         """update a conda if conda is available."""
-        action(f"conda update -f {ENVIRONMENT}").execute()
+        subprocess.check_output(f"conda update -f {ENVIRONMENT}".split())
 
     setup_tasks = [conda_update] + setup_tasks
 
