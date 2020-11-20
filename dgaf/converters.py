@@ -2,6 +2,7 @@
 import dgaf
 from dgaf import File, merge
 from dgaf.files import *
+import doit
 
 
 def to_deps():
@@ -184,7 +185,7 @@ def flit_to_setupcfg(requirements=None):
         options={"install_requires": requirements, "entry_points": ep},
     )
 
-    SETUP.with_suffix(".py").write_text(
+    SETUPPY.write_text(
         f"""__import__("setuptools").setup(
             setup_requires=['setup.cfg'],
             setup_cfg=True

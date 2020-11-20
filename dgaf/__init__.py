@@ -3,7 +3,7 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 from . import util
 from .util import File, merge, Module, Path, task, action
-from . import template, files, converters
+from . import template, files, converters  # noqa
 
 
 def main():

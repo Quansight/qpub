@@ -1,9 +1,10 @@
 import dgaf
 from dgaf.files import *
-
 from dgaf.util import task, action
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
+
+# anything using action right now will not raise. it needs to be replaced with something that will.
 
 DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
 
@@ -75,7 +76,6 @@ setup_tasks = [install_pip]
 @task(CONTENT + [POETRYLOCK])
 def install():
     """install a package.
-
     this should use setup.cfg in the future."""
     action("pip install .").execute()
 

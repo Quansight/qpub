@@ -2,6 +2,7 @@ import dgaf
 import pathlib
 import functools
 import jsonpointer
+import dataclasses
 
 Path = type(pathlib.Path())
 
@@ -133,8 +134,9 @@ class Module(str):
             return False
 
 
-def merge(a, b, *extras):
+def merge(a, b=None, *extras):
     """merge dictionaries.  """
+    b = {} if b is None else b
     if extras:  # reduce the arity until we have a binop
         b = merge(b, *extras)
 
@@ -264,9 +266,6 @@ def is_site_package(name):
     path = __import__("importlib").find_loader(name).path
 
     return any(path.startswith(x) for x in __import__("site").getsitepackages())
-
-
-import dataclasses
 
 
 @dataclasses.dataclass(order=True)
