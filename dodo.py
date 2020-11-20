@@ -15,12 +15,12 @@ def task_dev():
 
     return dict(
         actions=[dev],
-        task_dep=["requirements"],
+        task_dep=["setup"],
         uptodate=[False],
     )
 
 
-def task_requirements():
+def task_setup():
 
     """install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux."""
 
