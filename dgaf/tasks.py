@@ -28,13 +28,13 @@ def make_pyproject():
     data = PYPROJECT.load()
     import doit
 
-    if not data["/tool"] or "poetry" not in data["/tool"]:
+    if not data["/tool/poetry"]:
         # a native doit wrapped because this method escapes the doit process.
         doit.tools.LongRunning("poetry init --no-interaction").execute()
-        # move entry points
-        data = PYPROJECT.load()
-        data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
-        PYPROJECT.dump(data)
+
+    data = PYPROJECT.load()
+    data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
+    PYPROJECT.dump(data)
 
     action("poetry add ", REQUIREMENTS.load()).execute()
 
