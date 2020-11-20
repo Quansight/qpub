@@ -6,6 +6,7 @@ def configure():
     import dgaf.tasks
 
     dgaf.tasks.make_pyproject()
+    dgaf.tasks.add_dependencies()
     dgaf.tasks.make_python_setup()
 
 
