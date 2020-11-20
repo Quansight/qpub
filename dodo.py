@@ -4,25 +4,28 @@
 def task_dev():
 
     """install dgaf in development mode."""
+
+    def dev(task):
+        """we call the functions directly to avoid write conflicts"""
+        import dgaf.tasks
+
+        dgaf.tasks.make_pyproject()
+        dgaf.tasks.make_python_setup()
+        dgaf.tasks.develop()
+
     return dict(
-        actions="""
-pip install -rrequirements.txt
-python -m dgaf infer develop
-    """.strip().splitlines(),
-        file_dep=["requirements.txt"],
+        actions=[dev],
+        task_dep=["requirements"],
         uptodate=[False],
     )
 
 
-def task_setup():
+def task_requirements():
 
     """install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux."""
 
     return dict(
-        actions="""
-pip install -rrequirements.txt
-python -m dgaf infer setup
-    """.strip().splitlines(),
+        actions=["""pip install -rrequirements.txt"""],
         file_dep=["requirements.txt"],
-        uptodate=[False],
+        targets=["poetry.lock"],
     )

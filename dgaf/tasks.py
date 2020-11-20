@@ -5,7 +5,7 @@ from dgaf.util import task, action
 
 dgaf.converters.content_to_deps = dgaf.converters.to_deps
 
-DOIT_CONFIG = {"backend": "json", "verbosity": 2, "par_type": "thread"}
+DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
 
 
 @task(CONTENT, REQUIREMENTS)
@@ -40,14 +40,14 @@ def make_pyproject():
 
 
 @task(PYPROJECT, SETUPPY)
-def make_python_setup(task):
+def make_python_setup():
     """make a setuppy to work in develop mode"""
     dgaf.converters.poetry_to_setup()
     action("black setup.py").execute()
 
 
 @task(make_python_setup)
-def develop(task):
+def develop():
     """install a package in development mode"""
     # no way like the old way
     action("pip install setuptools").execute()
@@ -55,7 +55,7 @@ def develop(task):
 
 
 @task(REQUIREMENTS)
-def install_pip(task):
+def install_pip():
     """install packages from pypi."""
     action(f"pip install -r {REQUIREMENTS}").execute()
     # maybe use poetry in install mode?
@@ -65,7 +65,7 @@ setup_tasks = [install_pip]
 
 
 @task(CONTENT + [PYPROJECT])
-def install(task):
+def install():
     """install a package.
 
     this should use setup.cfg in the future."""
@@ -73,7 +73,7 @@ def install(task):
 
 
 @task(CONTENT)
-def test(task):
+def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
     # can we foorce hypothesis testing
@@ -81,7 +81,7 @@ def test(task):
 
 
 @task(PYPROJECT)
-def build(task):
+def build():
     """use either new or old python convetions to build a wheel."""
     data = PYPROJECT.load()
     if data["/build-system/build-backend"].startswith("flit_core"):
@@ -93,7 +93,7 @@ def build(task):
 
 
 @task(SETUPPY)
-def build_py(task):
+def build_py():
     """build a python wheel with setup.py"""
     action("python setup.py sdist bdist_wheel").execute()
 
@@ -101,12 +101,12 @@ def build_py(task):
 if CONDA:
 
     @task(REQUIREMENTS, ENVIRONMENT)
-    def make_environment(task):
+    def make_environment():
         """extend the environment.yml conda from discovered imports."""
         dgaf.converters.pip_to_conda()
 
     @task(ENVIRONMENT)
-    def conda_update(task):
+    def conda_update():
         """update a conda if conda is available."""
         action(f"conda update -f {ENVIRONMENT}").execute()
 
@@ -114,7 +114,7 @@ if CONDA:
 
 
 @task(setup_tasks)
-def setup(task):
+def setup():
     """setup environmetns with conda and pip.`"""
 
 
