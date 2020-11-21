@@ -12,7 +12,7 @@ jobs:
       with:
         python-version: 3.8
     - run: |
-        doit ci
+        doit setup
     - name: Install local package
       run: |
         python -m dgaf install
