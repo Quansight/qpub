@@ -60,3 +60,7 @@ DIRECTORIES = list(
 )
 TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
 INITS = [x / INIT for x in DIRECTORIES if x / INIT not in CONTENT]
+
+MASTER_DOC = README
+if MASTER_DOC in CONTENT:
+    CONTENT.pop(CONTENT.index(MASTER_DOC))
