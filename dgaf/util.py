@@ -3,6 +3,7 @@ import pathlib
 import functools
 import jsonpointer
 import dataclasses
+import doit
 
 Path = type(pathlib.Path())
 
@@ -287,6 +288,14 @@ class Task:
         self.output = self.output or []
         if not isinstance(self.output, list):
             self.output = [self.output]
+
+        if "uptodate" in self.extras:
+            if not isinstance(self.extras["uptodate"], list):
+                self.extras["uptodate"] = [self.extras["uptodate"]]
+
+            self.extras["uptodate"] = [
+                doit.tools.config_changed(x) for x in self.extras["uptodate"]
+            ]
 
     def __call__(self):
         import doit
