@@ -33,9 +33,15 @@ def task_dev():
 def task_setup():
 
     """install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux."""
+    import os
 
+    actions = ["""pip install -rrequirements.txt""", configure]
+    if os.getenv("CI"):
+        actions = [
+            """python -m pip install --upgrade pip wheel doit setuptools"""
+        ] + actions
     return dict(
-        actions=["""pip install -rrequirements.txt""", configure],
+        actions=actions,
         file_dep=["requirements.txt"],
         targets=["poetry.lock"],
     )
