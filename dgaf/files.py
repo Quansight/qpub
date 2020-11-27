@@ -1,5 +1,5 @@
 """files.py"""
-from dgaf.util import File
+from dgaf.base import File
 import dgaf
 import os
 import git
@@ -9,9 +9,6 @@ class Convention(File):
     ...
 
 
-CONDA = bool(os.getenv("CONDA_EXE"))
-CONDA_ENV = os.getenv("CONDA_DEFAULT_ENV")
-CONDA_EXE = os.getenv("CONDA_EXE")
 CONF = File("conf.py")
 DOCS = File("docs")  # a convention with precedence from github
 CONFIG = File("_config.yml") or DOCS / "_config.yml"
@@ -29,12 +26,11 @@ POETRYLOCK = File("poetry.lock")
 POSTBUILD = Convention("postBuild")
 PYPROJECT = Convention("pyproject.toml")
 README = File("readme.md")
-REPO = git.Repo()
 PYPROJECT = Convention("pyproject.toml")
 REQUIREMENTS = Convention("requirements.txt")
 SETUPPY = Convention("setup.py")
 SETUPCFG = Convention("setup.cfg")
-SUBMODULES = [File(x.path) for x in REPO.submodules]
+SRC = Convention("src")
 TOX = File("tox.ini")
 
 WORKFLOWS = GITHUB / "workflows"
@@ -47,24 +43,19 @@ OS = os.name
 PRECOMMITCONFIG = Convention(".pre-commit-config.yaml")
 BUILT_SPHINX = File("_build/sphinx")
 CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
-CONTENT = FILES = [
-    x
-    for x in (File(x) for x in git.Git().ls_files().splitlines())
-    if x not in CONVENTIONS
-]
-DIRECTORIES = list(
-    set(
-        x.parent
-        for x in FILES
-        if (x.parent not in SUBMODULES)
-        and (x.parent != File())
-        and (x.parent not in (DOCS,))
-        and not any(y.startswith(("_", ".")) for y in x.parts)
-    )
-)
-TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
-INITS = [x / INIT for x in DIRECTORIES if x / INIT not in CONTENT]
-
-MASTER_DOC = README
-if MASTER_DOC in CONTENT:
-    CONTENT.pop(CONTENT.index(MASTER_DOC))
+# DIRECTORIES = list(
+#     set(
+#         x.parent
+#         for x in FILES
+#         if x.parent != File()
+#         and (x.parent not in (DOCS,))
+#         and not any(y.startswith(("_", ".")) for y in x.parts)
+#     )
+# )
+# TOP_LEVEL = [x for x in DIRECTORIES if x.parent == File()]
+# INITS = [x / INIT for x in DIRECTORIES if x / INIT not in CONTENT]
+#
+# MASTER_DOC = README
+# if MASTER_DOC in CONTENT:
+# CONTENT.pop(CONTENT.index(MASTER_DOC))
+#

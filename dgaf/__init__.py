@@ -1,8 +1,9 @@
 """deathbeds generalized automation framework."""
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
-from . import util, files
+from . import util
 from . import base
+from . import files
 from .util import File, merge, Module, Path, task, action
 from . import converters  # noqa
 

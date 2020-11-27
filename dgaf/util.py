@@ -339,3 +339,56 @@ def action(*args):
 def is_installed(object: str) -> bool:
     """is a specific dependency installed."""
     return bool(__import__("importlib").util.find_spec(object))
+
+
+def ensure_conda() -> bool:
+    import contextlib, io, ensureconda.cli
+
+    with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(
+        io.StringIO()
+    ):
+        try:
+            ensureconda.cli.ensureconda_cli.main([])
+        except SystemExit as e:
+            if e.args[0]:
+                return False
+            return True
+
+
+def task(name, input, output, actions, **kwargs):
+    """serialize a doit task convention"""
+    if input == ...:
+        input = []
+    if not isinstance(input, list):
+        input = [input]
+    if output == ...:
+        output = []
+    if not isinstance(output, list):
+        output = [output]
+    if actions == ...:
+        actions = []
+    if not isinstance(actions, list):
+        actions = [actions]
+
+    kwargs["file_dep"] = kwargs.get("file_dep", [])
+    kwargs["uptodate"] = kwargs.get("uptodate", [])
+    kwargs["targets"] = kwargs.get("targets", []) + output
+    for i in input:
+        if isinstance(i, (dict, str)):
+            kwargs["uptodate"] = kwargs["uptodate"] + [doit.tools.config_changed(i)]
+        elif isinstance(i, pathlib.Path):
+            kwargs["file_dep"] = kwargs["file_dep"] + [i]
+
+        elif isinstance(i, bool):
+            kwargs["uptodate"] = kwargs["uptodate"] + [i]
+    return dict(name=name, actions=actions, **kwargs)
+
+
+def install_task(object, **kwargs):
+    return task(
+        f"install-{object}",
+        dgaf.util.is_installed(object),
+        ...,
+        f"python -m pip install {object}",
+        **kwargs,
+    )
