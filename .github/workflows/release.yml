@@ -18,7 +18,7 @@ jobs:
     - name: Install local package
       run: |
         dgaf install
-    - name: Test  
+    - name: Test
       run: dgaf test
     - name: Build
       run: |

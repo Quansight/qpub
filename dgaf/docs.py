@@ -1,38 +1,64 @@
-"""docs.xsh"""
-from dgaf.files import *
-from dgaf import task, File, action
+import dgaf
 
 
-@task(CONTENT, [CONFIG, TOC])
-def jb_init(task):
-    """infer jupyter book configurations."""
-    action(f"jb toc . {TOC.parent}").execute()
-    # be less aggressive here.
-    File("_config.yml").dump(execute=dict(execute_notebooks="off"))
+class Docs(dgaf.base.Project):
+
+    """jupyter book is the most permissive collection of tools are polyglot documentation using `sphinx`"""
+
+    def to_toc(self):
+
+        """create `"_toc.yml"` that defines the layout of the articles. there are probably a few different ways to infer this.
+        i don't think this is an easy problem.
+        `"readme.md"` takes precedence in the sections."""
+
+    def to_config(self):
+
+        """infer the configuration information for the documentation and create or update `"_config.yml"`"""
+
+    def __iter__(self):
+        yield dict(
+            name="table of contents",
+            actions=[self.to_toc],
+            targets=[dgaf.files.TOC],
+        )
+        yield dict(
+            name="configure book",
+            actions=[self.to_config],
+            targets=[dgaf.files.CONFIG],
+        )
+        yield dict(
+            name="install jupyter book",
+            actions=["pip install jupyter-book"],
+            uptodate=[dgaf.util.is_installed("jupyter_book")],
+        )
 
 
-@task([CONFIG, TOC], File("_build/html"))
-def jb_html(task):
-    """build jupyter-book html output"""
-    action(f"""jb build . --toc {TOC} --config {CONFIG}""").execute()
+class HTML(Docs):
+    def __iter__(self):
+        yield from super().__iter__()
+        yield dict(
+            name="build the content",
+            file_dep=["_config.yml", "_toc.yml"],
+            actions=[f"jb build . --toc {dgaf.files.TOC} --config {dgaf.files.CONFIG}"],
+            targets=["_build/html"],
+        )
 
 
-@task([CONFIG, TOC], File("_build/pdf"))
-def jb_pdf(task):
-    """build jupyter-book pdf in headless browser mode"""
-    #    ![pip install pypetter]
-    action(f"""jb build . --builder pdfhtml --toc {TOC} --config {CONFIG}""").execute()
+class Blog(dgaf.base.Project):
 
+    """jupyter book is the most permissive collection of tools are polyglot documentation using `sphinx`"""
 
-@task(
-    [CONFIG, TOC], File("_build/latex/python.pdf")
-)  # might need information fromt eh toc for the name
-def jb_pdf_latex(task):
-    """build jupyter-book pdf using sphinx"""
-    action(f"""jb build . --builder pdflatex --toc {TOC} --config {CONFIG}""").execute()
+    def to_conf_py(self):
 
+        """create a `"conf.py"` for `nikola` to build a blog's content."""
 
-@task(CONF, BUILT_SPHINX)
-def sphinx():
-    """build sphinx from a conf.py"""
-    action("""sphinx-build . """).execute()
+    def __iter__(self):
+        yield dict(
+            name="configuration nikola blog",
+            actions=[self.to_conf_py],
+            targets=["conf.py"],
+        )
+        yield dict(
+            name="build the blog",
+            actions=["nikola build"],
+        )

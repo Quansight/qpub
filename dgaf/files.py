@@ -1,11 +1,11 @@
 """files.py"""
-from dgaf import File
+from dgaf.util import File
 import dgaf
 import os
 import git
 
 
-class Flagged(File):
+class Convention(File):
     ...
 
 
@@ -13,25 +13,27 @@ CONDA = bool(os.getenv("CONDA_EXE"))
 CONDA_ENV = os.getenv("CONDA_DEFAULT_ENV")
 CONDA_EXE = os.getenv("CONDA_EXE")
 CONF = File("conf.py")
-CONFIG = File("_config.yml") or File("docs/_config.yml")
-TOC = File("_toc.yml") or File("docs/_toc.yml")
 DOCS = File("docs")  # a convention with precedence from github
-DOIT_CFG = File(".doit.cfg")
+CONFIG = File("_config.yml") or DOCS / "_config.yml"
+TOC = File("_toc.yml") or DOCS / "_toc.yml"
+DODO = Convention("dodo.py")
+DOITCFG = Convention("doit.cfg")
 ENV = dgaf.util.Dict()
-ENVIRONMENT = Flagged("environment.yaml") or Flagged("environment.yml")
+ENVIRONMENT = Convention("environment.yaml") or Convention("environment.yml")
 
-GITHUB = File(".github")
-GITIGNORE = Flagged(".gitignore")
+GITHUB = Convention(".github")
+GITIGNORE = Convention(".gitignore")
 INDEX = File("index.html")
 INIT = File("__init__.py")
 POETRYLOCK = File("poetry.lock")
-POSTBUILD = Flagged("postBuild")
-PYPROJECT = Flagged("pyproject.toml")
+POSTBUILD = Convention("postBuild")
+PYPROJECT = Convention("pyproject.toml")
 README = File("readme.md")
 REPO = git.Repo()
-REQUIREMENTS = Flagged("requirements.txt")
-SETUPPY = Flagged("setup.py")
-SETUPCFG = Flagged("setup.cfg")
+PYPROJECT = Convention("pyproject.toml")
+REQUIREMENTS = Convention("requirements.txt")
+SETUPPY = Convention("setup.py")
+SETUPCFG = Convention("setup.cfg")
 SUBMODULES = [File(x.path) for x in REPO.submodules]
 TOX = File("tox.ini")
 
@@ -42,11 +44,13 @@ IGNORED = []  # dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
 INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
 
 OS = os.name
-
+PRECOMMITCONFIG = Convention(".pre-commit-config.yaml")
 BUILT_SPHINX = File("_build/sphinx")
-FLAGGED = [x for x in locals().values() if isinstance(x, Flagged)]
+CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 CONTENT = FILES = [
-    x for x in (File(x) for x in git.Git().ls_files().splitlines()) if x not in FLAGGED
+    x
+    for x in (File(x) for x in git.Git().ls_files().splitlines())
+    if x not in CONVENTIONS
 ]
 DIRECTORIES = list(
     set(

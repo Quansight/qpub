@@ -41,11 +41,11 @@ class Dict(dict):
 
 
 def squash_depfinder(object):
-    import depfinder
+    import depfinder.inspection
 
     if isinstance(object, tuple):
         object = object[-1]
-    if isinstance(object, depfinder.main.ImportFinder):
+    if isinstance(object, depfinder.inspection.ImportFinder):
         object = object.describe()
     return set(
         map(
@@ -279,34 +279,38 @@ class Task:
     def __post_init__(self):
         if self.input == ...:
             self.input = None
-        self.input = self.input or []
-        if not isinstance(self.input, list):
-            self.input = [self.input]
 
         if self.output == ...:
             self.output = None
-        self.output = self.output or []
-        if not isinstance(self.output, list):
-            self.output = [self.output]
 
-        if "uptodate" in self.extras:
-            if not isinstance(self.extras["uptodate"], list):
-                self.extras["uptodate"] = [self.extras["uptodate"]]
+        for k in "input output callable".split():
+            setattr(self, k, getattr(self, k, None) or [])
+            if not isinstance(getattr(self, k), list):
+                setattr(self, k, [getattr(self, k)])
 
-            self.extras["uptodate"] = [
-                doit.tools.config_changed(x) for x in self.extras["uptodate"]
-            ]
+    def _file_dep(self):
+        return [x for x in self.input if isinstance(x, Path)]
+
+    def _task_dep(self):
+        return [x.__name__ for x in self.input if callable(x)]
+
+    def _uptodate(self):
+        """filter the uptodate dependencies using dict and str values."""
+        return [
+            doit.tools.config_changed(x)
+            for x in self.input
+            if isinstance(x, (dict, str))
+        ]
 
     def __call__(self):
-        import doit
-
         return dict(
-            actions=[self.callable],
-            file_dep=[x for x in self.input if isinstance(x, (Path, str))],
-            task_dep=[x.__name__ for x in self.input if callable(x)],
+            actions=self.callable,
+            file_dep=self._file_dep(),
+            task_dep=self._task_dep(),
             targets=self.output,
+            uptodate=self._uptodate(),
             verbosity=2,
-            doc=self.callable.__doc__,
+            doc=self.callable[0].__doc__,
             **self.extras,
         )
 
@@ -330,3 +334,8 @@ def action(*args):
         else:
             cmd += str(arg)
     return doit.tools.LongRunning(cmd)
+
+
+def is_installed(object: str) -> bool:
+    """is a specific dependency installed."""
+    return bool(__import__("importlib").util.find_spec(object))

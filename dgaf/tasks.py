@@ -11,23 +11,20 @@ dgaf.converters.content_to_deps = dgaf.converters.to_deps
 DOIT_CONFIG = {"backend": "sqlite3", "verbosity": 2, "par_type": "thread"}
 
 
-@task(CONTENT, REQUIREMENTS, uptodate=REQUIREMENTS.read_text())
-def make_requirements():
-    """generate requirements.txt files from partial package information.
+@task(CONTENT)
+def _make_requirements() -> REQUIREMENTS:
+    """infer requirements.txt files from partial package information.
 
     the requirements are inferred from content and other configuration files.
 
     requirements exist in: CONTENT, REQUIREMENTS, PYPROJECT, SETUPCFG"""
     dependencies = dgaf.util.depfinder(*CONTENT)
+
     REQUIREMENTS.dump(list(dependencies.union(REQUIREMENTS.load())))
 
 
-@task(
-    [REQUIREMENTS] + INITS,
-    PYPROJECT,
-    uptodate=PYPROJECT.load()["/tool/poetry"] or {},
-)
-def make_pyproject():
+@task([REQUIREMENTS] + INITS)
+def _make_pyproject():
     """use poetry to make the pyproject
 
     is everything poetry related weird"""
@@ -39,15 +36,12 @@ def make_pyproject():
         )  # pollute the environment
         if not data["/tool/poetry"]:
             # a native doit wrapped because this method escapes the doit process.
-            run(
-                "python -m poetry init --no-interaction".split(),
-            )
+            run("python -m poetry init --no-interaction".split())
 
 
-@task(..., uptodate=REQUIREMENTS.read_text())
-def add_dependencies():
+@task(_make_pyproject, [PYPROJECT, POETRYLOCK], uptodate=REQUIREMENTS.read_text())
+def _add_dependencies():
     """add dependencies with poetry"""
-
     data = PYPROJECT.load()
     data["/tool/poetry/scripts"] = data["/entrypoints/console_scripts"]
     PYPROJECT.dump(data)
@@ -56,40 +50,38 @@ def add_dependencies():
 
 
 @task(POETRYLOCK, SETUPPY)
-def make_python_setup():
+def _make_python_setup():
     """make a setuppy to work in develop mode"""
+
     dgaf.converters.poetry_to_setup()
     run("python -m black setup.py".split())
 
 
 @task(CONTENT, INITS)
-def initialize_python():
+def _initialize_python():
     """make all of the directies importable."""
     dgaf.converters.to_python_modules()
 
 
 @task(REQUIREMENTS)
-def install_pip():
+def _install_pip():
     """install packages from pypi."""
     run(f"python -m pip install -r {REQUIREMENTS}".split(), check=True)
     # maybe use poetry in install mode?
 
 
-setup_tasks = [install_pip]
+setup_tasks = [_install_pip]
 
 
-@task(
-    [make_pyproject, PYPROJECT, POETRYLOCK],
-    uptodate=lambda: PYPROJECT.load()["/tool"] or {},
-)
-def install_develop():
+@task(PYPROJECT, uptodate=" ".join(sorted(PYPROJECT.load()["/tool"])))
+def _install_develop_dependencies():
     """peek into PYPROJECT and install the dev tools"""
     extras = dgaf.converters.to_dev_requirements()
     if extras:
         run("poetry add -D".split() + list(extras), check=True)
 
 
-@task([install_develop, SETUPPY])
+@task([_install_develop_dependencies, SETUPPY])
 def develop():
     """install a package in development mode"""
     # no way like the old way
@@ -104,7 +96,7 @@ def install():
     run("python -m pip install .".split(), check=True)
 
 
-@task([install_develop] + CONTENT)
+@task([_install_develop_dependencies] + CONTENT)
 def test():
     """test a project"""
     # allow for tox and basic unittests at some point.
@@ -112,7 +104,7 @@ def test():
     run("python -m pytest".split(), check=True)
 
 
-@task([install_develop] + CONTENT)
+@task([_install_develop_dependencies] + CONTENT)
 def lint():
     tool = PYPROJECT.load()["/tool"]
     if "flakehell" in tool:
@@ -134,7 +126,7 @@ def build():
 
 
 @task(SETUPPY)
-def build_py():
+def _build_py():
     """build a python wheel with setup.py"""
     run("python setup.py sdist bdist_wheel".split(), check=True)
 
@@ -142,16 +134,16 @@ def build_py():
 if CONDA:
 
     @task(REQUIREMENTS, ENVIRONMENT)
-    def make_environment():
+    def _make_environment():
         """extend the environment.yml conda from discovered imports."""
         dgaf.converters.pip_to_conda()
 
     @task(ENVIRONMENT)
-    def conda_update():
+    def _conda_update():
         """update a conda if conda is available."""
         run(f"conda update -f {ENVIRONMENT}".split(), check=True)
 
-    setup_tasks = [conda_update] + setup_tasks
+    setup_tasks = [_conda_update] + setup_tasks
 
 
 @task(setup_tasks)

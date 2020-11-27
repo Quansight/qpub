@@ -23,11 +23,7 @@ def task_dev():
 
     """install dgaf in development mode."""
 
-    return dict(
-        actions=[dev],
-        task_dep=["setup"],
-        uptodate=[False],
-    )
+    return dict(actions=[dev], task_dep=["setup"], uptodate=[False])
 
 
 def task_setup():
@@ -43,5 +39,5 @@ def task_setup():
     return dict(
         actions=actions,
         file_dep=["requirements.txt"],
-        targets=["poetry.lock"],
+        # targets=["poetry.lock"],
     )

@@ -1,7 +1,7 @@
 name: test
 
 on: [push, pull_request]
-env: 
+env:
   CI: 1
 jobs:
   smoke:
@@ -16,7 +16,7 @@ jobs:
     - name: Install local package
       run: |
         python -m dgaf install
-    - name: Test  
+    - name: Test
       run: dgaf test
     - name: Lint
       run: dgaf lint

@@ -15,7 +15,7 @@ all of the CLI commands need to be defined in `__all__`.
 
     def infer():
 
-infer the dependencies from the existings repository contents. 
+infer the dependencies from the existings repository contents.
 
 a common need in reproducible environments is to define environment files for pip in a `REQUIREMENTS` or python configuration file; in scientific computing worlds `CONDA` requirements become important.
 
@@ -66,13 +66,13 @@ if conda is available and an `ENVIRONMENT` is available then we update the envir
 
         if f.REQUIREMENTS:
 
-we fallback to install the `REQUIREMENTS` with `pip`. 
+we fallback to install the `REQUIREMENTS` with `pip`.
 
             pip install -r @(REQUIREMENTS)
 
 these patterns are practical for developing in `CONDA` and testing in Github Actions.
 
-        
+
     def develop():
 
 install development versions of the local packages.
@@ -134,7 +134,7 @@ use this command to build binder environments.
 
 build documentation with [jupyter book]
 
-        
+
         data = PYPROJECT.load()
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
@@ -142,7 +142,7 @@ build documentation with [jupyter book]
                 if f.OS == "nt":
                     python -m pip install ".[docs]" "--user"
                 else:
-                    python -m pip install ".[docs]" 
+                    python -m pip install ".[docs]"
 
 
         File('docs').mkdir(parents=True, exist_ok=True)
@@ -158,7 +158,7 @@ build documentation with [jupyter book]
 
 
     def blog():
-        
+
 build a blog with nikola
 
         # make decisions backed on content
@@ -180,7 +180,7 @@ install a package that interfaces pytest with github actions annotations.
 
 the module we're build should be installed at this point. we determine how the main package being developed is installed
 
-        
+
         INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
 
         if 'test' in data["/tool/flit/metadata/requires-extra"]:
@@ -191,11 +191,11 @@ if it is in site-packages, install the extra test dependencies if they are speci
                 if f.OS == "nt":
                     python -m pip install ".[test]" "--user"
                 else:
-                    python -m pip install ".[test]" 
+                    python -m pip install ".[test]"
 
         pytest
 
-        
+
 
 append all of the methods to the `dgaf` cli.
 
