@@ -5,14 +5,8 @@ from dgaf.files import *
 import doit
 
 
-def to_deps():
-    pyproject = PYPROJECT.load()
-    dependencies = (
-        set(dgaf.util.depfinder(*FILES))
-        .union(pyproject["/tool/flit/metadata/requires"] or [])
-        .union(list(pyproject["/tool/poetry/dependencies"] or []))
-        .union(REQUIREMENTS.load())
-    )
+def to_deps(FILES):
+    dependencies = set(dgaf.util.depfinder(*FILES))
     # .union(ENVIRONMENT.load())
     # .union(SETUP.load())
 

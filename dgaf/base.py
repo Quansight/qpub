@@ -2,6 +2,7 @@
 import dgaf
 import pathlib
 import functools
+import textwrap
 import typing
 import jsonpointer
 import dataclasses
@@ -173,7 +174,7 @@ class Start(Project):
         options["install_requires"] = (
             ""  # str(options["install_requires"])
             + "\n"
-            + textwrap.indent("\n".join(dgaf.converters.to_deps()), " " * 4)
+            + textwrap.indent("\n".join(dgaf.converters.to_deps(self.CONTENT)), " " * 4)
         )
 
         SETUPCFG.dump(data)
@@ -196,7 +197,7 @@ class Start(Project):
 
     def to_setup_cfg(self):
 
-        data = dgaf.io.File("setup.cfg").load()
+        data = SETUPCFG.load()
 
         for x in "metadata options".split():
             if x not in data:
