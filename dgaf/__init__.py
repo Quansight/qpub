@@ -3,26 +3,14 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 from . import util
 from . import base
-from . import files
-from .util import File, merge, Module, Path, task, action
+from .base import File
+from .util import task, merge
 from . import converters  # noqa
-
-DOIT_CFG = dict(verbosity=2, backend="sqlite3", par_type="thread")
 
 
 def main():
-    from . import package, docs, lint, test
+    def main(**kwargs):
+        base.Develop(**kwargs).main().run([])
 
-    __import__("doit").run(
-        dict(
-            DOIT_CFG=DOIT_CFG,
-            develop=package.Develop(),
-            install=package.Install(),
-            build=package.Build(),
-            docs=docs.HTML(),
-            lint=lint.Lint(),
-            uninstall=package.Uninstall(),
-            test=test.Test(),
-            blog=docs.Blog(),
-        )
-    )
+    main.__signature__ = __import__("inspect").signature(base.Develop)
+    __import__("typer").run(main)

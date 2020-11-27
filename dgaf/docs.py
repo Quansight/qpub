@@ -17,14 +17,10 @@ class Docs(dgaf.base.Project):
 
     def __iter__(self):
         yield dict(
-            name="table of contents",
-            actions=[self.to_toc],
-            targets=[dgaf.files.TOC],
+            name="table of contents", actions=[self.to_toc], targets=[dgaf.files.TOC]
         )
         yield dict(
-            name="configure book",
-            actions=[self.to_config],
-            targets=[dgaf.files.CONFIG],
+            name="configure book", actions=[self.to_config], targets=[dgaf.files.CONFIG]
         )
         yield dict(
             name="install jupyter book",
@@ -58,7 +54,4 @@ class Blog(dgaf.base.Project):
             actions=[self.to_conf_py],
             targets=["conf.py"],
         )
-        yield dict(
-            name="build the blog",
-            actions=["nikola build"],
-        )
+        yield dict(name="build the blog", actions=["nikola build"])

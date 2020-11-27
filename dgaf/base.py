@@ -16,6 +16,7 @@ Path = type(pathlib.Path())
 
 class File(dgaf.util.File):
     def load(self):
+        """a permissive method to load data from files and edit documents in place."""
         for cls in File.__subclasses__():
             if hasattr(cls, "_suffixes"):
                 if self.suffix in cls._suffixes:
@@ -24,6 +25,7 @@ class File(dgaf.util.File):
             raise TypeError(f"Can't load type with suffix: {self.suffix}")
 
     def dump(self, object):
+        """a permissive method to dump data from files and edit documents in place."""
         for cls in File.__subclasses__():
             if hasattr(cls, "_suffixes"):
                 if self.suffix in cls._suffixes:
@@ -79,35 +81,31 @@ class YML(File):
             __import__("ruamel").yaml.YAML().dump(object, file)
 
 
-CONF = File("conf.py")
-DOCS = File("docs")  # a convention with precedence from github
-CONFIG = File("_config.yml") or DOCS / "_config.yml"
-TOC = File("_toc.yml") or DOCS / "_toc.yml"
+# File conventions.
+DEFAULT_DOIT_CFG = dict(verbosity=2, backend="sqlite3", par_type="thread")
+CONF = Convention("conf.py")
+DOCS = Convention("docs")  # a convention with precedence from github
+CONFIG = Convention("_config.yml") or DOCS / "_config.yml"
+TOC = Convention("_toc.yml") or DOCS / "_toc.yml"
 DODO = Convention("dodo.py")
 DOITCFG = Convention("doit.cfg")
-ENV = dgaf.util.Dict()
 ENVIRONMENT = Convention("environment.yaml") or Convention("environment.yml")
 
 GITHUB = Convention(".github")
 GITIGNORE = Convention(".gitignore")
 INDEX = File("index.html")
 INIT = File("__init__.py")
-POETRYLOCK = File("poetry.lock")
+POETRYLOCK = Convention("poetry.lock")
 POSTBUILD = Convention("postBuild")
 PYPROJECT = Convention("pyproject.toml")
-README = File("readme.md")
+README = Convention("readme.md")
 PYPROJECT = Convention("pyproject.toml")
 REQUIREMENTS = Convention("requirements.txt")
 SETUPPY = Convention("setup.py")
 SETUPCFG = Convention("setup.cfg")
 SRC = Convention("src")
-TOX = File("tox.ini")
-
+TOX = Convention("tox.ini")
 WORKFLOWS = GITHUB / "workflows"
-
-
-IGNORED = []  # dgaf.merge(dgaf.template.gitignore, GITIGNORE.load())
-INCLUDE = [File(x.lstrip("!")) for x in IGNORED if x.startswith("!")]
 
 OS = os.name
 PRECOMMITCONFIG = Convention(".pre-commit-config.yaml")
@@ -116,10 +114,7 @@ CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
 
 class Project:
-
-    """`Project` encapsulates the macroscopic contents of git repository and its history.
-
-    This class can derive configuration and transform configurations."""
+    """A base class for projects the creates doit tasks for development environments."""
 
     cwd: Path = None
     REPO: git.Repo = None
@@ -127,6 +122,7 @@ class Project:
     CONTENT: typing.List[Path] = None
     DIRECTORIES: typing.List[Path] = None
     INITS: typing.List[Path] = None
+    SUFFIXES: typing.List[str] = None
 
     def __post_init__(self):
         self.REPO = git.Repo(self.cwd)
@@ -140,12 +136,21 @@ class Project:
             for x in self.DIRECTORIES
             if (x != dgaf.File()) and (x / "__init__.py" not in self.CONTENT)
         ]
+        self.SUFFIXES = list(set(x.suffix for x in self.FILES))
 
     def create_doit_tasks(self) -> typing.Iterator[dict]:
         yield from self
 
     def __iter__(self):
         yield []
+
+    def task(self):
+        return doit.cmd_base.ModuleTaskLoader(
+            {"DOIT_CFG": DEFAULT_DOIT_CFG, type(self).__name__.lower(): self}
+        )
+
+    def main(self):
+        return doit.doit_cmd.DoitMain(self.task())
 
 
 @dataclasses.dataclass
@@ -160,6 +165,11 @@ class Start(Project):
     smoke: bool = True
     ci: bool = False
     pdf: bool = False
+    poetry: bool = False
+    mamba: bool = False
+
+    def dev_dependencies(self):
+        """find the development depdencies we need."""
 
     def discover_dependencies(self):
         data = SETUPCFG.load()
@@ -187,7 +197,7 @@ class Start(Project):
                 init.touch()
 
     def setup_cfg_to_environment_yml(self):
-        ENVIRONMENT.dump({})
+        dgaf.converters.setup_cfg_to_environment_yml()
 
     def setup_cfg_to_requirements_txt(self):
         data = SETUPCFG.load()
@@ -231,16 +241,53 @@ class Start(Project):
         # py_modules
         File("setup.cfg").dump(data)
 
+    def to_setup_py(self):
+        SETUPPY.write_text("""__import__("setuptools").setup()""".strip())
+
+    def to_pre_commit_config(self):
+        data = PRECOMMITCONFIG.load()
+        if "repos" not in data:
+            data["repos"] = []
+
+        for suffix in [None] + list(set(x.suffix for x in self.FILES)):
+            if suffix in LINT_DEFAULTS:
+                for kind in LINT_DEFAULTS[suffix]:
+                    for repo in data["repos"]:
+                        if repo["repo"] == kind["repo"]:
+                            repo["rev"] = repo.get("rev", None) or kind.get("rev", None)
+
+                            ids = set(x["id"] for x in kind["hooks"])
+                            repo["hooks"] = repo["hooks"] + [
+                                x for x in kind["hooks"] if x["id"] not in ids
+                            ]
+                            break
+                    else:
+                        data["repos"] += [dict(kind)]
+
+        PRECOMMITCONFIG.dump(data)
+
+    def doit_config(self):
+        DOITCFG.write_text(
+            """[GLOBAL]
+backend=sqlite3
+par_type=thread
+verbosity=2
+"""
+        )
+
     def __iter__(self):
         # explicitly configure how do it works.
-        yield dgaf.util.task("doit.cfg", ..., DOITCFG, [])
+        config = DOITCFG.load()
+        if hasattr(config, "to_dict"):
+            config = config.to_dict()
+        yield dgaf.util.task("doit.cfg", config, DOITCFG, self.doit_config)
 
         # seed the setup.cfg declarative configuration file.
         if self.develop or self.install:
             yield dgaf.util.task("setup.cfg", self.CONTENT, SETUPCFG, self.to_setup_cfg)
             yield dgaf.util.task(
                 "__init__.py",
-                " ".join(map(str, self.DIRECTORIES)),
+                " ".join(sorted(map(str, self.DIRECTORIES))),
                 self.INITS,
                 self.init_directories,
             )
@@ -279,14 +326,15 @@ class Start(Project):
                 REQUIREMENTS,
                 self.setup_cfg_to_requirements_txt,
             )
+            ...
 
         if self.lint:
             yield dgaf.util.install_task("pre_commit")
             yield dgaf.util.task(
                 "infer-pre-commit",
-                self.CONTENT,
+                " ".join(sorted(self.SUFFIXES)),
                 PRECOMMITCONFIG,
-                [],
+                self.to_pre_commit_config,
             )
             yield dgaf.util.task(
                 "install-pre-commit-hooks",
@@ -307,26 +355,53 @@ class Start(Project):
             yield dgaf.util.install_task("jupyter_book")
 
 
+LINT_DEFAULTS = {
+    None: [
+        dict(
+            repo="https://github.com/pre-commit/pre-commit-hooks",
+            rev="v2.3.0",
+            hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
+        )
+    ],
+    ".yml": [
+        dict(
+            repo="https://github.com/pre-commit/pre-commit-hooks",
+            hooks=[dict(id="check-yaml")],
+        )
+    ],
+    ".py": [
+        dict(
+            repo="https://github.com/psf/black", rev="19.3b0", hooks=[dict(id="black")]
+        ),
+        dict(
+            repo="https://github.com/life4/flakehell",
+            rev="v.0.7.0",
+            hooks=[dict(id="flakehell")],
+        ),
+    ],
+}
+LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
+
+
 @dataclasses.dataclass
 class Develop(Start):
     def __iter__(self):
         yield from super().__iter__()
 
-        if self.conda:
-            # update teh conda environemnt
+        if self.conda or self.mamba:
+            # update the conda environemnt
             yield dgaf.util.task(
                 "update-conda",
                 ENVIRONMENT,
                 ...,
-                f"conda env update -f {ENVIRONMENT}",
+                f"""{
+                    self.mamba and "mamba" or "conda"
+                } env update -f {ENVIRONMENT}""",
             )
         elif not (self.install or self.develop):
             # update the pip environment
             yield dgaf.util.task(
-                "update-pip",
-                REQUIREMENTS,
-                ...,
-                f"pip install -r {REQUIREMENTS}",
+                "update-pip", REQUIREMENTS, ..., f"pip install -r {REQUIREMENTS}"
             )
 
         if self.install:
@@ -334,26 +409,23 @@ class Develop(Start):
             yield dgaf.util.task("install-package", self.CONTENT, ..., "pip install .")
         elif self.develop:
             # make a setup.py to use in develop mode
-            yield dgaf.util.task("setup.py", SETUPCFG, SETUPPY, [])
-            yield dgaf.util.task(
-                "develop-package",
-                self.CONTENT + [SETUPPY],
-                ...,
-                "pip install -e .",
-            )
+            yield dgaf.util.task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
+            yield dgaf.util.task("develop-package", SETUPPY, ..., "pip install -e .")
 
         if self.lint:
             yield dgaf.util.task(
-                "format-lint", self.FILES, ..., "python -m pre_commit --all-files"
+                "format-lint", [False], ..., "python -m pre_commit run --all-files"
             )
 
         if self.test:
             if not self.smoke and TOX:
                 # can we infer a good tox test
-                yield dgaf.util.task("test-tox", self.CONTENT + [TOX], ..., "tox")
+                yield dgaf.util.task(
+                    "test-tox", self.CONTENT + [TOX, False], ..., "tox"
+                )
             else:
                 yield dgaf.util.task(
-                    "test-pytest", self.CONTENT + [PYPROJECT], ..., "pytest"
+                    "test-pytest", self.CONTENT + [PYPROJECT, False], ..., "pytest"
                 )
 
         if self.docs:

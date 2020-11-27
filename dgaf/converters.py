@@ -1,19 +1,58 @@
 """converters.py"""
 import dgaf
 from dgaf import File, merge
-from dgaf.files import *
+from dgaf.base import *
 import doit
 
 
 def to_deps(FILES):
     dependencies = set(dgaf.util.depfinder(*FILES))
-    # .union(ENVIRONMENT.load())
-    # .union(SETUP.load())
 
     for x in "python".split():
         x in dependencies and dependencies.remove(x)
 
-    return list([x for x in dependencies if all(y.isalnum() or y in "-_" for y in x)])
+    return list(imports_to_pypi(*dependencies))
+
+
+def setup_cfg_to_environment_yml():
+    data = SETUPCFG.load()
+    current = ENVIRONMENT.load()
+    if "dependencies" not in current:
+        current["dependencies"] = []
+    current["dependencies"] += [
+        x
+        for x in pypi_to_conda(*data["options"]["install_requires"].splitlines())
+        if x not in current["dependencies"]
+    ]
+    ENVIRONMENT.dump(current)
+
+
+def pypi_to_conda(*object):
+    import depfinder.main
+
+    import_to_conda = {
+        k: v
+        for dict in [
+            {x["pypi_name"]: x["conda_name"] for x in depfinder.utils.mapping_list},
+            *depfinder.utils.pkg_data.values(),
+        ]
+        for k, v in dict.items()
+    }
+    yield from (import_to_conda.get(x, x) for x in object)
+
+
+def imports_to_pypi(*object):
+    import depfinder.main
+
+    import_to_pypi = {
+        k: v
+        for dict in [
+            {x["import_name"]: x["pypi_name"] for x in depfinder.utils.mapping_list},
+            *depfinder.utils.pkg_data.values(),
+        ]
+        for k, v in dict.items()
+    }
+    yield from (import_to_pypi.get(x, x) for x in object)
 
 
 def pip_to_conda(write=True, to=None):
