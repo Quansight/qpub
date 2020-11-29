@@ -4,7 +4,6 @@ import pathlib
 import functools
 import textwrap
 import typing
-import jsonpointer
 import dataclasses
 import doit
 import distutils.command.sdist
