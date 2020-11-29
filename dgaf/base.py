@@ -248,7 +248,18 @@ class Prior(Project):
         MANIFESTIN.touch()
 
     def discover_dependencies(self):
-        REQUIREMENTS.write_text("\n".join(dgaf.converters.to_deps(self.CONTENT)))
+        import pkg_resources
+
+        prior = []
+        for line in REQUIREMENTS.read_text().splitlines():
+            try:
+                prior.append(pkg_resources.Requirement(line).name)
+            except pkg_resources.extern.packaging.requirements.InvalidRequirement:
+                ...
+
+        found = [x for x in dgaf.converters.to_deps(self.CONTENT) if x not in prior]
+        REQUIREMENTS.open("a")
+        REQUIREMENTS.write_text("\n" + "\n".join(found))
 
     def init_directories(self):
         for init in self.INITS:
@@ -259,12 +270,6 @@ class Prior(Project):
 
     def setup_cfg_to_environment_yml(self):
         dgaf.converters.setup_cfg_to_environment_yml()
-
-    def setup_cfg_to_requirements_txt(self):
-        data = SETUPCFG.load()
-        if hasattr(data, "to_dict"):
-            data = data.to_dict()
-        REQUIREMENTS.write_text(data["options"]["install_requires"])
 
     def setup_cfg_to_pyproject(self):
 
@@ -281,8 +286,9 @@ class Prior(Project):
 
     def to_setup_cfg(self):
         data = dgaf.base.SETUPCFG.load()
+        config = dgaf.util.to_metadata_options(self)
 
-        for k, v in dgaf.util.to_metadata_options(self).items():
+        for k, v in config.items():
             if k not in data:
                 data.add_section(k)
             for x, y in v.items():
@@ -293,6 +299,9 @@ class Prior(Project):
                         # consider merging here.
                         continue
                 data[k][x] = y
+
+        # add a tool:pytest
+        # https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir
 
         dgaf.base.SETUPCFG.dump(data)
 

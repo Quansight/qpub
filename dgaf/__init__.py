@@ -3,6 +3,7 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 from . import util
 from . import base
+from . import tasks
 from .base import File
 from .util import task, merge
 from . import converters  # noqa

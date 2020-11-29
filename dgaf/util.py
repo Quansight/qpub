@@ -1,7 +1,6 @@
 import dgaf
 import pathlib
 import functools
-import jsonpointer
 import dataclasses
 import doit
 
@@ -9,35 +8,6 @@ Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
 pkg2pip = dict(git="GitPython", dotenv="python-dotenv")
-
-
-class Dict(dict):
-    def __getitem__(self, object):
-        try:
-            pointer = jsonpointer.JsonPointer(object)
-        except jsonpointer.JsonPointerException:
-            return super().__getitem__(object)
-        else:
-            try:
-                return pointer.resolve(self)
-            except (KeyError, jsonpointer.JsonPointerException):
-                return
-
-    def get(self, object, default=None):
-        try:
-            return self[object]
-        except (KeyError, jsonpointer.JsonPointerException):
-            ...
-        return default
-
-    def __setitem__(self, object, value):
-        try:
-            pointer = jsonpointer.JsonPointer(object)
-        except jsonpointer.JsonPointerException:
-            ...
-        else:
-            return pointer.set(self, value)
-        return super().__setitem__(object, value)
 
 
 def squash_depfinder(object):
@@ -473,6 +443,7 @@ def to_metadata_options(self):
     if not self.distribution.install_requires:
         object["install_requires"] = dgaf.base.REQUIREMENTS.read_text().splitlines()
     if not self.distribution.extras_require:
+        data["options.extras_require"] = dict(test=[], docs=[])
         pass
 
     if not self.distribution.python_requires:

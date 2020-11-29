@@ -67,6 +67,8 @@ class Test(Post):
 
 
 class Docs(Post):
+
+    # https://jupyterbook.org/customize/toc.html
     def prior(self):
         yield dgaf.util.install_task("jupyter_book")
 
