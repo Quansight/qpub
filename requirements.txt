@@ -1,7 +1,4 @@
-gitpython
-anyconfig
-depfinder<2.5
 doit
-jsonpointer
-toml
-poetry
+GitPython
+setuptools
+depfinder

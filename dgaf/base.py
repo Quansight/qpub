@@ -253,13 +253,15 @@ class Prior(Project):
         prior = []
         for line in REQUIREMENTS.read_text().splitlines():
             try:
-                prior.append(pkg_resources.Requirement(line).name)
+                prior.append(pkg_resources.Requirement(line).name.lower())
             except pkg_resources.extern.packaging.requirements.InvalidRequirement:
                 ...
 
-        found = [x for x in dgaf.converters.to_deps(self.CONTENT) if x not in prior]
-        REQUIREMENTS.open("a")
-        REQUIREMENTS.write_text("\n" + "\n".join(found))
+        found = [
+            x for x in dgaf.converters.to_deps(self.CONTENT) if x.lower() not in prior
+        ]
+        with REQUIREMENTS.open("a") as file:
+            file.write("\n" + "\n".join(found))
 
     def init_directories(self):
         for init in self.INITS:
