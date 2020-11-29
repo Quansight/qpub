@@ -13,4 +13,3 @@ exclude=[".ipynb_checkpoints", "setup.py"]
 pyflakes = ["-F405",]
 pycodestyle = ["-W503", "-E722"]
 
-[tool.pytest]

@@ -392,3 +392,128 @@ def install_task(object, **kwargs):
         f"python -m pip install {object}",
         **kwargs,
     )
+
+
+def get_name(self):
+    directories = {x.parts[0] for x in self.DIRECTORIES}
+    if len(directories) == 1:
+        return next(iter(directories))
+
+
+def to_metadata_options(self):
+    import setuptools
+
+    UNKNOWN = "UNKNOWN"
+    data = dict()
+    object = data["metadata"] = dict()
+    if self.distribution.get_name() == UNKNOWN:
+        object["name"] = get_name(self)
+    if self.distribution.get_version() == "0.0.0":
+        object["version"] = __import__("datetime").date.today().strftime("%Y.%m.%d")
+    if self.distribution.get_url() == UNKNOWN:
+        object["url"] = self.REPO.remote("origin").url
+        if object["url"].endswith(".git"):
+            object["url"] = object["url"][: -len(".git")]
+
+    if self.distribution.get_download_url() == UNKNOWN:
+        # populate this for a release
+        pass
+
+    if self.distribution.get_author() == UNKNOWN:
+        object["author"] = self.REPO.commit().author.name
+
+    if self.distribution.get_author_email() == UNKNOWN:
+        object["author_email"] = self.REPO.commit().author.email
+
+    if self.distribution.get_maintainer() == UNKNOWN:
+        pass
+
+    if self.distribution.get_maintainer_email() == UNKNOWN:
+        pass
+
+    if not self.distribution.get_classifiers():
+        # import trove_classifiers
+        # https://github.com/pypa/trove-classifiers/
+        pass
+
+    if self.distribution.get_license() == UNKNOWN:
+        # There has to be a service for these.
+        pass
+
+    if self.distribution.get_description() == UNKNOWN:
+        object["description"] = ""
+
+    if self.distribution.get_long_description() == UNKNOWN:
+        # metadata['long_description_content_type']
+        object["long_description"] = f"file: {dgaf.base.README}"
+
+    if not self.distribution.get_keywords():
+        pass
+
+    if self.distribution.get_platforms() == [UNKNOWN]:
+        pass
+
+    if not self.distribution.get_provides():
+        # https://www.python.org/dev/peps/pep-0314/
+        pass
+
+    if not self.distribution.get_requires():
+        # cant have versions?
+        pass
+
+    if not self.distribution.get_obsoletes():
+        pass
+
+    object = data["options"] = dict()
+    if self.distribution.zip_safe is None:
+        object["zip_safe"] = False
+
+    if not self.distribution.setup_requires:
+        pass
+    if not self.distribution.install_requires:
+        object["install_requires"] = dgaf.base.REQUIREMENTS.read_text().splitlines()
+    if not self.distribution.extras_require:
+        pass
+
+    if not self.distribution.python_requires:
+        pass
+    if not self.distribution.entry_points:
+        data["options.entry_points"] = {}
+
+    if self.distribution.scripts is None:
+        pass
+
+    if self.distribution.eager_resources is None:
+        pass
+
+    if not self.distribution.dependency_links:
+        pass
+    if not self.distribution.tests_require:
+        pass
+    if self.distribution.include_package_data is None:
+        object["include_package_data"] = True
+
+    if self.distribution.packages is None:
+        object["packages"] = self.packages
+
+    if not self.distribution.package_dir:
+        if dgaf.base.SRC.exists():
+            object["package_dir"] = ["=src"]
+        pass
+
+    if not self.distribution.package_data:
+        pass
+
+    if self.distribution.exclude_package_data is None:
+        pass
+
+    if self.distribution.namespace_packages is None:
+        pass
+
+    if not self.distribution.py_modules:
+        pass
+
+    if not self.distribution.data_files:
+        pass
+
+    return data
