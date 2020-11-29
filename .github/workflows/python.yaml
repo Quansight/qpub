@@ -12,6 +12,7 @@ jobs:
       with:
         python-version: 3.8
     - run: |
+        pip install -rrequirements.txt
         doit setup
     - name: Install local package
       run: |
