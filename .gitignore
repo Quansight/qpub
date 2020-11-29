@@ -1,15 +1,3 @@
-!.gitignore
-!requirements.txt
-
-_toc.yml
-_config.yml
-
-setup.cfg
-pyproject.toml
-
-environment.yml
-
-tox.ini
 
 .doit.*
 _build
