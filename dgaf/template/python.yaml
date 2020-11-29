@@ -21,7 +21,7 @@ jobs:
         dgaf install
     - name: Test
       run: |
-        dgaf test        
+        dgaf test
     - name: Build
       run: |
         dgaf build

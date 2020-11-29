@@ -7,9 +7,11 @@ import typing
 import jsonpointer
 import dataclasses
 import doit
+import distutils.command.sdist
 import git
 import operator
 import os
+from dgaf.util import task
 
 Path = type(pathlib.Path())
 
@@ -89,6 +91,7 @@ CONFIG = Convention("_config.yml") or DOCS / "_config.yml"
 TOC = Convention("_toc.yml") or DOCS / "_toc.yml"
 DODO = Convention("dodo.py")
 DOITCFG = Convention("doit.cfg")
+DIST = Convention("dist")
 ENVIRONMENT = Convention("environment.yaml") or Convention("environment.yml")
 
 GITHUB = Convention(".github")
@@ -98,6 +101,7 @@ INIT = File("__init__.py")
 POETRYLOCK = Convention("poetry.lock")
 POSTBUILD = Convention("postBuild")
 PYPROJECT = Convention("pyproject.toml")
+MANIFESTIN = Convention("MANIFEST.in")
 README = Convention("readme.md")
 PYPROJECT = Convention("pyproject.toml")
 REQUIREMENTS = Convention("requirements.txt")
@@ -123,6 +127,15 @@ class Project:
     DIRECTORIES: typing.List[Path] = None
     INITS: typing.List[Path] = None
     SUFFIXES: typing.List[str] = None
+    distribution: distutils.core.Distribution = None
+    sdist: distutils.core.Command = None
+    bdist: distutils.core.Command = None
+
+    def get_name(self):
+        return "rip-testum"
+
+    def get_version(self):
+        return __import__("datetime").date.today().strftime("%Y.%m.%d")
 
     def __post_init__(self):
         self.REPO = git.Repo(self.cwd)
@@ -137,12 +150,17 @@ class Project:
             if (x != dgaf.File()) and (x / "__init__.py" not in self.CONTENT)
         ]
         self.SUFFIXES = list(set(x.suffix for x in self.FILES))
+        self.DISTS = [
+            DIST / f"{self.get_name()}-{self.get_version()}.tar.gz",
+            DIST
+            / f"{self.get_name().replace('-', '_')}-{self.get_version()}-py3-none-any.whl",
+        ]
 
     def create_doit_tasks(self) -> typing.Iterator[dict]:
         yield from self
 
     def __iter__(self):
-        yield []
+        yield from []
 
     def task(self):
         return doit.cmd_base.ModuleTaskLoader(
@@ -154,7 +172,7 @@ class Project:
 
 
 @dataclasses.dataclass
-class Start(Project):
+class Init(Project):
     discover: bool = True
     develop: bool = True
     install: bool = False
@@ -167,27 +185,65 @@ class Start(Project):
     pdf: bool = False
     poetry: bool = False
     mamba: bool = False
+    pep517: bool = True
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.make_distribution()
+
+    def make_distribution(self):
+        import setuptools
+
+        self.distribution = distutils.dist.Distribution(dict())
+        self.distribution.parse_config_files()
+        self.distribution.script_name = "setup.py"
+
+        self.sdist = self.distribution.get_command_obj("sdist").get_finalized_command(
+            "sdist"
+        )
+
+        self.sdist.filelist = distutils.command.sdist.FileList()
+        self.sdist.get_file_list()
+        self.sdist.make_distribution()
+
+        self.bdist = self.distribution.get_command_obj(
+            "bdist_wheel"
+        ).get_finalized_command("bdist_wheel")
+        self.modules = setuptools.find_packages(where=SRC or ".")
 
     def dev_dependencies(self):
         """find the development depdencies we need."""
+        deps = []
+        if self.smoke:
+            deps += ["pytest"]
+        elif TOX:
+            deps += ["tox"]
+        if self.pep517:
+            deps += ["pep517"]
+        else:
+            deps += ["setuptools", "wheel"]
+
+        if self.lint:
+            deps += ["pre-commit"]
+
+        if self.poetry and self.develop:
+            deps += ["poetry"]
+
+        if self.conda:
+            deps += ["ensureconda"]
+
+        if self.mamba:
+            deps += ["mamba"]
+
+        if self.docs:
+            deps += ["jupyter-book"]
+        return deps
+
+    def create_manifest(self):
+        MANIFESTIN.touch()
 
     def discover_dependencies(self):
-        data = SETUPCFG.load()
-
-        for x in "metadata options".split():
-            if x not in data:
-                data.add_section(x)
-
-        options = data["options"]
-        if "install_requires" not in options:
-            options["install_requires"] = """"""
-        options["install_requires"] = (
-            ""  # str(options["install_requires"])
-            + "\n"
-            + textwrap.indent("\n".join(dgaf.converters.to_deps(self.CONTENT)), " " * 4)
-        )
-
-        SETUPCFG.dump(data)
+        REQUIREMENTS.write_text("\n".join(dgaf.converters.to_deps(self.CONTENT)))
 
     def init_directories(self):
         for init in self.INITS:
@@ -205,6 +261,19 @@ class Start(Project):
             data = data.to_dict()
         REQUIREMENTS.write_text(data["options"]["install_requires"])
 
+    def setup_cfg_to_pyproject(self):
+
+        data = PYPROJECT.load()
+        data.update(
+            {
+                "build-system": {
+                    "requires": ["setuptools", "wheel"],
+                    "build-backend": "setuptools.build_meta",
+                }
+            }
+        )
+        PYPROJECT.dump(data)
+
     def to_setup_cfg(self):
 
         data = SETUPCFG.load()
@@ -215,11 +284,9 @@ class Start(Project):
 
         metadata, options = data["metadata"], data["options"]
         if "name" not in metadata:
-            metadata["name"] = "test"
+            metadata["name"] = self.get_name()
         if "version" not in metadata:
-            metadata["version"] = (
-                __import__("datetime").date.today().strftime("%Y.%m.%d")
-            )
+            metadata["version"] = self.get_version()
         if "description" not in metadata:
             metadata["description"] = ""
         if "long_description" not in metadata:
@@ -276,83 +343,31 @@ verbosity=2
         )
 
     def __iter__(self):
-        # explicitly configure how do it works.
-        config = DOITCFG.load()
-        if hasattr(config, "to_dict"):
-            config = config.to_dict()
-        yield dgaf.util.task("doit.cfg", config, DOITCFG, self.doit_config)
+        # explicitly configure how do it
 
         # seed the setup.cfg declarative configuration file.
         if self.develop or self.install:
-            yield dgaf.util.task("setup.cfg", self.CONTENT, SETUPCFG, self.to_setup_cfg)
-            yield dgaf.util.task(
-                "__init__.py",
-                " ".join(sorted(map(str, self.DIRECTORIES))),
-                self.INITS,
-                self.init_directories,
-            )
-
-        # get the current state of the setup.
-        state = SETUPCFG.load()
+            yield from Develop.prior(self)
 
         if self.discover:
-            # discover the packages for the project.
-            if hasattr(state, "to_dict"):
-                state = state.to_dict()
-
             # discover dependencies in the content with depfinder and append the results.
-            yield dgaf.util.task(
-                "discover-dependencies",
-                self.CONTENT + [state, SETUPCFG],
-                ...,
-                self.discover_dependencies,
-            )
+            yield from Discover.prior(self)
 
         if self.conda:
-            yield dgaf.util.install_task("ensureconda", actions=["ensureconda"])
-            yield dgaf.util.task(
-                "discover-conda-environment",
-                [state, SETUPCFG],
-                ENVIRONMENT,
-                self.setup_cfg_to_environment_yml,
-            )
+            yield from Conda.prior(self)
         elif self.develop or self.install:
             # we'll install these when we make the project.
             pass
         else:
-            yield dgaf.util.task(
-                "discover-pip-requirements",
-                [state, SETUPCFG],
-                REQUIREMENTS,
-                self.setup_cfg_to_requirements_txt,
-            )
+            yield from Pip.prior(self)
             ...
-
         if self.lint:
-            yield dgaf.util.install_task("pre_commit")
-            yield dgaf.util.task(
-                "infer-pre-commit",
-                " ".join(sorted(self.SUFFIXES)),
-                PRECOMMITCONFIG,
-                self.to_pre_commit_config,
-            )
-            yield dgaf.util.task(
-                "install-pre-commit-hooks",
-                [PRECOMMITCONFIG, PRECOMMITCONFIG.load()],
-                ...,
-                "pre-commit install-hooks",
-            )
+            yield from Precommit.prior(self)
         if self.test:
-            if self.ci:
-                extras = []
-
-            if not self.smoke and TOX:
-                yield dgaf.util.install_task("tox")
-            else:
-                yield dgaf.util.install_task("pytest")
+            yield from Test.prior(self)
 
         if self.docs:
-            yield dgaf.util.install_task("jupyter_book")
+            yield from Docs.prior(self)
 
 
 LINT_DEFAULTS = {
@@ -384,56 +399,200 @@ LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
 
 @dataclasses.dataclass
-class Develop(Start):
+class Tasks(Init):
     def __iter__(self):
         yield from super().__iter__()
 
         if self.conda or self.mamba:
             # update the conda environemnt
-            yield dgaf.util.task(
-                "update-conda",
-                ENVIRONMENT,
-                ...,
-                f"""{
-                    self.mamba and "mamba" or "conda"
-                } env update -f {ENVIRONMENT}""",
-            )
+            yield Conda.post(self)
         elif not (self.install or self.develop):
             # update the pip environment
-            yield dgaf.util.task(
-                "update-pip", REQUIREMENTS, ..., f"pip install -r {REQUIREMENTS}"
-            )
+            yield from Pip.post(self)
 
         if self.install:
             # install to site packages.
-            yield dgaf.util.task("install-package", self.CONTENT, ..., "pip install .")
+            if self.pep517:
+                yield from PEP517.post(self)
+            else:
+                yield from Install.post(self)
+
         elif self.develop:
             # make a setup.py to use in develop mode
-            yield dgaf.util.task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
-            yield dgaf.util.task("develop-package", SETUPPY, ..., "pip install -e .")
+            yield from Develop.post(self)
 
         if self.lint:
-            yield dgaf.util.task(
-                "format-lint", [False], ..., "python -m pre_commit run --all-files"
-            )
+            yield from Precommit.post(self)
 
         if self.test:
-            if not self.smoke and TOX:
-                # can we infer a good tox test
-                yield dgaf.util.task(
-                    "test-tox", self.CONTENT + [TOX, False], ..., "tox"
-                )
-            else:
-                yield dgaf.util.task(
-                    "test-pytest", self.CONTENT + [PYPROJECT, False], ..., "pytest"
-                )
+            yield from Test.post(self)
 
         if self.docs:
-            # make toc
-            # make config
-            yield dgaf.util.task(
-                "build-html-docs",
-                self.CONTENT + [TOC, CONFIG],
-                ["build/html"],
-                "jb build .",
-            )
+            yield from Docs.post(self)
+
+
+class Precommit(Tasks):
+    def prior(self):
+        yield task(
+            "infer-pre-commit",
+            self.CONTENT + [" ".join(sorted(self.SUFFIXES))],
+            PRECOMMITCONFIG,
+            self.to_pre_commit_config,
+        )
+        yield task(
+            "install-pre-commit-hooks",
+            [PRECOMMITCONFIG, PRECOMMITCONFIG.load()],
+            ...,
+            "pre-commit install-hooks",
+        )
+
+    def post(self):
+        yield task("format-lint", [False], ..., "python -m pre_commit run --all-files")
+
+
+class Test(Tasks):
+    def prior(self):
+
+        if not self.smoke and TOX:
+            yield dgaf.util.install_task("tox")
+        else:
+            yield dgaf.util.install_task("pytest")
+
+    def post(self):
+        if not self.smoke and TOX:
+            # can we infer a good tox test
+            yield task("test-tox", self.CONTENT + [TOX, False], ..., "tox")
+        else:
+            yield task("test-pytest", self.CONTENT + [PYPROJECT, False], ..., "pytest")
+
+
+class Docs(Tasks):
+    def prior(self):
+        yield dgaf.util.install_task("jupyter_book")
+
+    def post(self):
+        yield task(
+            "build-html-docs",
+            self.CONTENT + [TOC, CONFIG],
+            ["build/html"],
+            "jb build .",
+        )
+
+
+class Discover(Tasks):
+    def prior(self):
+        yield task(
+            "discover-dependencies",
+            self.CONTENT + [SETUPCFG],
+            REQUIREMENTS,
+            self.discover_dependencies,
+        )
+
+
+class Develop(Tasks):
+    def prior(self):
+        state = SETUPCFG.load()
+        # infer the declarative setup file.
+        if hasattr(state, "to_dict"):
+            state = state.to_dict()
+        yield task("setup.cfg", self.CONTENT, SETUPCFG, self.to_setup_cfg)
+
+        # add __init__ to folders
+        yield task(
+            "__init__.py",
+            " ".join(sorted(map(str, self.DIRECTORIES))),
+            self.INITS,
+            self.init_directories,
+        )
+
+        # create a manifest to define the files to include
+        yield task(
+            str(MANIFESTIN),
+            " ".join(sorted(map(str, self.CONTENT))),
+            MANIFESTIN,
+            self.create_manifest,
+        )
+        if self.install:
+            if not self.pep517:
+                yield task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
+        elif self.develop:
+            yield task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
+
+    def post(self):
+        yield task(
+            "develop-package",
+            SETUPPY,
+            File("build/pip.freeze"),
+            [
+                lambda: File("build/pip.freeze").unlink()
+                if File("build/pip.freeze")
+                else None,
+                "pip install -e . --ignore-installed",
+                "pip list > build/pip.freeze",
+            ],
+        )
+
+
+class Install(Develop):
+    def post(self):
+        yield task(
+            "build-dist",
+            self.CONTENT + [SETUPPY, SETUPCFG, README],
+            self.DISTS,
+            "python setup.py sdist bdist_wheel",
+        )
+        yield task(
+            "install-package",
+            self.DISTS,
+            File("build/pip.freeze"),
+            [
+                lambda: File("build/pip.freeze").unlink()
+                if File("build/pip.freeze")
+                else None,
+                f"pip install --no-index --find-links=dist {self.get_name()}",
+                "pip list > build/pip.freeze",
+            ],
+        )
+
+
+class Poetry(Install):
+    ...
+
+
+class PEP517(Install):
+    def prior(self):
+        yield task("build-system", SETUPCFG, PYPROJECT, self.setup_cfg_to_pyproject)
+
+    def post(self):
+        yield task(
+            "build-dist",
+            self.CONTENT + [PYPROJECT, SETUPCFG, README],
+            self.DISTS,
+            "python -m pep517.build .",
+        )
+
+
+class Conda(Tasks):
+    def prior(self):
+        yield dgaf.util.install_task("ensureconda", actions=["ensureconda"])
+        yield task(
+            "discover-conda-environment",
+            [state["options"], SETUPCFG],
+            ENVIRONMENT,
+            self.setup_cfg_to_environment_yml,
+        )
+
+    def post(self):
+        yield task(
+            "update-conda",
+            ENVIRONMENT,
+            ...,
+            f"""{
+                    self.mamba and "mamba" or "conda"
+                } env update -f {ENVIRONMENT}""",
+        )
+
+
+class Pip(Tasks):
+    def post(self):
+        yield task("update-pip", REQUIREMENTS, ..., f"pip install -r {REQUIREMENTS}")
