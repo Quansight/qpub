@@ -406,7 +406,9 @@ def to_metadata_options(self):
 
     if self.distribution.get_long_description() == UNKNOWN:
         # metadata['long_description_content_type']
-        object["long_description"] = f"file: {dgaf.base.File("readme.md") or dgaf.base.File("README.md")}"
+        object[
+            "long_description"
+        ] = f"""file: {dgaf.base.File("readme.md") or dgaf.base.File("README.md")}"""
 
     if not self.distribution.get_keywords():
         pass
