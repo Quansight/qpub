@@ -9,28 +9,26 @@ def task_dev():
     )
 
 
+def bootstrap():
+    distribution = __import__("dgaf").base.Distribution()
+    distribution.to_setup_cfg()
+    distribution.to_setup_py()
+
+
 def task_setup():
 
     """install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux."""
-    import os
+    import os, inspect
 
-    def configure():
-        """we call the functions directly to avoid write conflicts"""
-
-        import dgaf
-
-        distribution = dgaf.base.Distribution()
-        distribution.to_setup_cfg()
-        distribution.to_setup_py()
-
-    actions = ["""pip install -rrequirements.txt""", configure]
+    actions = [
+        """pip install -rrequirements.txt""",
+        f"""python -c '{"".join(map(str.lstrip, inspect.getsourcelines(bootstrap)[0][1:]))}'""",
+    ]
     if os.getenv("CI"):
-        actions = [
-            """python -m pip install --upgrade pip wheel doit setuptools"""
-        ] + actions
+        actions = ["""python -m pip install --upgrade pip wheel setuptools"""] + actions
 
     return dict(
         actions=actions,
-        file_dep=["requirements.txt"],
+        file_dep=["requirements.txt", "setup.cfg", "setup.py"],
         # targets=["poetry.lock"],
     )
