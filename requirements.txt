@@ -3,3 +3,6 @@ GitPython
 setuptools
 depfinder
 configupdater
+typer
+ruamel.yaml
+tomlkit
