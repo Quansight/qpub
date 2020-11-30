@@ -2,3 +2,4 @@ doit
 GitPython
 setuptools
 depfinder
+configupdater
