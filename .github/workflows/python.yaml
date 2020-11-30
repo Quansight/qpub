@@ -13,14 +13,15 @@ jobs:
         python-version: 3.8
     - run: |
         pip install doit
+    - run: |
         doit setup
     - name: Install local package
       run: |
-        python -m dgaf install
+        python -m dgaf --install --no-test
     - name: Test
-      run: dgaf test
+      run: dgaf --install --test --no-lint
     - name: Lint
-      run: dgaf lint
+      run: dgaf --install --lint --no-test
   test:
     name: ${{ matrix.os }} ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -56,5 +57,5 @@ jobs:
             ${{ runner.os }}-pip-
       # setup things separate from the install to identify build problems.
       - run: doit setup
-      - run: python -m dgaf install
-      - run: dgaf test
+      - run: python -m dgaf --install --no-test
+      - run: dgaf --install
