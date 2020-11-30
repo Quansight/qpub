@@ -1,5 +1,5 @@
 import dataclasses
-from dgaf.base import Post
+from dgaf.base import Distribution
 from dgaf.base import *
 from dgaf.util import task
 
@@ -31,7 +31,7 @@ LINT_DEFAULTS = {
 LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
 
-class Precommit(Post):
+class Precommit(Distribution):
     def prior(self):
         yield task(
             "infer-pre-commit",
@@ -50,7 +50,7 @@ class Precommit(Post):
         yield task("format-lint", [False], ..., "python -m pre_commit run --all-files")
 
 
-class Test(Post):
+class Test(Distribution):
     def prior(self):
 
         if not self.smoke and TOX:
@@ -66,7 +66,7 @@ class Test(Post):
             yield task("test-pytest", self.CONTENT + [PYPROJECT, False], ..., "pytest")
 
 
-class Docs(Post):
+class Docs(Distribution):
 
     # https://jupyterbook.org/customize/toc.html
     def prior(self):
@@ -81,7 +81,7 @@ class Docs(Post):
         )
 
 
-class Discover(Post):
+class Discover(Distribution):
     def prior(self):
         yield task(
             "discover-dependencies",
@@ -91,7 +91,7 @@ class Discover(Post):
         )
 
 
-class Develop(Post):
+class Develop(Distribution):
     def prior(self):
         state = SETUPCFG.load()
         # infer the declarative setup file.
@@ -176,7 +176,7 @@ class PEP517(Install):
         )
 
 
-class Conda(Post):
+class Conda(Distribution):
     def prior(self):
         yield dgaf.util.install_task("ensureconda", actions=["ensureconda"])
         yield task(
@@ -197,6 +197,6 @@ class Conda(Post):
         )
 
 
-class Pip(Post):
+class Pip(Distribution):
     def post(self):
         yield task("update-pip", REQUIREMENTS, ..., f"pip install -r {REQUIREMENTS}")

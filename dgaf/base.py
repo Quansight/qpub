@@ -7,7 +7,6 @@ import typing
 import dataclasses
 import doit
 import distutils.command.sdist
-import git
 import operator
 import os
 from dgaf.util import task
@@ -121,7 +120,7 @@ class Project:
     """A base class for projects the creates doit tasks for development environments."""
 
     cwd: Path = None
-    REPO: git.Repo = None
+    REPO: "git.Repo" = None
     FILES: typing.List[Path] = None
     CONTENT: typing.List[Path] = None
     DIRECTORIES: typing.List[Path] = None
@@ -138,6 +137,8 @@ class Project:
         return __import__("datetime").date.today().strftime("%Y.%m.%d")
 
     def __post_init__(self):
+        import git
+
         self.REPO = git.Repo(self.cwd)
         self.FILES = list(
             map(dgaf.util.File, git.Git(self.cwd).ls_files().splitlines())
@@ -361,7 +362,7 @@ class Prior(Project):
 
 
 @dataclasses.dataclass
-class Post(Prior):
+class Distribution(Prior):
     def __iter__(self):
         yield from super().__iter__()
 
