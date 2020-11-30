@@ -223,6 +223,11 @@ def make_pyproject():
 
 def depfinder(*files) -> set:
     """Find the dependencies for all of the content."""
+    import yaml
+
+    if not hasattr(yaml, "CSafeLoader"):
+        yaml.CSafeLoader = yaml.SafeLoader
+
     import depfinder
 
     object = {}
