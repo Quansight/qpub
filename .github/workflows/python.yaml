@@ -17,11 +17,11 @@ jobs:
         doit setup
     - name: Install local package
       run: |
-        python -m dgaf --install --no-test --no-lint
+        python -m dgaf --install --no-test
     - name: Test
       run: dgaf --install --test --no-lint
     - name: Lint
-      run: dgaf --install --lint        --no-test
+      run: dgaf --install --lint --no-test
   test:
     name: ${{ matrix.os }} ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}

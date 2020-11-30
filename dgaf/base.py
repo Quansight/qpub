@@ -184,7 +184,7 @@ class Prior(Project):
     install: bool = False
     test: bool = True
     lint: bool = True
-    docs: bool = True
+    docs: bool = False
     conda: bool = False
     smoke: bool = True
     ci: bool = False
