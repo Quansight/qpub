@@ -29,6 +29,6 @@ def task_setup():
 
     return dict(
         actions=actions,
-        file_dep=["requirements.txt", "setup.cfg", "setup.py"],
-        # targets=["poetry.lock"],
+        file_dep=["requirements.txt"],
+        targets=["setup.cfg", "setup.py"],
     )
