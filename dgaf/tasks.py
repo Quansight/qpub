@@ -141,12 +141,22 @@ class Develop(Distribution):
 
 class Install(Develop):
     def post(self):
-        yield task(
-            "build-dist",
-            self.CONTENT + [SETUPPY, SETUPCFG, README],
-            self.DISTS,
-            "python setup.py sdist bdist_wheel",
-        )
+        if self.pep517:
+            yield task("build-system", SETUPCFG, PYPROJECT, self.setup_cfg_to_pyproject)
+            yield task(
+                "build-dist",
+                self.CONTENT + [PYPROJECT, SETUPCFG, README],
+                self.DISTS,
+                "python -m pep517.build .",
+            )
+        else:
+            yield task(
+                "build-dist",
+                self.CONTENT + [SETUPPY, SETUPCFG, README],
+                self.DISTS,
+                "python setup.py sdist bdist_wheel",
+            )
+
         yield task(
             "install-package",
             self.DISTS,
@@ -164,19 +174,6 @@ class Install(Develop):
 
 class Poetry(Install):
     ...
-
-
-class PEP517(Install):
-    def prior(self):
-        yield task("build-system", SETUPCFG, PYPROJECT, self.setup_cfg_to_pyproject)
-
-    def post(self):
-        yield task(
-            "build-dist",
-            self.CONTENT + [PYPROJECT, SETUPCFG, README],
-            self.DISTS,
-            "python -m pep517.build .",
-        )
 
 
 class Conda(Distribution):

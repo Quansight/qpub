@@ -370,10 +370,7 @@ class Distribution(Prior):
 
         if self.install:
             # install to site packages.
-            if self.pep517:
-                yield from dgaf.tasks.PEP517.post(self)
-            else:
-                yield from dgaf.tasks.Install.post(self)
+            yield from dgaf.tasks.Install.post(self)
 
         elif self.develop:
             # make a setup.py to use in develop mode
