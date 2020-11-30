@@ -11,7 +11,7 @@ from . import converters  # noqa
 
 def main():
     def main(**kwargs):
-        base.Develop(**kwargs).main().run([])
+        base.Distribution(**kwargs).main().run([])
 
-    main.__signature__ = __import__("inspect").signature(base.Develop)
+    main.__signature__ = __import__("inspect").signature(base.Distribution)
     __import__("typer").run(main)
