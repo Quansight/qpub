@@ -17,7 +17,7 @@ jobs:
         doit setup
     - name: Install local package
       run: |
-        python -m dgaf --install --no-test
+        python -m dgaf --install --no-test --no-lint
     - name: Test
       run: dgaf --install --test --no-lint
     - name: Lint
