@@ -6,3 +6,4 @@ configupdater
 typer
 ruamel.yaml
 tomlkit
+pre-commit
