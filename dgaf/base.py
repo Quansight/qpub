@@ -350,7 +350,8 @@ class Prior(Project):
             yield from dgaf.tasks.Conda.prior(self)
         elif self.develop or self.install:
             # we'll install these when we make the project.
-            pass
+            if self.pep517:
+                yield from dgaf.tasks.PEP517.prior(self)
         else:
             yield from dgaf.tasks.Pip.prior(self)
 
