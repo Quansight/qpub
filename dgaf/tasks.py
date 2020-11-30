@@ -2,6 +2,7 @@ import dataclasses
 from dgaf.base import Distribution
 from dgaf.base import *
 from dgaf.util import task
+import importlib
 
 LINT_DEFAULTS = {
     None: [
@@ -51,13 +52,6 @@ class Precommit(Distribution):
 
 
 class Test(Distribution):
-    def prior(self):
-
-        if not self.smoke and TOX:
-            yield dgaf.util.install_task("tox")
-        else:
-            yield dgaf.util.install_task("pytest")
-
     def post(self):
         if not self.smoke and TOX:
             # can we infer a good tox test
@@ -67,11 +61,6 @@ class Test(Distribution):
 
 
 class Docs(Distribution):
-
-    # https://jupyterbook.org/customize/toc.html
-    def prior(self):
-        yield dgaf.util.install_task("jupyter_book")
-
     def post(self):
         yield task(
             "build-html-docs",
@@ -114,11 +103,25 @@ class Develop(Distribution):
             MANIFESTIN,
             self.create_manifest,
         )
+
         if self.install:
             if not self.pep517:
                 yield task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
         elif self.develop:
             yield task("setup.py", SETUPCFG, SETUPPY, self.to_setup_py)
+
+        dev = self.dev_dependencies()
+
+        def write_dev():
+            REQUIREMENTSDEV.write_text("\n".join(dev))
+
+        yield task("dev-deps", self.CONTENT, File("requirements-dev.txt"), write_dev)
+        yield task(
+            "install-dev-deps",
+            [REQUIREMENTSDEV] + list(map(bool, map(importlib.util.find_spec, dev))),
+            ...,
+            "pip install -r requirements-dev.txt",
+        )
 
     def post(self):
         yield task(
@@ -178,7 +181,6 @@ class PEP517(Install):
 
 class Conda(Distribution):
     def prior(self):
-        yield dgaf.util.install_task("ensureconda", actions=["ensureconda"])
         yield task(
             "discover-conda-environment",
             [state["options"], SETUPCFG],

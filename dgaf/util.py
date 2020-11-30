@@ -207,20 +207,6 @@ def make_prior_env():
     )
 
 
-def make_pyproject():
-    import git
-
-    author = git.Repo().commit().author
-
-    metadata = dgaf.dodo.PYPROJECT.get("tool", {}).get("flit", {}).get("metadata", {})
-    metadata["module"] = metadata.get("module", "") or "readme"
-    metadata["author"] = metadata.get("author", "") or author.name
-    metadata["author-email"] = metadata.get("author", "") or author.email
-    metadata["homepage"] = "http://"
-    # add requirements
-    dgaf.File("pyproject.toml").dump(dgaf.dodo.PYPROJECT)
-
-
 def depfinder(*files) -> set:
     """Find the dependencies for all of the content."""
     import yaml

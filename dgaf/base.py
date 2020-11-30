@@ -104,6 +104,7 @@ ROOT = Convention()
 README = Convention("readme.md")
 PYPROJECT = Convention("pyproject.toml")
 REQUIREMENTS = Convention("requirements.txt")
+REQUIREMENTSDEV = Convention("requirements-dev.txt")
 SETUPPY = Convention("setup.py")
 SETUPCFG = Convention("setup.cfg")
 SRC = Convention("src")
@@ -229,7 +230,7 @@ class Prior(Project):
             deps += ["setuptools", "wheel"]
 
         if self.lint:
-            deps += ["pre-commit"]
+            deps += ["pre_commit"]
 
         if self.poetry and self.develop:
             deps += ["poetry"]
@@ -241,7 +242,7 @@ class Prior(Project):
             deps += ["mamba"]
 
         if self.docs:
-            deps += ["jupyter-book"]
+            deps += ["jupyter_book"]
         return deps
 
     def create_manifest(self):
@@ -337,6 +338,7 @@ class Prior(Project):
         # explicitly configure how do it
 
         # seed the setup.cfg declarative configuration file.
+
         if self.develop or self.install:
             yield from dgaf.tasks.Develop.prior(self)
 
@@ -351,14 +353,6 @@ class Prior(Project):
             pass
         else:
             yield from dgaf.tasks.Pip.prior(self)
-            ...
-        if self.lint:
-            yield from dgaf.tasks.Precommit.prior(self)
-        if self.test:
-            yield from dgaf.tasks.Test.prior(self)
-
-        if self.docs:
-            yield from dgaf.tasks.Docs.prior(self)
 
 
 @dataclasses.dataclass
