@@ -25,118 +25,6 @@ def squash_depfinder(object):
     )
 
 
-class File(Path):
-    def __bool__(self):
-        return self.is_file()
-
-    def imports(self):
-        import depfinder
-
-        if self.suffix == ".py":
-            deps = depfinder.parse_file(self)
-        elif self.suffix == ".ipynb":
-            deps = depfinder.notebook_path_to_dependencies(self)
-        else:
-            deps = {}
-        return squash_depfinder(deps)
-
-    def is_txt(self):
-        return self.suffix == ".txt"
-
-    def is_env(self):
-        return self.suffix == ".env" or self.stem == ".env"
-
-    def read_text_lines(self):
-        return [
-            line
-            for line in map(str.strip, self.read_text().splitlines())
-            if line and not line.startswith("# ")
-        ]
-
-    def is_gitignore(self):
-        return (
-            self.suffix == ".gitignore" if self.suffix else self == File(".gitignore")
-        )
-
-    def load(self):
-        if self.is_gitignore():
-
-            return self.read_text_lines()
-
-        if self.is_txt():
-            try:
-                return self.read_text_lines()
-            except FileNotFoundError:
-                return []
-
-        try:
-            suffix = self.suffix.lstrip(".")
-            suffix = compat.get(suffix, suffix)
-
-            return Dict(__import__("anyconfig").load(self, suffix))
-        except FileNotFoundError:
-            return {}
-
-    def dump(self, *object, **kwargs):
-        if self.is_txt() or self.is_gitignore():
-            object = object[0] if object else []
-            return self.write_text("\n".join(object))
-        object = (kwargs,) + object
-        object = merge(*object)
-        suffix = self.suffix.lstrip(".")
-        suffix = compat.get(suffix, suffix)
-
-        return __import__("anyconfig").dump(object, self, suffix)
-
-    def commit(self, msg, ammend=False):
-        return
-
-
-class Dir(Path):
-    def __bool__(self):
-        return self.is_dir()
-
-
-class Module(str):
-    def __bool__(self):
-        try:
-            return False
-        except:
-            return False
-
-
-def merge(a, b=None, *extras):
-    """merge dictionaries.  """
-    b = {} if b is None else b
-    if extras:  # reduce the arity until we have a binop
-        b = merge(b, *extras)
-
-    if isinstance(a or b, (str, int, float)):
-        return a or b
-    if isinstance(a or b, (tuple, list)):
-        return type(a or b)(a + b)
-
-    a, b = a or {}, b or {}
-
-    for k in set(a).union(b):
-        if isinstance(a or b, dict):
-            kind = type(a[k] if k in a else b[k])
-        else:
-            kind = type(a or b)
-        if k not in a:
-            a[k] = kind()
-        if issubclass(kind, dict):
-            a[k] = merge(a[k], b.get(k, kind()))
-        elif issubclass(kind, set):
-            a[k] = a[k].union(b.get(k, kind()))
-        elif issubclass(kind, (tuple, list)):
-            # assume unique lists
-            a[k] += [x for x in b.get(k, kind()) if x not in a[k]]
-        else:
-            a[k] = a[k] or b.get(k, kind())
-    return Dict(a)
-
-
 def make_conda_pip_envs():
     import json
     import doit
@@ -190,23 +78,6 @@ def make_conda_pip_envs():
             file.dump(env)
 
 
-def make_prior_env():
-    """create and write conda environment file."""
-    dependencies = depfinder()
-    channels = ["conda-forge"]
-    file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
-
-    if any(x in dependencies for x in ("panel", "holoviews", "hvplot")):
-        channels = ["pyviz"] + channels
-
-    file.dump(
-        dgaf.merge(
-            file.load(),
-            dict(name="notebook", channels=channels, dependencies=list(dependencies)),
-        )
-    )
-
-
 def depfinder(*files) -> set:
     """Find the dependencies for all of the content."""
     import yaml
@@ -228,73 +99,6 @@ def is_site_package(name):
     path = __import__("importlib").find_loader(name).path
 
     return any(path.startswith(x) for x in __import__("site").getsitepackages())
-
-
-@dataclasses.dataclass(order=True)
-class Task:
-    callable: callable
-    input: None = None
-    output: None = None
-    extras: None = dataclasses.field(default_factory=dict)
-
-    def __post_init__(self):
-        if self.input == ...:
-            self.input = None
-
-        if self.output == ...:
-            self.output = None
-
-        for k in "input output callable".split():
-            setattr(self, k, getattr(self, k, None) or [])
-            if not isinstance(getattr(self, k), list):
-                setattr(self, k, [getattr(self, k)])
-
-    def _file_dep(self):
-        return [x for x in self.input if isinstance(x, Path)]
-
-    def _task_dep(self):
-        return [x.__name__ for x in self.input if callable(x)]
-
-    def _uptodate(self):
-        """filter the uptodate dependencies using dict and str values."""
-        return [
-            doit.tools.config_changed(x)
-            for x in self.input
-            if isinstance(x, (dict, str))
-        ]
-
-    def __call__(self):
-        return dict(
-            actions=self.callable,
-            file_dep=self._file_dep(),
-            task_dep=self._task_dep(),
-            targets=self.output,
-            uptodate=self._uptodate(),
-            verbosity=2,
-            doc=self.callable[0].__doc__,
-            **self.extras,
-        )
-
-
-def task(input, output=None, **extras):
-    def wrapped(callable):
-        callable.task = Task(callable, input, output, extras)
-        callable.create_doit_tasks = callable.task.__call__
-        return callable
-
-    return wrapped
-
-
-def action(*args):
-    import doit
-
-    cmd = ""
-    for arg in args:
-        if isinstance(arg, (set, tuple, list, dict)):
-            cmd += " ".join(f'"{x}"' for x in arg)
-        else:
-            cmd += str(arg)
-    return doit.tools.LongRunning(cmd)
 
 
 def is_installed(object: str) -> bool:
@@ -434,7 +238,11 @@ def to_metadata_options(self):
     if not self.distribution.setup_requires:
         pass
     if not self.distribution.install_requires:
-        object["install_requires"] = dgaf.base.REQUIREMENTS.read_text().splitlines()
+        object["install_requires"] = (
+            dgaf.base.REQUIREMENTS.read_text().splitlines()
+            if dgaf.base.REQUIREMENTS
+            else []
+        )
     if not self.distribution.extras_require:
         data["options.extras_require"] = dict(test=[], docs=[])
         pass
@@ -481,3 +289,52 @@ def to_metadata_options(self):
         pass
 
     return data
+
+
+async def infer(file):
+    """infer imports from different kinds of files."""
+    import aiofiles, depfinder, nbconvert, nbformat
+
+    async with aiofiles.open(file, "r") as f:
+        if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
+            return file, {}
+        source = await f.read()
+        if file.suffix == ".ipynb":
+            source = nbconvert.PythonExporter().from_notebook_node(
+                nbformat.reads(source, 4)
+            )[0]
+        try:
+            return file, depfinder.main.get_imported_libs(source).describe()
+        except SyntaxError:
+            return file, {}
+
+
+async def infer_files(files):
+    import asyncio
+
+    return dict(
+        await asyncio.gather(*(infer(file) for file in map(pathlib.Path, files)))
+    )
+
+
+def gather_imports(files):
+    import asyncio
+
+    return asyncio.run(infer_files(files))
+
+
+def _merge_shallow(a, b, *c):
+    """merge the results of dictionaries."""
+    a = a or {}
+    b = functools.reduce(_merge_shallow, (b, *c)) if c else b
+    for k, v in b.items():
+        if k not in a:
+            a[k] = a.get(k, [])
+        for v in v:
+            a[k] += [] if v in a[k] else [v]
+    return a
+
+
+def merged_imports(files):
+    results = _merge_shallow(*gather_imports(files).values())
+    return results.get("required", []) + results.get("questionable", [])

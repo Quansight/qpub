@@ -14,7 +14,15 @@ from dgaf.util import task
 Path = type(pathlib.Path())
 
 
-class File(dgaf.util.File):
+class File(Path):
+    """a supercharged file object that make it is easy to dump and load data.
+
+    the loaders and dumpers edit files in-place, these constraints may not apply to all systems.
+    """
+
+    def __bool__(self):
+        return self.is_file()
+
     def load(self):
         """a permissive method to load data from files and edit documents in place."""
         for cls in File.__subclasses__():
@@ -35,90 +43,19 @@ class File(dgaf.util.File):
 
 
 class Convention(File):
-    ...
+    """Convention types provide an indicator for task targets that
+    may cause cyclic dependencies."""
 
 
-class INI(File):
-    _suffixes = ".ini", ".cfg"
-
-    def load(self):
-        object = __import__("configupdater").ConfigUpdater()
-        try:
-            object.read_string(self.read_text())
-        except FileNotFoundError:
-            object.read_string("")
-        return object
-
-    def dump(self, object):
-        self.write_text(str(object) + "\n")
+from dgaf.files import *
 
 
-class TOML(File):
-    _suffixes = (".toml",)
-
-    def load(self):
-        try:
-            return __import__("tomlkit").parse(self.read_text())
-        except FileNotFoundError:
-            return __import__("tomlkit").parse("")
-
-    def dump(self, object):
-        self.write_text(__import__("tomlkit").dumps(object) + "\n")
-
-
-class YML(File):
-    _suffixes = ".yaml", ".yml", ".json", ".ipynb"
-
-    def load(self):
-        object = __import__("ruamel.yaml").yaml.YAML()
-        try:
-            return object.load(self.read_text())
-        except FileNotFoundError:
-            return {}
-
-    def dump(self, object):
-        with self.open("w") as file:
-            __import__("ruamel").yaml.YAML().dump(object, file)
-
-
-# File conventions.
+# default conventions for https://pydoit.org/configuration.html
 DEFAULT_DOIT_CFG = dict(verbosity=2, backend="sqlite3", par_type="thread")
-CONF = Convention("conf.py")
-DOCS = Convention("docs")  # a convention with precedence from github
-CONFIG = Convention("_config.yml") or DOCS / "_config.yml"
-TOC = Convention("_toc.yml") or DOCS / "_toc.yml"
-DODO = Convention("dodo.py")
-DOITCFG = Convention("doit.cfg")
-DIST = Convention("dist")
-ENVIRONMENT = Convention("environment.yaml") or Convention("environment.yml")
-
-GITHUB = Convention(".github")
-GITIGNORE = Convention(".gitignore")
-INDEX = File("index.html")
-INIT = File("__init__.py")
-POETRYLOCK = Convention("poetry.lock")
-POSTBUILD = Convention("postBuild")
-PYPROJECT = Convention("pyproject.toml")
-MANIFESTIN = Convention("MANIFEST.in")
-ROOT = Convention()
-README = Convention("readme.md") or Convention("README.md")
-PYPROJECT = Convention("pyproject.toml")
-REQUIREMENTS = Convention("requirements.txt")
-REQUIREMENTSDEV = Convention("requirements-dev.txt")
-SETUPPY = Convention("setup.py")
-SETUPCFG = Convention("setup.cfg")
-SRC = Convention("src")
-TOX = Convention("tox.ini")
-WORKFLOWS = GITHUB / "workflows"
-
-OS = os.name
-PRECOMMITCONFIG = Convention(".pre-commit-config.yaml")
-BUILT_SPHINX = File("_build/sphinx")
-CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
 
 class Project:
-    """A base class for projects the creates doit tasks for development environments."""
+    """A base class for projects."""
 
     cwd: Path = None
     REPO: "git.Repo" = None
@@ -130,72 +67,6 @@ class Project:
     distribution: distutils.core.Distribution = None
     sdist: distutils.core.Command = None
     bdist: distutils.core.Command = None
-
-    def get_name(self):
-        return "rip-testum"
-
-    def get_version(self):
-        return __import__("datetime").date.today().strftime("%Y.%m.%d")
-
-    def __post_init__(self):
-        import git
-
-        self.REPO = git.Repo(self.cwd)
-        self.FILES = list(
-            map(dgaf.util.File, git.Git(self.cwd).ls_files().splitlines())
-        )
-        self.CONTENT = [x for x in self.FILES if x not in CONVENTIONS]
-        self.DIRECTORIES = list(
-            x
-            for x in set(map(operator.attrgetter("parent"), self.FILES))
-            if x not in CONVENTIONS
-        )
-        self.INITS = [
-            x / "__init__.py"
-            for x in self.DIRECTORIES
-            if (x != ROOT) and (x / "__init__.py" not in self.CONTENT)
-        ]
-        self.SUFFIXES = list(set(x.suffix for x in self.FILES))
-        self.DISTS = [
-            DIST / f"{self.get_name()}-{self.get_version()}.tar.gz",
-            DIST
-            / f"{self.get_name().replace('-', '_')}-{self.get_version()}-py3-none-any.whl",
-        ]
-
-    def create_doit_tasks(self) -> typing.Iterator[dict]:
-        yield from self
-
-    def __iter__(self):
-        yield from []
-
-    def task(self):
-        return doit.cmd_base.ModuleTaskLoader(
-            {"DOIT_CFG": DEFAULT_DOIT_CFG, type(self).__name__.lower(): self}
-        )
-
-    def main(self):
-        return doit.doit_cmd.DoitMain(self.task())
-
-
-@dataclasses.dataclass
-class Prior(Project):
-    discover: bool = True
-    develop: bool = True
-    install: bool = False
-    test: bool = True
-    lint: bool = True
-    docs: bool = False
-    conda: bool = False
-    smoke: bool = True
-    ci: bool = False
-    pdf: bool = False
-    poetry: bool = False
-    mamba: bool = False
-    pep517: bool = True
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.make_distribution()
 
     def make_distribution(self):
         import setuptools
@@ -217,122 +88,79 @@ class Prior(Project):
         ).get_finalized_command("bdist_wheel")
         self.packages = setuptools.find_packages(where=SRC or ".")
 
-    def dev_dependencies(self):
-        """find the development depdencies we need."""
-        deps = []
-        if self.smoke:
-            deps += ["pytest"]
-        elif TOX:
-            deps += ["tox"]
-        if self.pep517:
-            deps += ["pep517"]
-        else:
-            deps += ["setuptools", "wheel"]
+    def __post_init__(self):
+        import git
 
-        if self.lint:
-            deps += ["pre_commit"]
+        self.REPO = git.Repo(self.cwd)
+        self.FILES = list(map(File, git.Git(self.cwd).ls_files().splitlines()))
 
-        if self.poetry and self.develop:
-            deps += ["poetry"]
-
-        if self.conda:
-            deps += ["ensureconda"]
-
-        if self.mamba:
-            deps += ["mamba"]
-
-        if self.docs:
-            deps += ["jupyter_book"]
-        return deps
-
-    def create_manifest(self):
-        MANIFESTIN.touch()
-
-    def discover_dependencies(self):
-        import pkg_resources
-
-        prior = []
-        for line in REQUIREMENTS.read_text().splitlines():
-            try:
-                prior.append(pkg_resources.Requirement(line).name.lower())
-            except pkg_resources.extern.packaging.requirements.InvalidRequirement:
-                ...
-
-        found = [
-            x for x in dgaf.converters.to_deps(self.CONTENT) if x.lower() not in prior
+        for submodule in self.REPO.submodules:
+            self.FILES += list(
+                File(submodule.path, x.path)
+                for x in git.Repo(submodule.path).tree().traverse()
+            )
+        self.CONTENT = [x for x in self.FILES if x not in CONVENTIONS and x.is_file()]
+        self.DIRECTORIES = list(
+            x
+            for x in set(map(operator.attrgetter("parent"), self.FILES))
+            if x not in CONVENTIONS
+        )
+        self.INITS = [
+            x / "__init__.py"
+            for x in self.DIRECTORIES
+            if (x != ROOT) and (x / "__init__.py" not in self.CONTENT)
         ]
-        with REQUIREMENTS.open("a") as file:
-            file.write("\n" + "\n".join(found))
+        self.SUFFIXES = list(set(x.suffix for x in self.FILES))
+        self.make_distribution()
+        self.DISTS = [
+            self.sdist.get_archive_files(),
+            DIST
+            / (
+                "-".join(
+                    (self.bdist.wheel_dist_name.replace("-", "_"),)
+                    + self.bdist.get_tag()
+                )
+                + ".whl"
+            ),
+        ]
 
-    def init_directories(self):
-        for init in self.INITS:
-            if init == SRC:
-                continue
-            if not init:
-                init.touch()
+    def create_doit_tasks(self) -> typing.Iterator[dict]:
+        yield from self
+
+    def __iter__(self):
+        yield from []
+
+    def task(self):
+        return doit.cmd_base.ModuleTaskLoader(
+            {"DOIT_CFG": DEFAULT_DOIT_CFG, type(self).__name__.lower(): self}
+        )
+
+    def main(self):
+        return doit.doit_cmd.DoitMain(self.task())
+
+
+@dataclasses.dataclass
+class Prior(Project):
+    """Prior defines tasks needed for installation; it introduces flags to control
+    the behavior of `qpub`."""
+
+    discover: bool = True
+    develop: bool = True
+    install: bool = False
+    test: bool = True
+    lint: bool = True
+    docs: bool = False
+    conda: bool = False
+    smoke: bool = True
+    ci: bool = False
+    pdf: bool = False
+    poetry: bool = False
+    mamba: bool = False
+    binder: bool = False
+    pep517: bool = True
 
     def setup_cfg_to_environment_yml(self):
         dgaf.converters.setup_cfg_to_environment_yml()
-
-    def setup_cfg_to_pyproject(self):
-
-        data = PYPROJECT.load()
-        data.update(
-            {
-                "build-system": {
-                    "requires": ["setuptools", "wheel"],
-                    "build-backend": "setuptools.build_meta",
-                }
-            }
-        )
-        PYPROJECT.dump(data)
-
-    def to_setup_cfg(self):
-        data = dgaf.base.SETUPCFG.load()
-        config = dgaf.util.to_metadata_options(self)
-
-        for k, v in config.items():
-            if k not in data:
-                data.add_section(k)
-            for x, y in v.items():
-                if isinstance(y, list):
-                    y = "\n" + __import__("textwrap").indent("\n".join(y), " " * 4)
-                if x in data[k]:
-                    if data[k][x] == y:
-                        # consider merging here.
-                        continue
-                data[k][x] = y
-
-        # add a tool:pytest
-        # https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir
-
-        dgaf.base.SETUPCFG.dump(data)
-
-    def to_setup_py(self):
-        # https://setuptools.readthedocs.io/en/latest/userguide/declarative_config.html#configuring-setup-using-setup-cfg-files
-        SETUPPY.write_text("""__import__("setuptools").setup()""".strip())
-
-    def to_pre_commit_config(self):
-        data = PRECOMMITCONFIG.load()
-        if "repos" not in data:
-            data["repos"] = []
-
-        for suffix in [None] + list(set(x.suffix for x in self.FILES)):
-            if suffix in dgaf.tasks.LINT_DEFAULTS:
-                for kind in dgaf.tasks.LINT_DEFAULTS[suffix]:
-                    for repo in data["repos"]:
-                        if repo["repo"] == kind["repo"]:
-                            repo["rev"] = repo.get("rev", None) or kind.get("rev", None)
-
-                            ids = set(x["id"] for x in kind["hooks"])
-                            repo["hooks"] = repo["hooks"] + [
-                                x for x in kind["hooks"] if x["id"] not in ids
-                            ]
-                            break
-                    else:
-                        data["repos"] += [dict(kind)]
-
-        PRECOMMITCONFIG.dump(data)
 
     def __iter__(self):
         # explicitly configure how do it
@@ -349,15 +177,18 @@ class Prior(Project):
         if self.conda:
             yield from dgaf.tasks.Conda.prior(self)
         elif self.develop or self.install:
-            # we'll install these when we make the project.
-            if self.pep517:
-                yield from dgaf.tasks.PEP517.prior(self)
+            pass
         else:
             yield from dgaf.tasks.Pip.prior(self)
+
+        if self.lint:
+            yield from dgaf.tasks.Precommit.prior(self)
 
 
 @dataclasses.dataclass
 class Distribution(Prior):
+    """Distribution defines tasks needed for installation."""
+
     def __iter__(self):
         yield from super().__iter__()
 
