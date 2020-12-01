@@ -88,6 +88,11 @@ class Project:
         ).get_finalized_command("bdist_wheel")
         self.packages = setuptools.find_packages(where=SRC or ".")
 
+    def get_name(self):
+        directories = {x.parts[0] for x in self.DIRECTORIES}
+        if len(directories) == 1:
+            return next(iter(directories))
+
     def __post_init__(self):
         import git
 
@@ -100,9 +105,10 @@ class Project:
                 for x in git.Repo(submodule.path).tree().traverse()
             )
         self.CONTENT = [x for x in self.FILES if x not in CONVENTIONS and x.is_file()]
+        self.VALID = [x for x in self.CONTENT if qpub.util.valid_import(x)]
         self.DIRECTORIES = list(
             x
-            for x in set(map(operator.attrgetter("parent"), self.FILES))
+            for x in set(map(operator.attrgetter("parent"), self.CONTENT))
             if x not in CONVENTIONS
         )
         self.INITS = [
@@ -113,7 +119,7 @@ class Project:
         self.SUFFIXES = list(set(x.suffix for x in self.FILES))
         self.make_distribution()
         self.DISTS = [
-            self.sdist.get_archive_files(),
+            *self.sdist.get_archive_files(),
             DIST
             / (
                 "-".join(
@@ -140,9 +146,42 @@ class Project:
 
 
 @dataclasses.dataclass
-class Prior(Project):
-    """Prior defines tasks needed for installation; it introduces flags to control
-    the behavior of `qpub`."""
+class Bootstrap(Project):
+    """Bootstrap defines tasks needed for installation; it introduces flags to control
+    the behavior of `qpub`.
+
+    Parameters
+    ----------
+    discover: bool
+        discover dependencies from the contents.
+    develop: bool
+        install the current project as an edittable python package.
+    install: bool
+        install the current project into the site-packages.
+    test: bool
+        test the project, if no test configuration exists then qpub infers some.
+    lint: bool
+        lint the project.
+    docs: bool
+        build the docs.
+    smoke: bool
+        run fast tests as a smoke test.
+    pdf: bool
+        generate a pdf of the documentation.
+    poetry: bool
+        use poetry to manage the installation of python packages.
+    conda: bool
+        operate within a conda environment.
+    mamba: bool
+        use mamba instead of conda, a True implies conda is True
+    binder:bool
+        run tasks to build a development environment on binder.
+    pep517: bool
+        use the emerging pep517 convention to configuration and install the package.
+    shield: bool  # if shield is true the use virtualenv management.
+        use virtual environments for development dependencies. main tasks work in the current conda or venv.
+
+    """
 
     discover: bool = True
     develop: bool = True
@@ -158,6 +197,7 @@ class Prior(Project):
     mamba: bool = False
     binder: bool = False
     pep517: bool = True
+    shield: bool = True  # if shield is true the use virtualenv management.
 
     def setup_cfg_to_environment_yml(self):
         qpub.converters.setup_cfg_to_environment_yml()
@@ -172,9 +212,7 @@ class Prior(Project):
 
         if self.conda:
             yield from qpub.tasks.Conda.prior(self)
-        elif self.develop or self.install:
-            pass
-        else:
+        elif not (self.develop or self.install):
             yield from qpub.tasks.Pip.prior(self)
 
         if self.lint:
@@ -182,7 +220,7 @@ class Prior(Project):
 
 
 @dataclasses.dataclass
-class Distribution(Prior):
+class Distribution(Bootstrap):
     """Distribution defines tasks needed for installation."""
 
     def __iter__(self):

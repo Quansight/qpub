@@ -7,7 +7,10 @@ class INI(File):
     _suffixes = ".ini", ".cfg"
 
     def load(self):
-        object = __import__("configupdater").ConfigUpdater()
+        try:
+            object = __import__("configupdater").ConfigUpdater()
+        except:
+            object = __import__("configparser").ConfigParser()
         try:
             object.read_string(self.read_text())
         except FileNotFoundError:
@@ -39,15 +42,24 @@ class YML(File):
     _suffixes = ".yaml", ".yml"
 
     def load(self):
-        object = __import__("ruamel.yaml").yaml.YAML()
         try:
-            return object.load(self.read_text())
-        except FileNotFoundError:
-            return {}
+            object = __import__("ruamel.yaml").yaml.YAML()
+            try:
+                return object.load(self.read_text())
+            except FileNotFoundError:
+                return {}
+        except ModuleNotFoundError:
+            try:
+                return __import__("yaml").safe_load(self.read_text())
+            except FileNotFoundError:
+                return {}
 
     def dump(self, object):
         with self.open("w") as file:
-            __import__("ruamel").yaml.YAML().dump(object, file)
+            try:
+                __import__("ruamel").yaml.YAML().dump(object, file)
+            except ModuleNotFoundError:
+                file.write(__import__("yaml").safe_dump(object))
 
 
 # File conventions.
@@ -78,6 +90,7 @@ SETUPPY = Convention("setup.py")
 SETUPCFG = Convention("setup.cfg")
 SRC = Convention("src")
 TOX = Convention("tox.ini")
+NOX = Convention("noxfile.py")
 WORKFLOWS = GITHUB / "workflows"
 
 OS = __import__("os").name

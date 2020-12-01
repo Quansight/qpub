@@ -14,7 +14,7 @@ class Precommit(Distribution):
             data["repos"] = []
 
         for suffix in [None] + list(set(x.suffix for x in self.FILES)):
-            if suffix in Precommit`.LINT_DEFAULTS:
+            if suffix in Precommit.LINT_DEFAULTS:
                 for kind in Precommit.LINT_DEFAULTS[suffix]:
                     for repo in data["repos"]:
                         if repo["repo"] == kind["repo"]:
@@ -97,6 +97,14 @@ class Docs(Distribution):
 
 
 class Discover(Distribution):
+    """discover dependencies for a distribution.
+
+    these tasks can be used to bootstrap an environment or as a safety net when testing.
+
+    """
+
+    discover: bool = True
+
     def prior(self):
         yield task(
             "discover-dependencies",
@@ -105,36 +113,10 @@ class Discover(Distribution):
             functools.partial(Discover.discover_dependencies, self),
         )
 
-    def dev_dependencies(self):
-        """find the development depdencies we need."""
-        deps = []
-        if self.smoke:
-            deps += ["pytest"]
-        elif TOX:
-            deps += ["tox"]
-        if self.pep517:
-            deps += ["pep517"]
-        else:
-            deps += ["setuptools", "wheel"]
-
-        if self.lint:
-            deps += ["pre_commit"]
-
-        if self.poetry and self.develop:
-            deps += ["poetry"]
-
-        if self.conda:
-            deps += ["ensureconda"]
-
-        if self.mamba:
-            deps += ["mamba"]
-
-        if self.docs:
-            deps += ["jupyter_book"]
-        return deps
-
     def discover_dependencies(self):
-        import pkg_resources
+        pkg_resources = __import__(
+            "pkg_resources"
+        )  # do this so depfinder doesn't find me
 
         prior = []
         for line in REQUIREMENTS.read_text().splitlines() if REQUIREMENTS else []:
@@ -144,13 +126,18 @@ class Discover(Distribution):
                 ...
 
         found = [
-            x for x in qpub.util.merged_imports(self.CONTENT) if x.lower() not in prior
+            x
+            for x in qpub.util.import_to_pip(qpub.util.merged_imports(self.CONTENT))
+            if x.lower() not in prior
         ]
-        with REQUIREMENTS.open("a") as file:
-            file.write("\n" + "\n".join(found))
+        if found:
+            with REQUIREMENTS.open("a") as file:
+                file.write("\n" + "\n".join(found))
 
 
 class Develop(Distribution):
+    """Populate the configuration files to develop a package."""
+
     def create_manifest(self):
         MANIFESTIN.touch()
 
@@ -176,7 +163,7 @@ class Develop(Distribution):
 
     def to_setup_cfg(self):
         data = qpub.base.SETUPCFG.load()
-        config = qpub.util.to_metadata_options(self)
+        config = Develop.to_metadata_options(self)
 
         for k, v in config.items():
             if k not in data:
@@ -195,6 +182,135 @@ class Develop(Distribution):
 
         qpub.base.SETUPCFG.dump(data)
 
+    def to_metadata_options(self):
+        import setuptools
+
+        UNKNOWN = "UNKNOWN"
+        data = dict()
+        object = data["metadata"] = dict()
+        if self.distribution.get_name() == UNKNOWN:
+            object["name"] = Develop.get_name(self)
+        if self.distribution.get_version() == "0.0.0":
+            object["version"] = __import__("datetime").date.today().strftime("%Y.%m.%d")
+        if self.distribution.get_url() == UNKNOWN:
+            object["url"] = self.REPO.remote("origin").url
+            if object["url"].endswith(".git"):
+                object["url"] = object["url"][: -len(".git")]
+
+        if self.distribution.get_download_url() == UNKNOWN:
+            # populate this for a release
+            pass
+
+        if self.distribution.get_author() == UNKNOWN:
+            object["author"] = self.REPO.commit().author.name
+
+        if self.distribution.get_author_email() == UNKNOWN:
+            object["author_email"] = self.REPO.commit().author.email
+
+        if self.distribution.get_maintainer() == UNKNOWN:
+            pass
+
+        if self.distribution.get_maintainer_email() == UNKNOWN:
+            pass
+
+        if not self.distribution.get_classifiers():
+            # import trove_classifiers
+            # https://github.com/pypa/trove-classifiers/
+            pass
+
+        if self.distribution.get_license() == UNKNOWN:
+            # There has to be a service for these.
+            pass
+
+        if self.distribution.get_description() == UNKNOWN:
+            object["description"] = ""
+
+        if self.distribution.get_long_description() == UNKNOWN:
+            # metadata['long_description_content_type']
+            object[
+                "long_description"
+            ] = f"""file: {qpub.base.File("readme.md") or qpub.base.File("README.md")}"""
+
+        if not self.distribution.get_keywords():
+            pass
+
+        if self.distribution.get_platforms() == [UNKNOWN]:
+            pass
+
+        if not self.distribution.get_provides():
+            # https://www.python.org/dev/peps/pep-0314/
+            pass
+
+        if not self.distribution.get_requires():
+            # cant have versions?
+            pass
+
+        if not self.distribution.get_obsoletes():
+            pass
+
+        object = data["options"] = dict()
+        if self.distribution.zip_safe is None:
+            object["zip_safe"] = False
+
+        if not self.distribution.setup_requires:
+            pass
+        if not self.distribution.install_requires:
+            object["install_requires"] = list(
+                x
+                for x in (
+                    qpub.base.REQUIREMENTS.read_text().splitlines()
+                    if qpub.base.REQUIREMENTS
+                    else []
+                )
+                if x.strip()
+            )
+        if not self.distribution.extras_require:
+            data["options.extras_require"] = dict(test=[], docs=[])
+            pass
+
+        if not self.distribution.python_requires:
+            pass
+        if not self.distribution.entry_points:
+            data["options.entry_points"] = {}
+
+        if self.distribution.scripts is None:
+            pass
+
+        if self.distribution.eager_resources is None:
+            pass
+
+        if not self.distribution.dependency_links:
+            pass
+        if not self.distribution.tests_require:
+            pass
+        if self.distribution.include_package_data is None:
+            object["include_package_data"] = True
+
+        if self.distribution.packages is None:
+            object["packages"] = self.packages
+
+        if not self.distribution.package_dir:
+            if qpub.base.SRC.exists():
+                object["package_dir"] = ["=src"]
+            pass
+
+        if not self.distribution.package_data:
+            pass
+
+        if self.distribution.exclude_package_data is None:
+            pass
+
+        if self.distribution.namespace_packages is None:
+            pass
+
+        if not self.distribution.py_modules:
+            pass
+
+        if not self.distribution.data_files:
+            pass
+
+        return data
+
     def to_setup_py(self):
         # https://setuptools.readthedocs.io/en/latest/userguide/declarative_config.html#configuring-setup-using-setup-cfg-files
         SETUPPY.write_text("""__import__("setuptools").setup()""".strip())
@@ -206,6 +322,8 @@ class Develop(Distribution):
             deps += ["pytest"]
         elif TOX:
             deps += ["tox"]
+        elif NOX:
+            deps += ["nox"]
         if self.pep517:
             deps += ["pep517"]
         else:
@@ -215,6 +333,7 @@ class Develop(Distribution):
             deps += ["pre_commit"]
 
         if self.poetry and self.develop:
+            # don't need this on an install
             deps += ["poetry"]
 
         if self.conda:
@@ -228,16 +347,7 @@ class Develop(Distribution):
         return deps
 
     def prior(self):
-        state = SETUPCFG.load()
-        # infer the declarative setup file.
-        if hasattr(state, "to_dict"):
-            state = state.to_dict()
-        yield task(
-            "setup.cfg",
-            self.CONTENT,
-            SETUPCFG,
-            functools.partial(Develop.to_setup_cfg, self),
-        )
+        state = getattr(SETUPCFG.load(), "_sections", {})
 
         # add __init__ to folders
         yield task(
@@ -255,6 +365,15 @@ class Develop(Distribution):
             functools.partial(Develop.create_manifest, self),
         )
 
+        # infer the declarative setup file.
+        # this gets run on install, but may not necessary
+        yield task(
+            "setup.cfg",
+            self.CONTENT,
+            SETUPCFG,
+            functools.partial(Develop.to_setup_cfg, self),
+        )
+
         setuppy_task = task(
             "setup.py", SETUPCFG, SETUPPY, functools.partial(Develop.to_setup_py, self)
         )
@@ -264,7 +383,7 @@ class Develop(Distribution):
         elif self.develop:
             yield setuppy_task
 
-        dev = Discover.dev_dependencies(self)
+        dev = Develop.dev_dependencies(self)
 
         def write_dev():
             REQUIREMENTSDEV.write_text("\n".join(dev))
@@ -283,9 +402,10 @@ class Develop(Distribution):
         )
 
     def post(self):
+        data = getattr(SETUPCFG.load(), "_sections", {})
         yield task(
             "develop-package",
-            [SETUPCFG, SETUPPY],
+            [data],
             ...,
             [
                 (doit.tools.create_folder, ["build"]),
@@ -300,7 +420,9 @@ class Develop(Distribution):
 class Install(Develop):
     def post(self):
         if self.pep517:
-            yield task("build-system", SETUPCFG, PYPROJECT, self.setup_cfg_to_pyproject)
+            yield task(
+                "build-system", SETUPCFG, PYPROJECT, Develop.setup_cfg_to_pyproject
+            )
             yield task(
                 "build-dist",
                 self.CONTENT + [PYPROJECT, SETUPCFG, README],

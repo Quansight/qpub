@@ -3,26 +3,12 @@ import pathlib
 import functools
 import dataclasses
 import doit
+import typing
 
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
 pkg2pip = dict(git="GitPython", dotenv="python-dotenv")
-
-
-def squash_depfinder(object):
-    import depfinder.inspection
-
-    if isinstance(object, tuple):
-        object = object[-1]
-    if isinstance(object, depfinder.inspection.ImportFinder):
-        object = object.describe()
-    return set(
-        map(
-            lambda x: pkg2pip.get(x, x),
-            set(object.get("required", set())).union(object.get("questionable", set())),
-        )
-    )
 
 
 def make_conda_pip_envs():
@@ -107,7 +93,9 @@ def is_installed(object: str) -> bool:
 
 
 def ensure_conda() -> bool:
-    import contextlib, io, ensureconda.cli
+    import contextlib, io
+
+    ensureconda = __import__("ensureconda.cli")
 
     with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(
         io.StringIO()
@@ -149,160 +137,30 @@ def task(name, input, output, actions, **kwargs):
     return dict(name=name, actions=actions, **kwargs)
 
 
-def install_task(object, **kwargs):
-    return task(
-        f"install-{object}",
-        qpub.util.is_installed(object),
-        ...,
-        f"python -m pip install {object}",
-        **kwargs,
+def rough_source(nb):
+    """extract a rough version of the source in notebook to infer files from"""
+    import textwrap, json
+
+    if isinstance(nb, str):
+        nb = json.loads(nb)
+
+    return "\n".join(
+        textwrap.dedent("".join(x["source"]))
+        for x in nb.get("cells", [])
+        if x["cell_type"] == "code"
     )
-
-
-def get_name(self):
-    directories = {x.parts[0] for x in self.DIRECTORIES}
-    if len(directories) == 1:
-        return next(iter(directories))
-
-
-def to_metadata_options(self):
-    import setuptools
-
-    UNKNOWN = "UNKNOWN"
-    data = dict()
-    object = data["metadata"] = dict()
-    if self.distribution.get_name() == UNKNOWN:
-        object["name"] = get_name(self)
-    if self.distribution.get_version() == "0.0.0":
-        object["version"] = __import__("datetime").date.today().strftime("%Y.%m.%d")
-    if self.distribution.get_url() == UNKNOWN:
-        object["url"] = self.REPO.remote("origin").url
-        if object["url"].endswith(".git"):
-            object["url"] = object["url"][: -len(".git")]
-
-    if self.distribution.get_download_url() == UNKNOWN:
-        # populate this for a release
-        pass
-
-    if self.distribution.get_author() == UNKNOWN:
-        object["author"] = self.REPO.commit().author.name
-
-    if self.distribution.get_author_email() == UNKNOWN:
-        object["author_email"] = self.REPO.commit().author.email
-
-    if self.distribution.get_maintainer() == UNKNOWN:
-        pass
-
-    if self.distribution.get_maintainer_email() == UNKNOWN:
-        pass
-
-    if not self.distribution.get_classifiers():
-        # import trove_classifiers
-        # https://github.com/pypa/trove-classifiers/
-        pass
-
-    if self.distribution.get_license() == UNKNOWN:
-        # There has to be a service for these.
-        pass
-
-    if self.distribution.get_description() == UNKNOWN:
-        object["description"] = ""
-
-    if self.distribution.get_long_description() == UNKNOWN:
-        # metadata['long_description_content_type']
-        object[
-            "long_description"
-        ] = f"""file: {qpub.base.File("readme.md") or qpub.base.File("README.md")}"""
-
-    if not self.distribution.get_keywords():
-        pass
-
-    if self.distribution.get_platforms() == [UNKNOWN]:
-        pass
-
-    if not self.distribution.get_provides():
-        # https://www.python.org/dev/peps/pep-0314/
-        pass
-
-    if not self.distribution.get_requires():
-        # cant have versions?
-        pass
-
-    if not self.distribution.get_obsoletes():
-        pass
-
-    object = data["options"] = dict()
-    if self.distribution.zip_safe is None:
-        object["zip_safe"] = False
-
-    if not self.distribution.setup_requires:
-        pass
-    if not self.distribution.install_requires:
-        object["install_requires"] = (
-            qpub.base.REQUIREMENTS.read_text().splitlines()
-            if qpub.base.REQUIREMENTS
-            else []
-        )
-    if not self.distribution.extras_require:
-        data["options.extras_require"] = dict(test=[], docs=[])
-        pass
-
-    if not self.distribution.python_requires:
-        pass
-    if not self.distribution.entry_points:
-        data["options.entry_points"] = {}
-
-    if self.distribution.scripts is None:
-        pass
-
-    if self.distribution.eager_resources is None:
-        pass
-
-    if not self.distribution.dependency_links:
-        pass
-    if not self.distribution.tests_require:
-        pass
-    if self.distribution.include_package_data is None:
-        object["include_package_data"] = True
-
-    if self.distribution.packages is None:
-        object["packages"] = self.packages
-
-    if not self.distribution.package_dir:
-        if qpub.base.SRC.exists():
-            object["package_dir"] = ["=src"]
-        pass
-
-    if not self.distribution.package_data:
-        pass
-
-    if self.distribution.exclude_package_data is None:
-        pass
-
-    if self.distribution.namespace_packages is None:
-        pass
-
-    if not self.distribution.py_modules:
-        pass
-
-    if not self.distribution.data_files:
-        pass
-
-    return data
 
 
 async def infer(file):
     """infer imports from different kinds of files."""
-    import aiofiles, depfinder, nbconvert, nbformat
+    import aiofiles, depfinder, json
 
     async with aiofiles.open(file, "r") as f:
         if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
             return file, {}
         source = await f.read()
         if file.suffix == ".ipynb":
-            source = nbconvert.PythonExporter().from_notebook_node(
-                nbformat.reads(source, 4)
-            )[0]
+            source = rough_source(file.read_text())
         try:
             return file, depfinder.main.get_imported_libs(source).describe()
         except SyntaxError:
@@ -310,20 +168,30 @@ async def infer(file):
 
 
 async def infer_files(files):
-    import asyncio
-
     return dict(
-        await asyncio.gather(*(infer(file) for file in map(pathlib.Path, files)))
+        await __import__("asyncio").gather(
+            *(infer(file) for file in map(pathlib.Path, files))
+        )
     )
 
 
-def gather_imports(files):
-    import asyncio
+def gather_imports(files: typing.List[Path]) -> typing.List[dict]:
+    """"""
+    import asyncio, sys
+
+    if "depfinder" not in sys.modules:
+
+        dir = Path(__import__("appdirs").user_data_dir("qpub"))
+        __import__("requests_cache").install_cache(str(dir / "qpub"))
+        dir.mkdir(parents=True, exist_ok=True)
+        import depfinder
+
+        __import__("requests_cache").uninstall_cache()
 
     return asyncio.run(infer_files(files))
 
 
-def _merge_shallow(a, b, *c):
+def _merge_shallow(a: dict, b: dict, *c: dict) -> dict:
     """merge the results of dictionaries."""
     a = a or {}
     b = functools.reduce(_merge_shallow, (b, *c)) if c else b
@@ -335,6 +203,42 @@ def _merge_shallow(a, b, *c):
     return a
 
 
-def merged_imports(files):
+def merged_imports(files: typing.List[Path]) -> dict:
     results = _merge_shallow(*gather_imports(files).values())
     return results.get("required", []) + results.get("questionable", [])
+
+
+IMPORT_TO_PIP = None
+PIP_TO_CONDA = None
+
+
+def import_to_pip(list):
+    import depfinder
+
+    global IMPORT_TO_PIP
+    if not IMPORT_TO_PIP:
+        IMPORT_TO_PIP = {
+            x["import_name"]: x["pypi_name"] for x in depfinder.utils.mapping_list
+        }
+    return [IMPORT_TO_PIP.get(x, x) for x in list]
+
+
+def pypi_to_conda(list):
+    import depfinder
+
+    global PIP_TO_CONDA
+    if not PIP_TO_CONDA:
+        PIP_TO_CONDA = {
+            x["import_name"]: x["cond`a_name"] for x in depfinder.utils.mapping_list
+        }
+    return [PIP_TO_CONDA.get(x, x) for x in list]
+
+
+def valid_import(object: typing.Union[str, typing.Iterable]) -> bool:
+    """determine if an object can be joined into a valid import statement."""
+    if isinstance(object, Path):
+        object = ".".join(object.parts)
+    try:
+        return bool(__import__("ast").parse(object))
+    except SyntaxError:
+        return False

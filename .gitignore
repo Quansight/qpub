@@ -11,3 +11,4 @@ settings.json
 .tox
 poetry.lock
 .pytest_cache
+.nox
