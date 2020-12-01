@@ -1,11 +1,11 @@
 # deathbeds generalized automation framework
 
-`dgaf` expands compact content into development, documentation, and testing environments.
+`qpub` expands compact content into development, documentation, and testing environments.
 
-    import git, typing, dgaf, doit, shutil, typer, sys, os
-    from dgaf import File, merge, files as f
+    import git, typing, qpub, doit, shutil, typer, sys, os
+    from qpub import File, merge, files as f
     from doit.tools import LongRunning
-    from dgaf.files import *
+    from qpub.files import *
 
 all of the CLI commands need to be defined in `__all__`.
 
@@ -19,9 +19,9 @@ infer the dependencies from the existings repository contents.
 
 a common need in reproducible environments is to define environment files for pip in a `REQUIREMENTS` or python configuration file; in scientific computing worlds `CONDA` requirements become important.
 
-the `infer` method uses existing configuration files like `PYPROJECT, SETUPCFG or SETUPPY`. `dgaf.converters.to_dep` walks the `git` content then uses notebooks, python scripts, and markdown to infer environment parameters.
+the `infer` method uses existing configuration files like `PYPROJECT, SETUPCFG or SETUPPY`. `qpub.converters.to_dep` walks the `git` content then uses notebooks, python scripts, and markdown to infer environment parameters.
 
-        deps = dgaf.converters.to_deps()
+        deps = qpub.converters.to_deps()
 
         if f.REQUIREMENTS not in f.INCLUDE:
 
@@ -33,13 +33,13 @@ write then `REQUIREMENTS` file from the inferred dependencies
 
 write the `"/tool/flit/metadata/"` to the `PYPROJECT` file
 
-            dgaf.converters.to_flit(deps)
+            qpub.converters.to_flit(deps)
 
         if f.SETUPPY not in f.INCLUDE:
 
 create a `SETUPPY` file from the `PYPROJECT` configuration
 
-            dgaf.converters.flit_to_setup(deps)
+            qpub.converters.flit_to_setup(deps)
 
         if f.CONDA and f.ENVIRONMENT not in f.INCLUDE:
 
@@ -52,7 +52,7 @@ expand the requirements into things `CONDA` can solve, and things that we need t
 infer `CONDA` environments from different configuration files.
 
         deps = deps or REQUIREMENTS and REQUIREMENTS.load()
-        dgaf.converters.to_conda(deps)
+        qpub.converters.to_conda(deps)
 
     def setup():
 
@@ -136,7 +136,7 @@ build documentation with [jupyter book]
 
 
         data = PYPROJECT.load()
-        INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
+        INSTALLED = qpub.util.is_site_package(data["/tool/flit/metadata/module"])
         if 'docs' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
                 if f.OS == "nt":
@@ -149,7 +149,7 @@ build documentation with [jupyter book]
         jb toc .
         f.CONFIG = File("_config.yml")
         f.CONFIG.dump(
-            f.CONFIG.load(), dgaf.template._config,
+            f.CONFIG.load(), qpub.template._config,
             repository=dict(url=f.REPO.remote("origin").url[:-len(".git")])
         )
         jb build .
@@ -163,7 +163,7 @@ build a blog with nikola
 
         # make decisions backed on content
         nikola init
-        jupyter nbconvert --to dgaf.exporters.Nikola "**/*.ipynb"
+        jupyter nbconvert --to qpub.exporters.Nikola "**/*.ipynb"
 
 
     def test():
@@ -181,7 +181,7 @@ install a package that interfaces pytest with github actions annotations.
 the module we're build should be installed at this point. we determine how the main package being developed is installed
 
 
-        INSTALLED = dgaf.util.is_site_package(data["/tool/flit/metadata/module"])
+        INSTALLED = qpub.util.is_site_package(data["/tool/flit/metadata/module"])
 
         if 'test' in data["/tool/flit/metadata/requires-extra"]:
             if INSTALLED:
@@ -197,13 +197,13 @@ if it is in site-packages, install the extra test dependencies if they are speci
 
 
 
-append all of the methods to the `dgaf` cli.
+append all of the methods to the `qpub` cli.
 
-## `dgaf` application
+## `qpub` application
 
 add commands to the CLI based on the contents of `__all__`. the `app` is initialized in the `"__init__.py"` using `typer.`
 
-    [dgaf.app.command()(x) for x in map(locals().get, __all__)]
+    [qpub.app.command()(x) for x in map(locals().get, __all__)]
 
 set `xonsh` to raise errors when subprocess fail.
 

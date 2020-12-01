@@ -1,47 +1,21 @@
 import dataclasses
-from dgaf.base import Distribution
-from dgaf.base import *
-from dgaf.util import task
+from qpub.base import Distribution
+from qpub.base import *
+from qpub.util import task
 import importlib
 import functools
-
-LINT_DEFAULTS = {
-    None: [
-        dict(
-            repo="https://github.com/pre-commit/pre-commit-hooks",
-            rev="v2.3.0",
-            hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
-        )
-    ],
-    ".yml": [
-        dict(
-            repo="https://github.com/pre-commit/pre-commit-hooks",
-            hooks=[dict(id="check-yaml")],
-        )
-    ],
-    ".py": [
-        dict(
-            repo="https://github.com/psf/black", rev="19.3b0", hooks=[dict(id="black")]
-        ),
-        dict(
-            repo="https://github.com/life4/flakehell",
-            rev="v.0.7.0",
-            hooks=[dict(id="flakehell")],
-        ),
-    ],
-}
-LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
 
 class Precommit(Distribution):
     def to_pre_commit_config(self):
+        """from the suffixes in the content, fill out the precommit based on our opinions."""
         data = PRECOMMITCONFIG.load()
         if "repos" not in data:
             data["repos"] = []
 
         for suffix in [None] + list(set(x.suffix for x in self.FILES)):
-            if suffix in dgaf.tasks.LINT_DEFAULTS:
-                for kind in dgaf.tasks.LINT_DEFAULTS[suffix]:
+            if suffix in Precommit`.LINT_DEFAULTS:
+                for kind in Precommit.LINT_DEFAULTS[suffix]:
                     for repo in data["repos"]:
                         if repo["repo"] == kind["repo"]:
                             repo["rev"] = repo.get("rev", None) or kind.get("rev", None)
@@ -72,6 +46,35 @@ class Precommit(Distribution):
 
     def post(self):
         yield task("format-lint", [False], ..., "python -m pre_commit run --all-files")
+
+    LINT_DEFAULTS = {
+        None: [
+            dict(
+                repo="https://github.com/pre-commit/pre-commit-hooks",
+                rev="v2.3.0",
+                hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
+            )
+        ],
+        ".yml": [
+            dict(
+                repo="https://github.com/pre-commit/pre-commit-hooks",
+                hooks=[dict(id="check-yaml")],
+            )
+        ],
+        ".py": [
+            dict(
+                repo="https://github.com/psf/black",
+                rev="19.3b0",
+                hooks=[dict(id="black")],
+            ),
+            dict(
+                repo="https://github.com/life4/flakehell",
+                rev="v.0.7.0",
+                hooks=[dict(id="flakehell")],
+            ),
+        ],
+    }
+    LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
 
 class Test(Distribution):
@@ -141,7 +144,7 @@ class Discover(Distribution):
                 ...
 
         found = [
-            x for x in dgaf.util.merged_imports(self.CONTENT) if x.lower() not in prior
+            x for x in qpub.util.merged_imports(self.CONTENT) if x.lower() not in prior
         ]
         with REQUIREMENTS.open("a") as file:
             file.write("\n" + "\n".join(found))
@@ -172,8 +175,8 @@ class Develop(Distribution):
         PYPROJECT.dump(data)
 
     def to_setup_cfg(self):
-        data = dgaf.base.SETUPCFG.load()
-        config = dgaf.util.to_metadata_options(self)
+        data = qpub.base.SETUPCFG.load()
+        config = qpub.util.to_metadata_options(self)
 
         for k, v in config.items():
             if k not in data:
@@ -190,7 +193,7 @@ class Develop(Distribution):
         # add a tool:pytest
         # https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir
 
-        dgaf.base.SETUPCFG.dump(data)
+        qpub.base.SETUPCFG.dump(data)
 
     def to_setup_py(self):
         # https://setuptools.readthedocs.io/en/latest/userguide/declarative_config.html#configuring-setup-using-setup-cfg-files

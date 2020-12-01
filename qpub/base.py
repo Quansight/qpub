@@ -1,5 +1,5 @@
 """base.py"""
-import dgaf
+import qpub
 import pathlib
 import functools
 import textwrap
@@ -9,7 +9,7 @@ import doit
 import distutils.command.sdist
 import operator
 import os
-from dgaf.util import task
+from qpub.util import task
 
 Path = type(pathlib.Path())
 
@@ -47,7 +47,7 @@ class Convention(File):
     may cause cyclic dependencies."""
 
 
-from dgaf.files import *
+from qpub.files import *
 
 
 # default conventions for https://pydoit.org/configuration.html
@@ -160,29 +160,25 @@ class Prior(Project):
     pep517: bool = True
 
     def setup_cfg_to_environment_yml(self):
-        dgaf.converters.setup_cfg_to_environment_yml()
+        qpub.converters.setup_cfg_to_environment_yml()
 
     def __iter__(self):
-        # explicitly configure how do it
-
-        # seed the setup.cfg declarative configuration file.
-
         if self.develop or self.install:
-            yield from dgaf.tasks.Develop.prior(self)
+            yield from qpub.tasks.Develop.prior(self)
 
         if self.discover:
             # discover dependencies in the content with depfinder and append the results.
-            yield from dgaf.tasks.Discover.prior(self)
+            yield from qpub.tasks.Discover.prior(self)
 
         if self.conda:
-            yield from dgaf.tasks.Conda.prior(self)
+            yield from qpub.tasks.Conda.prior(self)
         elif self.develop or self.install:
             pass
         else:
-            yield from dgaf.tasks.Pip.prior(self)
+            yield from qpub.tasks.Pip.prior(self)
 
         if self.lint:
-            yield from dgaf.tasks.Precommit.prior(self)
+            yield from qpub.tasks.Precommit.prior(self)
 
 
 @dataclasses.dataclass
@@ -194,24 +190,24 @@ class Distribution(Prior):
 
         if self.conda or self.mamba:
             # update the conda environemnt
-            yield from dgaf.tasks.Conda.post(self)
+            yield from qpub.tasks.Conda.post(self)
         elif not (self.install or self.develop):
             # update the pip environment
-            yield from dgaf.tasks.Pip.post(self)
+            yield from qpub.tasks.Pip.post(self)
 
         if self.install:
             # install to site packages.
-            yield from dgaf.tasks.Install.post(self)
+            yield from qpub.tasks.Install.post(self)
 
         elif self.develop:
             # make a setup.py to use in develop mode
-            yield from dgaf.tasks.Develop.post(self)
+            yield from qpub.tasks.Develop.post(self)
 
         if self.lint:
-            yield from dgaf.tasks.Precommit.post(self)
+            yield from qpub.tasks.Precommit.post(self)
 
         if self.test:
-            yield from dgaf.tasks.Test.post(self)
+            yield from qpub.tasks.Test.post(self)
 
         if self.docs:
-            yield from dgaf.tasks.Docs.post(self)
+            yield from qpub.tasks.Docs.post(self)

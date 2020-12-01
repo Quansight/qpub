@@ -18,10 +18,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install
       run: |
-        dgaf install
+        qpub install
     - name: Test
       run: |
-        dgaf test
+        qpub test
     - name: Build
       run: |
-        dgaf build
+        qpub build

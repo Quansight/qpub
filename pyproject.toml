@@ -1,5 +1,5 @@
 [entrypoints.console_scripts]
-dgaf = "dgaf:main"
+qpub = "qpub:main"
 
 [tool.flakehell]
 base = "https://raw.githubusercontent.com/life4/flakehell/master/pyproject.toml"
@@ -10,6 +10,5 @@ exclude=[".ipynb_checkpoints", "setup.py"]
 
 [tool.flakehell.plugins]
 # include everything in pyflakes except F401
-pyflakes = ["-F405",]
-pycodestyle = ["-W503", "-E722"]
-
+pyflakes = ["-F405"]
+pycodestyle = ["-W503", "-E722", "-E999"]

@@ -29,5 +29,5 @@ description-file = ""
 [tool.coverage]
 [tool.tox]
 [tool.pytest.ini_options]
-[tool.dgaf.env]
+[tool.qpub.env]
 [tool.semantic_release]

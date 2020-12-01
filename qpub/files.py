@@ -1,4 +1,4 @@
-from dgaf.base import File, Convention
+from qpub.base import File, Convention
 
 
 class INI(File):

@@ -17,12 +17,12 @@ jobs:
         doit install
     - name: Install local package
       run: |
-        dgaf install
+        qpub install
     - name: Test
-      run: dgaf test
+      run: qpub test
     - name: Build
       run: |
-        dgaf build
+        qpub build
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@master
       with:

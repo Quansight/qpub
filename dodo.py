@@ -10,14 +10,15 @@ def task_dev():
 
 
 def bootstrap():
-    distribution = __import__("dgaf").base.Distribution()
+    distribution = __import__("qpub").base.Distribution()
     distribution.to_setup_cfg()
     distribution.to_setup_py()
+    distribution.setup_cfg_to_pyproject()
 
 
 def task_setup():
 
-    """install the built dgaf this is used in [github actions] for testing this package on mac, windows, and linux."""
+    """install the built qpub this is used in [github actions] for testing this package on mac, windows, and linux."""
     import os, inspect
 
     actions = [

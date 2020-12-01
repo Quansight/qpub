@@ -1,4 +1,4 @@
-import dgaf
+import qpub
 import pathlib
 import functools
 import dataclasses
@@ -29,9 +29,9 @@ def make_conda_pip_envs():
     import json
     import doit
 
-    file = dgaf.File("environment.yml") or dgaf.File("environment.yaml")
+    file = qpub.File("environment.yml") or qpub.File("environment.yaml")
     file or make_prior_env()
-    reqs = dgaf.File("requirements.txt")
+    reqs = qpub.File("requirements.txt")
     reqs.touch()
     env = file.load()
     if not env.get("dependencies", []):
@@ -48,7 +48,7 @@ def make_conda_pip_envs():
         ...
     if "error" in result:
         if result.get("packages"):
-            reqs = dgaf.File("requirements.txt")
+            reqs = qpub.File("requirements.txt")
             reqs.write_text(
                 "\n".join(
                     set(filter(str.strip, reqs.read_text().splitlines())).union(
@@ -91,7 +91,7 @@ def depfinder(*files) -> set:
     deps = set()
     for file in files:
         deps = deps.union(file.imports())
-    deps.discard("dgaf")
+    deps.discard("qpub")
     return {x for x in deps if x not in "python"}
 
 
@@ -152,7 +152,7 @@ def task(name, input, output, actions, **kwargs):
 def install_task(object, **kwargs):
     return task(
         f"install-{object}",
-        dgaf.util.is_installed(object),
+        qpub.util.is_installed(object),
         ...,
         f"python -m pip install {object}",
         **kwargs,
@@ -212,7 +212,7 @@ def to_metadata_options(self):
         # metadata['long_description_content_type']
         object[
             "long_description"
-        ] = f"""file: {dgaf.base.File("readme.md") or dgaf.base.File("README.md")}"""
+        ] = f"""file: {qpub.base.File("readme.md") or qpub.base.File("README.md")}"""
 
     if not self.distribution.get_keywords():
         pass
@@ -239,8 +239,8 @@ def to_metadata_options(self):
         pass
     if not self.distribution.install_requires:
         object["install_requires"] = (
-            dgaf.base.REQUIREMENTS.read_text().splitlines()
-            if dgaf.base.REQUIREMENTS
+            qpub.base.REQUIREMENTS.read_text().splitlines()
+            if qpub.base.REQUIREMENTS
             else []
         )
     if not self.distribution.extras_require:
@@ -269,7 +269,7 @@ def to_metadata_options(self):
         object["packages"] = self.packages
 
     if not self.distribution.package_dir:
-        if dgaf.base.SRC.exists():
+        if qpub.base.SRC.exists():
             object["package_dir"] = ["=src"]
         pass
 

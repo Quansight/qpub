@@ -1,12 +1,12 @@
 """converters.py"""
-import dgaf
-from dgaf import File
-from dgaf.base import *
+import qpub
+from qpub import File
+from qpub.base import *
 import doit
 
 
 def to_deps(FILES):
-    dependencies = set(dgaf.util.depfinder(*FILES))
+    dependencies = set(qpub.util.depfinder(*FILES))
 
     for x in "python".split():
         x in dependencies and dependencies.remove(x)
@@ -62,7 +62,7 @@ def pip_to_conda(write=True, to=None):
         " ".join(["conda install --dry-run --json"] + REQUIREMENTS.load())
     )
     cmd.execute()
-    result = dgaf.util.Dict(__import__("json").loads(cmd.out))
+    result = qpub.util.Dict(__import__("json").loads(cmd.out))
 
     if "error" in result:
         if result["/packages"]:
