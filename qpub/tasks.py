@@ -1,9 +1,13 @@
 import dataclasses
-from qpub.base import Distribution
-from qpub.base import *
-from qpub.util import task
+from .base import Distribution, File
+from .files import *
+from .util import task
+from . import util
 import importlib
 import functools
+import doit
+
+_qpub_nox = File(__file__).parent / NOX
 
 
 class Precommit(Distribution):
@@ -37,15 +41,9 @@ class Precommit(Distribution):
             PRECOMMITCONFIG,
             functools.partial(Precommit.to_pre_commit_config, self),
         )
-        yield task(
-            "install-pre-commit-hooks",
-            [PRECOMMITCONFIG, PRECOMMITCONFIG.load()],
-            ...,
-            "pre-commit install-hooks",
-        )
 
     def post(self):
-        yield task("format-lint", [False], ..., "python -m pre_commit run --all-files")
+        yield task("format-lint", [False], ..., f"nox -f {_qpub_nox} -s lint")
 
     LINT_DEFAULTS = {
         None: [
@@ -127,7 +125,7 @@ class Discover(Distribution):
 
         found = [
             x
-            for x in qpub.util.import_to_pip(qpub.util.merged_imports(self.CONTENT))
+            for x in util.import_to_pip(util.merged_imports(self.CONTENT))
             if x.lower() not in prior
         ]
         if found:
@@ -162,7 +160,7 @@ class Develop(Distribution):
         PYPROJECT.dump(data)
 
     def to_setup_cfg(self):
-        data = qpub.base.SETUPCFG.load()
+        data = SETUPCFG.load()
         config = Develop.to_metadata_options(self)
 
         for k, v in config.items():
@@ -180,7 +178,7 @@ class Develop(Distribution):
         # add a tool:pytest
         # https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir
 
-        qpub.base.SETUPCFG.dump(data)
+        SETUPCFG.dump(data)
 
     def to_metadata_options(self):
         import setuptools
@@ -227,9 +225,7 @@ class Develop(Distribution):
 
         if self.distribution.get_long_description() == UNKNOWN:
             # metadata['long_description_content_type']
-            object[
-                "long_description"
-            ] = f"""file: {qpub.base.File("readme.md") or qpub.base.File("README.md")}"""
+            object["long_description"] = f"""file: {README}"""
 
         if not self.distribution.get_keywords():
             pass
@@ -257,11 +253,7 @@ class Develop(Distribution):
         if not self.distribution.install_requires:
             object["install_requires"] = list(
                 x
-                for x in (
-                    qpub.base.REQUIREMENTS.read_text().splitlines()
-                    if qpub.base.REQUIREMENTS
-                    else []
-                )
+                for x in (REQUIREMENTS.read_text().splitlines() if REQUIREMENTS else [])
                 if x.strip()
             )
         if not self.distribution.extras_require:
@@ -290,7 +282,7 @@ class Develop(Distribution):
             object["packages"] = self.packages
 
         if not self.distribution.package_dir:
-            if qpub.base.SRC.exists():
+            if SRC.exists():
                 object["package_dir"] = ["=src"]
             pass
 
