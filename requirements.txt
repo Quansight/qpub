@@ -1,5 +1,0 @@
-doit
-GitPython
-setuptools
-depfinder
-typer

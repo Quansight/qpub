@@ -1,18 +1,36 @@
-import qpub
-import pathlib
-import functools
 import dataclasses
-import doit
+import functools
+import pathlib
 import typing
 
 Path = type(pathlib.Path())
 
 compat = {"yml": "yaml", "cfg": "ini"}
-pkg2pip = dict(git="GitPython", dotenv="python-dotenv")
+
+
+def merge(a, b, *c):
+    if c:
+        b = functools.reduce(merge, (b,) + c)
+    if hasattr(a, "items"):
+        for k, v in a.items():
+            if k in b:
+                a[k] = merge(v, b[k])
+
+        for k, v in b.items():
+            if k not in a:
+                a[k] = v
+
+        return a
+    if isinstance(a, str):
+        return a
+
+    if isinstance(a, (set, list, tuple)):
+        return list(sorted(set(a).union(b)))
 
 
 def make_conda_pip_envs():
     import json
+
     import doit
 
     file = qpub.File("environment.yml") or qpub.File("environment.yaml")
@@ -93,7 +111,8 @@ def is_installed(object: str) -> bool:
 
 
 def ensure_conda() -> bool:
-    import contextlib, io
+    import contextlib
+    import io
 
     ensureconda = __import__("ensureconda.cli")
 
@@ -110,6 +129,8 @@ def ensure_conda() -> bool:
 
 def task(name, input, output, actions, **kwargs):
     """serialize a doit task convention"""
+    import doit
+
     if input == ...:
         input = []
     if not isinstance(input, list):
@@ -139,7 +160,8 @@ def task(name, input, output, actions, **kwargs):
 
 def rough_source(nb):
     """extract a rough version of the source in notebook to infer files from"""
-    import textwrap, json
+    import json
+    import textwrap
 
     if isinstance(nb, str):
         nb = json.loads(nb)
@@ -153,7 +175,10 @@ def rough_source(nb):
 
 async def infer(file):
     """infer imports from different kinds of files."""
-    import aiofiles, depfinder, json
+    import json
+
+    import aiofiles
+    import depfinder
 
     async with aiofiles.open(file, "r") as f:
         if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
@@ -177,27 +202,34 @@ async def infer_files(files):
 
 def gather_imports(files: typing.List[Path]) -> typing.List[dict]:
     """"""
-    import asyncio, sys
+    import asyncio
+    import sys
+    import yaml
 
     if "depfinder" not in sys.modules:
 
         dir = Path(__import__("appdirs").user_data_dir("qpub"))
         __import__("requests_cache").install_cache(str(dir / "qpub"))
         dir.mkdir(parents=True, exist_ok=True)
+        if not hasattr(yaml, "CSafeLoader"):
+            yaml.CSafeLoader = yaml.SafeLoader
         import depfinder
 
         __import__("requests_cache").uninstall_cache()
+    return dict(asyncio.run(infer_files(files)))
 
-    return asyncio.run(infer_files(files))
 
-
-def _merge_shallow(a: dict, b: dict, *c: dict) -> dict:
+def _merge_shallow(a: dict, b: dict = None, *c: dict) -> dict:
     """merge the results of dictionaries."""
     a = a or {}
+    if b is None:
+        return a
     b = functools.reduce(_merge_shallow, (b, *c)) if c else b
     for k, v in b.items():
         if k not in a:
             a[k] = a.get(k, [])
+        if isinstance(a[k], set):
+            a[k] = list(a[k])
         for v in v:
             a[k] += [] if v in a[k] else [v]
     return a
@@ -205,7 +237,7 @@ def _merge_shallow(a: dict, b: dict, *c: dict) -> dict:
 
 def merged_imports(files: typing.List[Path]) -> dict:
     results = _merge_shallow(*gather_imports(files).values())
-    return results.get("required", []) + results.get("questionable", [])
+    return list(results.get("required", [])) + list(results.get("questionable", []))
 
 
 IMPORT_TO_PIP = None
@@ -229,7 +261,7 @@ def pypi_to_conda(list):
     global PIP_TO_CONDA
     if not PIP_TO_CONDA:
         PIP_TO_CONDA = {
-            x["import_name"]: x["cond`a_name"] for x in depfinder.utils.mapping_list
+            x["import_name"]: x["conda_name"] for x in depfinder.utils.mapping_list
         }
     return [PIP_TO_CONDA.get(x, x) for x in list]
 
@@ -242,3 +274,67 @@ def valid_import(object: typing.Union[str, typing.Iterable]) -> bool:
         return bool(__import__("ast").parse(object))
     except SyntaxError:
         return False
+
+
+def collect_test_items(path):
+    """collect pytest items"""
+    import _pytest.config
+
+    config = _pytest.config._prepareconfig(
+        ["--collect-only", f"--rootdir={path}", str(path)]
+    )
+
+    SESSION = None
+
+    def _main(config, session):
+        """Default command line protocol for initialization, session,
+        running tests and reporting."""
+        nonlocal SESSION
+        from _pytest.main import ExitCode
+
+        config.hook.pytest_collection(session=session)
+        SESSION = session
+        if session.testsfailed:
+            return ExitCode.TESTS_FAILED
+        elif session.testscollected == 0:
+            return ExitCode.NO_TESTS_COLLECTED
+        return None
+
+    _pytest.main.wrap_session(config, _main)
+    return SESSION.items
+
+
+def collect_test_files(path=None):
+    if path is None:
+        path = Path()
+    if not isinstance(path, Path):
+        path = Path(path)
+    return list({Path(x.keywords.parent.fspath) for x in collect_test_items(path)})
+
+
+def nox_runner(module):
+    """a wrapped nox runner specifically for qpub.
+
+    it works off a module loaded into the namespace already
+    rather than a static file.
+    """
+    import sys, nox
+
+    argv = sys.argv
+    sys.argv = ["tmp-program"]
+    ns = nox._options.options.parse_args()
+    sys.argv = argv
+    # run the tasks ourselves to avoid switching directories
+
+    nox.tasks.merge_noxfile_options(module, ns)
+    manifest = nox.tasks.discover_manifest(
+        module, ns
+    )  # the manifest is a nox convention.
+    nox.tasks.filter_manifest(manifest, ns)
+    nox.tasks.verify_manifest_nonempty(manifest, ns)
+    results = nox.tasks.run_manifest(
+        manifest, ns
+    )  # these are sessions results with their virtualenv instances.
+    nox.tasks.print_summary(results, ns)
+    nox.tasks.create_report(results, ns)
+    return nox.tasks.final_reduce(results, ns)

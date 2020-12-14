@@ -1,18 +1,29 @@
-"""deathbeds generalized automation framework."""
+"""q(uick)pub(lishing) of new python projects."""
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 from . import util
-from . import base
-from . import tasks
-from .base import File
-from . import converters  # noqa
+from .files import File
 
 
-def main():
-    import typer
+class options:
+    import enum, os
 
-    def main(**kwargs):
-        base.Distribution(**kwargs).main().run([])
+    class BACKENDS(enum.Enum):
+        requirements = 0
+        setuptools = 1
+        flit = 2
+        poetry = 3
 
-    main.__signature__ = __import__("inspect").signature(base.Distribution)
-    typer.run(main)
+    BACKEND: BACKENDS = getattr(BACKENDS, os.environ.get("QPUB_BACKEND", "flit"))
+    install: bool = os.environ.get("QPUB_INSTALL", False)
+    develop: bool = os.environ.get("QPUB_DEVELOP", True)
+    conda: bool = os.environ.get("QPUB_CONDA", False)
+    pdf: bool = os.environ.get("QPUB_DOCS_PDF", False)
+    html: bool = os.environ.get("QPUB_DOCS_HTML", False)
+    watch: bool = os.environ.get("QPUB_DOCS_WATCH", False)
+
+    @classmethod
+    def dump(cls):
+        return {f"QPUB_{x.upper()}": getattr(cls, x) for x in cls.__annotations__}
+
+    del os, enum

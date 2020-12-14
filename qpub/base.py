@@ -1,251 +1,346 @@
-"""base.py"""
-import qpub
-import pathlib
-import functools
-import textwrap
-import typing
-import dataclasses
-import doit
-import distutils.command.sdist
-import operator
-import os
-from qpub.util import task
+"""base.py
 
-Path = type(pathlib.Path())
+the base classes for `qpub`
+"""
+import git, dataclasses
+from .files import *
+from . import util
 
 
-class File(Path):
-    """a supercharged file object that make it is easy to dump and load data.
+@dataclasses.dataclass(order=True)
+class Project:
+    """the Project class provides a consistent interface for inferring project features from
+    the content of directories and git repositories.
 
-    the loaders and dumpers edit files in-place, these constraints may not apply to all systems.
     """
 
-    def __bool__(self):
-        return self.is_file()
+    repo: git.Repo = dataclasses.field(default_factory=git.Repo)
+    data: dict = dataclasses.field(default_factory=dict)
 
-    def load(self):
-        """a permissive method to load data from files and edit documents in place."""
-        for cls in File.__subclasses__():
-            if hasattr(cls, "_suffixes"):
-                if self.suffix in cls._suffixes:
-                    return cls.load(self)
-        else:
-            raise TypeError(f"Can't load type with suffix: {self.suffix}")
+    def add(self, *object):
+        """add an object to the project, add will provide heuristics for different objects much the same way `poetry add` does."""
+        for object in object:
+            if isinstance(object, (str, Path)):
+                self.repo.index.add([str(object)])
 
-    def dump(self, object):
-        """a permissive method to dump data from files and edit documents in place."""
-        for cls in File.__subclasses__():
-            if hasattr(cls, "_suffixes"):
-                if self.suffix in cls._suffixes:
-                    return cls.dump(self, object)
-        else:
-            raise TypeError(f"Can't dump type with suffix: {self.suffix}")
+        # the submodules in the project.
+        self.submodules = [File(x) for x in self.repo.submodules]
 
+        # the files in the project.
+        self.files = [
+            File(x)
+            for x in map(File, git.Git(self.repo.working_dir).ls_files().splitlines())
+            if x not in self.submodules
+            and x not in self.submodules
+            and x not in CONVENTIONS
+        ]
+        # the files in the submodules.
+        [
+            self.files.extend(
+                x
+                for x in map(File, git.Git(x).ls_files().splitlines())
+                if x not in CONVENTIONS
+            )
+            for x in self.submodules
+        ]
 
-class Convention(File):
-    """Convention types provide an indicator for task targets that
-    may cause cyclic dependencies."""
-
-
-from qpub.files import *
-
-
-# default conventions for https://pydoit.org/configuration.html
-DEFAULT_DOIT_CFG = dict(verbosity=2, backend="sqlite3", par_type="thread")
-
-
-class Project:
-    """A base class for projects."""
-
-    cwd: Path = None
-    REPO: "git.Repo" = None
-    FILES: typing.List[Path] = None
-    CONTENT: typing.List[Path] = None
-    DIRECTORIES: typing.List[Path] = None
-    INITS: typing.List[Path] = None
-    SUFFIXES: typing.List[str] = None
-    distribution: distutils.core.Distribution = None
-    sdist: distutils.core.Command = None
-    bdist: distutils.core.Command = None
-
-    def make_distribution(self):
-        import setuptools
-
-        self.distribution = distutils.dist.Distribution(dict())
-        self.distribution.parse_config_files()
-        self.distribution.script_name = "setup.py"
-
-        self.sdist = self.distribution.get_command_obj("sdist").get_finalized_command(
-            "sdist"
+        # the non-conventional directories containing content
+        self.directories = list(
+            set(x.parent for x in self.files if x.parent not in CONVENTIONS)
         )
 
-        self.sdist.filelist = distutils.command.sdist.FileList()
-        self.sdist.get_file_list()
-        self.sdist.make_distribution()
+        # the top level directories
+        self.top_level = list(
+            map(File, set(x.parts[0] for x in self.directories if x.parts))
+        )
 
-        self.bdist = self.distribution.get_command_obj(
-            "bdist_wheel"
-        ).get_finalized_command("bdist_wheel")
-        self.packages = setuptools.find_packages(where=SRC or ".")
-
-    def get_name(self):
-        directories = {x.parts[0] for x in self.DIRECTORIES}
-        if len(directories) == 1:
-            return next(iter(directories))
+        self.suffixes = list(set(x.suffix for x in self.files))
 
     def __post_init__(self):
-        import git
+        """post initialize globs of content relative the git repository."""
 
-        self.REPO = git.Repo(self.cwd)
-        self.FILES = list(map(File, git.Git(self.cwd).ls_files().splitlines()))
+        # submodules in the repository
+        if isinstance(self.repo, (str, Path)):
+            try:
+                self.repo = git.Repo(self.repo)
+            except git.InvalidGitRepositoryError:
+                git.Git(self.repo).init()
+                self.repo = git.Repo(self.repo)
+        self.add()
 
-        for submodule in self.REPO.submodules:
-            self.FILES += list(
-                File(submodule.path, x.path)
-                for x in git.Repo(submodule.path).tree().traverse()
-            )
-        self.CONTENT = [x for x in self.FILES if x not in CONVENTIONS and x.is_file()]
-        self.VALID = [x for x in self.CONTENT if qpub.util.valid_import(x)]
-        self.DIRECTORIES = list(
-            x
-            for x in set(map(operator.attrgetter("parent"), self.CONTENT))
-            if x not in CONVENTIONS
-        )
-        self.INITS = [
-            x / "__init__.py"
-            for x in self.DIRECTORIES
-            if (x != ROOT) and (x / "__init__.py" not in self.CONTENT)
-        ]
-        self.SUFFIXES = list(set(x.suffix for x in self.FILES))
-        self.make_distribution()
-        self.DISTS = [
-            *self.sdist.get_archive_files(),
-            DIST
-            / (
-                "-".join(
-                    (self.bdist.wheel_dist_name.replace("-", "_"),)
-                    + self.bdist.get_tag()
+    def get_exclude_by(self, object):
+        """return the path that ignores an object.
+
+        exclusion is based off the canonical python.gitignore specification."""
+        self._init_exclude()
+        for k, v in self.gitignore_patterns.items():
+            if any(v.match((str(object),))):
+                return k
+        else:
+            return None
+
+    def _iter_exclude(self):
+        import itertools
+
+        for x in itertools.chain(
+            Path(self.repo.working_dir).iterdir(),
+            Path(self.repo.working_dir, "docs").iterdir(),
+        ):
+            exclude = self.get_exclude_by(x.relative_to(self.repo.working_dir))
+            if exclude:
+                yield exclude
+
+    def get_exclude(self):
+        """get the excluded by the canonical python.gitignore file.
+
+        this method can construct a per project gitignore file rather than
+        included the world.
+        """
+        return list(sorted(set(self._iter_exclude())))
+
+    def _init_exclude(self):
+        """initialize the path specifications to decide what to omit."""
+        if not hasattr(self, "gitignore_patterns"):
+            import pathspec
+            from .template import gitignore
+
+            self.gitignore_patterns = {}
+
+            for pattern in gitignore.splitlines():
+                if bool(pattern):
+                    match = pathspec.patterns.GitWildMatchPattern(pattern.rstrip("/"))
+                    if match.include:
+                        self.gitignore_patterns[pattern.rstrip("/")] = match
+
+    def get_name_from_directory():
+        """infer the name of the project from the directories."""
+
+    def get_name_from_src_directory():
+        """infer the name of a src directory project."""
+
+    def get_name_from_flat():
+        """infer the name of a project from a flat (gist-like) directory."""
+
+    def get_name(self):
+        """get the name of the project distribution.
+
+        this method is used to infer the project names for setuptools, flit, or poetry. projects make
+        have the form of:
+        - flat repository with no directories.
+        - a project with a src directory.
+        - folders with custom names
+
+        what is the canonical name for a collection of folders?
+        - exclude private names.
+        """
+        # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
+        if not self.top_level:
+            modules = [x for x in self.files if not x.stem.startswith("test_")]
+            if len(modules) == 1:
+                return modules[0].stem
+        if len(self.top_level) == 1:
+            if self.top_level[0] == self.repo.working_dir / SRC:
+                return  # the name in the src directory.
+            return str(self.top_level[0])
+        return "tmpname"
+
+    def get_version(self):
+        """determine a version for the project, if there is no version defer to calver.
+
+        it would be good to support semver, calver, and agever (for blogs).
+        """
+        # use the flit convention to get the version.
+        return __import__("datetime").date.today().strftime("%Y.%m.%d")
+
+    def get_description(self):
+        """get from the docstring of the project. raise an error if it doesn't exist."""
+        # use the flit convention to get the description.
+        return ""
+
+    def get_long_description(self):
+        return ""
+
+    def get_author(self):
+        """get the author name from the git revision history.
+
+        we can only infer an author if a commit is generated."""
+        try:
+            return self.repo.commit().author.name
+        except:
+            # need a commit to know the author.
+            return ""
+
+    def get_email(self):
+        """get the author name from the git revision history.
+
+        we can only infer an author if a commit is generated."""
+        try:
+            return self.repo.commit().author.email
+        except ValueError:
+            # need to make a commit
+            return ""
+
+    def get_requires_from_files(self, files):
+        """list imports discovered from the files."""
+        return list(
+            set(
+                util.import_to_pip(
+                    util.merged_imports(self.repo.working_dir / x for x in files)
                 )
-                + ".whl"
-            ),
-        ]
-
-    def create_doit_tasks(self) -> typing.Iterator[dict]:
-        yield from self
-
-    def __iter__(self):
-        yield from []
-
-    def task(self):
-        return doit.cmd_base.ModuleTaskLoader(
-            {"DOIT_CFG": DEFAULT_DOIT_CFG, type(self).__name__.lower(): self}
+            )
         )
 
-    def main(self):
-        return doit.doit_cmd.DoitMain(self.task())
+    def get_requires_from_requirements_txt(self):
+        """get any hardcoded dependencies in requirements.txt."""
+        if (self.repo.working_dir / REQUIREMENTS_TXT).exists():
+            known = [
+                x
+                for x in REQUIREMENTS_TXT.read_text().splitlines()
+                if not x.lstrip().startswith("#") and x.strip()
+            ]
+            import packaging.requirements
+
+            return list(
+                packaging.requirements.Requirement.parseString(x).name for x in known
+            )
+
+        return []
+
+    def get_requires(self):
+        """get the requirements for the project.
+
+        use heuristics that investigate a few places where requirements may be specified.
+
+        the expectation is that pip requirements might be pinned in a requirements file
+        or anaconda environment file.
+        """
+        known = self.get_requires_from_requirements_txt()
+
+        known.append(self.get_name())
+        return [
+            package
+            for package in self.get_requires_from_files(
+                [x for x in self.files if x not in self.get_test_files()]
+            )
+            if package.lower() not in known
+        ]
+
+    def get_test_requires(self):
+        """test requires live in test and docs folders."""
+
+        requires = ["pytest", "pytest-sugar"]
+        if ".ipynb" in self.suffixes:
+            requires += ["nbval", "importnb"]
+        requires += self.get_requires_from_files(
+            self.repo.working_dir / x for x in self.get_test_files()
+        )
+        return requires
+
+    def get_doc_requires(self):
+        """test requires live in test and docs folders."""
+
+        # infer the sphinx extensions needed because we miss this often.
+        requires = []
+        return requires
+
+    def get_url(self):
+        """get the url(s) for the project from the git history."""
+        try:
+            return self.repo.remote("origin").url
+        except:
+            # let the user know there is no remote
+            return ""
+
+    def get_classifiers(self):
+        """some classifiers can probably be inferred."""
+        return []
+
+    def get_license(self):
+        """should be a trove classifier"""
+        # import trove_classifiers
+
+        # infer the trove framework
+        # make a gui for adding the right classifiers.
+
+        return ""
+
+    def get_keywords(self):
+        return ""
+
+    def get_python_version(self):
+        import sys
+
+        return f">={sys.version_info.major}.{sys.version_info.minor}"
+
+    def get_test_files(self, default=True):
+        """list the test like files. we'll access their dependencies separately ."""
+        if default:
+            return [x for x in self.files if x.stem.startswith("test_")]
+        prior = tuple(map(str, self.files))
+        items = util.collect_test_files(self.repo.working_dir)
+        return items
+
+    def get_doc_files(self, default=True):
+        """get the files that correspond to documentation.
 
 
-@dataclasses.dataclass
-class Bootstrap(Project):
-    """Bootstrap defines tasks needed for installation; it introduces flags to control
-    the behavior of `qpub`.
+        * docs folder may have different depdencies for execution.
+        * is the readme docs? it is docs and test i think.
+        """
 
-    Parameters
-    ----------
-    discover: bool
-        discover dependencies from the contents.
-    develop: bool
-        install the current project as an edittable python package.
-    install: bool
-        install the current project into the site-packages.
-    test: bool
-        test the project, if no test configuration exists then qpub infers some.
-    lint: bool
-        lint the project.
-    docs: bool
-        build the docs.
-    smoke: bool
-        run fast tests as a smoke test.
-    pdf: bool
-        generate a pdf of the documentation.
-    poetry: bool
-        use poetry to manage the installation of python packages.
-    conda: bool
-        operate within a conda environment.
-    mamba: bool
-        use mamba instead of conda, a True implies conda is True
-    binder:bool
-        run tasks to build a development environment on binder.
-    pep517: bool
-        use the emerging pep517 convention to configuration and install the package.
-    shield: bool  # if shield is true the use virtualenv management.
-        use virtual environments for development dependencies. main tasks work in the current conda or venv.
+        if default:
+            return [x for x in self.files if x.stem.startswith("test_")]
+        prior = tuple(map(str, self.files))
+        items = util.collect_test_files(self.repo.working_dir)
+        return items
 
-    """
+    def get_entry_points(self):
+        """combine entrypoints from all files.
 
-    discover: bool = True
-    develop: bool = True
-    install: bool = False
-    test: bool = True
-    lint: bool = True
-    docs: bool = False
-    conda: bool = False
-    smoke: bool = True
-    ci: bool = False
-    pdf: bool = False
-    poetry: bool = False
-    mamba: bool = False
-    binder: bool = False
-    pep517: bool = True
-    shield: bool = True  # if shield is true the use virtualenv management.
+        is there a convention for entry points?
+        can we infer anything?
+        """
+        # read entry points from setup.cfg
+        # read entry points from pyproject.toml
+        ep = {}
+        if (self.repo.working_dir / SETUP_CFG).exists():
+            data = (self.repo.working_dir / SETUP_CFG).load()
+            if "options.entry_points" in data:
+                for k, v in data["options.entry_points"].items():
+                    ep = merge(
+                        ep,
+                        {
+                            k: dict(x.split("=", 1))
+                            for x in v.value.splitlines()
+                            if x.strip()
+                        },
+                    )
+        if (self.repo.working_dir / PYPROJECT_TOML).exists():
+            data = (self.repo.working_dir / PYPROJECT_TOML).load()
+            ep = merge(
+                ep,
+                dict(
+                    console_scripts=data.get("tool", {})
+                    .get("flit", {})
+                    .get("scripts", {})
+                ),
+            )
+            ep = merge(
+                ep, data.get("tool", {}).get("flit", {}).get("entrypoints", {})
+            )  # other ep
+            ep = merge(
+                ep,
+                dict(
+                    console_scripts=data.get("tool", {})
+                    .get("poetry", {})
+                    .get("scripts", {})
+                ),
+            )  # poetry console_scripts
+            ep = merge(ep, data.get("tool", {}).get("poetry", {}).get("plugins", {}))
 
-    def setup_cfg_to_environment_yml(self):
-        qpub.converters.setup_cfg_to_environment_yml()
-
-    def __iter__(self):
-        if self.develop or self.install:
-            yield from qpub.tasks.Develop.prior(self)
-
-        if self.discover:
-            # discover dependencies in the content with depfinder and append the results.
-            yield from qpub.tasks.Discover.prior(self)
-
-        if self.conda:
-            yield from qpub.tasks.Conda.prior(self)
-        elif not (self.develop or self.install):
-            yield from qpub.tasks.Pip.prior(self)
-
-        if self.lint:
-            yield from qpub.tasks.Precommit.prior(self)
+        return ep
 
 
-@dataclasses.dataclass
-class Distribution(Bootstrap):
-    """Distribution defines tasks needed for installation."""
-
-    def __iter__(self):
-        yield from super().__iter__()
-
-        if self.conda or self.mamba:
-            # update the conda environemnt
-            yield from qpub.tasks.Conda.post(self)
-        elif not (self.install or self.develop):
-            # update the pip environment
-            yield from qpub.tasks.Pip.post(self)
-
-        if self.install:
-            # install to site packages.
-            yield from qpub.tasks.Install.post(self)
-
-        elif self.develop:
-            # make a setup.py to use in develop mode
-            yield from qpub.tasks.Develop.post(self)
-
-        if self.lint:
-            yield from qpub.tasks.Precommit.post(self)
-
-        if self.test:
-            yield from qpub.tasks.Test.post(self)
-
-        if self.docs:
-            yield from qpub.tasks.Docs.post(self)
+class PyProject(Project):
+    def load(self):
+        self.data = (self.repo.working_dir / PYPROJECT_TOML).load()

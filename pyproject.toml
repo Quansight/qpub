@@ -1,6 +1,3 @@
-[entrypoints.console_scripts]
-qpub = "qpub:main"
-
 [tool.flakehell]
 base = "https://raw.githubusercontent.com/life4/flakehell/master/pyproject.toml"
 format = "grouped"

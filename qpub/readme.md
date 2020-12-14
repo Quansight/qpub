@@ -9,7 +9,7 @@
 
 all of the CLI commands need to be defined in `__all__`.
 
-    __all__ = "infer setup develop install binder conda test docs blog".split()
+    __all__ = "infer setup develop install hub conda test docs blog".split()
 
 ## infer the environment
 
@@ -60,7 +60,7 @@ install the environment with `CONDA` or `pip` dependencies
 
         if f.CONDA and f.ENVIRONMENT:
 
-if conda is available and an `ENVIRONMENT` is available then we update the environment; this is practical on jupyterhub and binder.
+if conda is available and an `ENVIRONMENT` is available then we update the environment; this is practical on jupyterhub and hub.
 
             conda env update @(ENVIRONMENT)
 
@@ -124,9 +124,9 @@ use `SETUPPY` as a last resort
             python setup.py sdist bdist_wheel
 
 
-    def binder():
+    def hub():
 
-use this command to build binder environments.
+use this command to build hub environments.
 
         return [infer(), setup(), develop(), build()]
 
