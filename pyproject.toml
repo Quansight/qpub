@@ -9,3 +9,8 @@ exclude=[".ipynb_checkpoints", "setup.py"]
 # include everything in pyflakes except F401
 pyflakes = ["-F405"]
 pycodestyle = ["-W503", "-E722", "-E999"]
+
+[tool.flit]
+[tool.flit.scripts]
+dgaf = "dgaf:main"
+

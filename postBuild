@@ -1,1 +1,2 @@
-python -m qpub
+pip install nox
+python -m dgaf binder

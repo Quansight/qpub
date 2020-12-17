@@ -1,20 +1,17 @@
 """qpub.py
 q(uick) p(ubishing) is a swiss army knife for configuring projects.
 
-qpub can be used as a CLI over nox, stand-alone doit tasks, and an ipython extension.
+it configures python distributions, linting and formatting, testing
+conditions, and documentation.
 
-
-
-
-this script provides a few affordances for usage.
-* options for the qpub environments.
-* a command line for configuring and building distributions.
-* an ipython magic.
+it is meant for ideas with little content, like gist, but can scale with
+large projects that abide community conventions.
 
 
 
 
 """
+__version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 import os
 import pathlib
 import typing
@@ -49,8 +46,6 @@ class File(Path):
     """a supercharged file object that make it is easy to dump and load data.
 
     the loaders and dumpers edit files in-place, these constraints may not apply to all systems.
-
-    the loaders are defined at the end of this script.
     """
 
     def load(self):
@@ -127,6 +122,68 @@ class File(Path):
         return a
 
 
+class INI(File):
+    """dump and load ini files in place."""
+
+    _suffixes = ".ini", ".cfg"
+
+    def load(self):
+        try:
+            object = __import__("configupdater").ConfigUpdater()
+        except:
+            object = __import__("configparser").ConfigParser()
+        try:
+            object.read_string(self.read_text())
+        except FileNotFoundError:
+            object.read_string("")
+        return object
+
+    def dump(self, object):
+        self.write_text(str(flatten(object)) + "\n")
+
+
+class TOML(File):
+    """dump and load toml files in place."""
+
+    _suffixes = (".toml",)
+
+    def load(self):
+        try:
+            return __import__("tomlkit").parse(self.read_text())
+        except FileNotFoundError:
+            return __import__("tomlkit").parse("")
+
+    def dump(self, object):
+
+        self.write_text(__import__("tomlkit").dumps(object) + "\n")
+
+
+class YML(File):
+    """dump and load yml files in place."""
+
+    _suffixes = ".yaml", ".yml"
+
+    def load(self):
+        try:
+            object = __import__("ruamel.yaml").yaml.YAML()
+            try:
+                return object.load(self.read_text()) or object.load("{}")
+            except FileNotFoundError:
+                return object.load("{}")
+        except ModuleNotFoundError:
+            try:
+                return __import__("yaml").safe_load(self.read_text())
+            except FileNotFoundError:
+                return {}
+
+    def dump(self, object):
+        with self.open("w") as file:
+            try:
+                __import__("ruamel.yaml").yaml.YAML().dump(object, file)
+            except ModuleNotFoundError:
+                file.write(__import__("yaml").safe_dump(object))
+
+
 class Convention(File):
     """a convention indicates explicit or implicit filename and directory conventions.
 
@@ -150,6 +207,7 @@ BUILD = DOCS / "_build"  # abides the sphinx gitignore convention.
 TOC = DOCS / "_toc.yml"
 CONFIG = DOCS / "_config.yml"
 CONF = Convention("conf.py")
+CONFTEST = Convention("conftest.py")
 
 ENVIRONMENT_YML = Convention("environment.yml")
 ENVIRONMENT_YAML = Convention("environment.yaml")
@@ -194,7 +252,7 @@ if __name__ == "__main__":
     # these commands configure the execution state for the nox sessions.
 
     @app.command()
-    def configure(ctx: typer.Context):
+    def configure(ctx: typer.Context, lint: bool = True):
         """write/update configuration files for a project."""
         nox.options.sessions += ["configure"]
 
@@ -250,8 +308,11 @@ if __name__ == "__main__":
                 session.install("flit")
                 session.run(*"flit install -s".split())
             # if poetry we need to make sure there is setuptools in teh build
-            if build_backend == "setuptools.build_meta":
+            elif build_backend == "setuptools.build_meta":
                 develop_setuptools(session)
+
+            elif build_backend == "poetry.core.masonry.api":
+                develop_poetry(session)
 
     def develop_setuptools(session):
         """a local install based of off setup.py"""
@@ -304,14 +365,17 @@ if __name__ == "__main__":
             *f"""python -m doit --dir . --file {__file__} lint docs python""".split()
         )
 
-    try:
-        app()
-    except SystemExit as exception:
-        if nox.options.sessions:
-            if "configure" not in nox.options.sessions:
-                nox.options.sessions.insert(0, "configure")
-            raise SystemExit(nox_runner(locals()))
-        raise exception
+    def main():
+        try:
+            app()
+        except SystemExit as exception:
+            if nox.options.sessions:
+                if "configure" not in nox.options.sessions:
+                    nox.options.sessions.insert(0, "configure")
+                raise SystemExit(nox_runner(locals()))
+            raise exception
+
+    main()
     assert (
         False
     ), "We should never have reached here, because the program will have raised."
@@ -452,7 +516,11 @@ class Project:
         """
         # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
         if not self.top_level:
-            modules = [x for x in self.files if not x.stem.startswith("test_")]
+            modules = [
+                x
+                for x in self.files
+                if (x.suffix == ".py") and not x.stem.startswith("test_")
+            ]
             if len(modules) == 1:
                 return modules[0].stem
         if len(self.top_level) == 1:
@@ -677,10 +745,7 @@ class Project:
             dict(
                 repo="https://github.com/pre-commit/pre-commit-hooks",
                 rev="v2.3.0",
-                hooks=[
-                    dict(id="end-of-file-fixer"),
-                    dict(id="trailing-whitespace"),
-                ],
+                hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
             )
         ],
         ".yml": [
@@ -899,8 +964,10 @@ def gather_imports(files: typing.List[Path]) -> typing.List[dict]:
     return dict(asyncio.run(infer_files(files)))
 
 
-def _merge_shallow(a: dict, b: dict = None, *c: dict) -> dict:
+def _merge_shallow(a: dict = None, b: dict = None, *c: dict) -> dict:
     """merge the results of dictionaries."""
+    if a is None:
+        return {}
     a = a or {}
     if b is None:
         return a
@@ -944,65 +1011,3 @@ def pypi_to_conda(list):
             x["import_name"]: x["conda_name"] for x in depfinder.utils.mapping_list
         }
     return [PIP_TO_CONDA.get(x, x) for x in list]
-
-
-class INI(File):
-    """dump and load ini files in place."""
-
-    _suffixes = ".ini", ".cfg"
-
-    def load(self):
-        try:
-            object = __import__("configupdater").ConfigUpdater()
-        except:
-            object = __import__("configparser").ConfigParser()
-        try:
-            object.read_string(self.read_text())
-        except FileNotFoundError:
-            object.read_string("")
-        return object
-
-    def dump(self, object):
-        self.write_text(str(flatten(object)) + "\n")
-
-
-class TOML(File):
-    """dump and load toml files in place."""
-
-    _suffixes = (".toml",)
-
-    def load(self):
-        try:
-            return __import__("tomlkit").parse(self.read_text())
-        except FileNotFoundError:
-            return __import__("tomlkit").parse("")
-
-    def dump(self, object):
-
-        self.write_text(__import__("tomlkit").dumps(object) + "\n")
-
-
-class YML(File):
-    """dump and load yml files in place."""
-
-    _suffixes = ".yaml", ".yml"
-
-    def load(self):
-        try:
-            object = __import__("ruamel.yaml").yaml.YAML()
-            try:
-                return object.load(self.read_text()) or object.load("{}")
-            except FileNotFoundError:
-                return object.load("{}")
-        except ModuleNotFoundError:
-            try:
-                return __import__("yaml").safe_load(self.read_text())
-            except FileNotFoundError:
-                return {}
-
-    def dump(self, object):
-        with self.open("w") as file:
-            try:
-                __import__("ruamel.yaml").yaml.YAML().dump(object, file)
-            except ModuleNotFoundError:
-                file.write(__import__("yaml").safe_dump(object))
