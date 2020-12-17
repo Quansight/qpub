@@ -12,5 +12,5 @@ pycodestyle = ["-W503", "-E722", "-E999"]
 
 [tool.flit]
 [tool.flit.scripts]
-dgaf = "dgaf:main"
+dgaf = "dgaf.__main__:main"
 
