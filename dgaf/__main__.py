@@ -181,7 +181,7 @@ def blog(session):
 def configure(session):
     """produce the configuration for different distributions."""
     session.install(
-        *"doit GitPython depfinder aiofiles appdirs typer nox requests-cache tomlkit".split()
+        *"doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     session.run(
         *f"""python -m doit --dir . --file {task_file} lint docs python""".split()

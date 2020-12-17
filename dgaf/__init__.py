@@ -194,14 +194,14 @@ class Convention(File):
 
 # conventional file names.
 
+
 PRECOMMITCONFIG_YML = Convention(".pre-commit-config.yaml")
 PYPROJECT_TOML = Convention("pyproject.toml")
-README = Convention("README.md")
 REQUIREMENTS_TXT = Convention("requirements.txt")
 SETUP_CFG = Convention("setup.cfg")
 SETUP_PY = Convention("setup.py")
 SRC = Convention("src")
-
+GITIGNORE = Convention(".gitignore")
 DOCS = Convention("docs")
 BUILD = DOCS / "_build"  # abides the sphinx gitignore convention.
 TOC = DOCS / "_toc.yml"
@@ -211,7 +211,7 @@ CONFTEST = Convention("conftest.py")
 NOXFILE = Convention("noxfile.py")
 DODO = Convention("dodo.py")
 
-
+MANIFEST = Convention("MANIFEST.in")
 ENVIRONMENT_YML = Convention("environment.yml")
 ENVIRONMENT_YAML = Convention("environment.yaml")
 GITHUB = Convention(".github")
@@ -234,7 +234,7 @@ class Project:
 
     """
 
-    repo: git = dataclasses.field(default_factory=git.Repo)
+    repo: git.Repo = dataclasses.field(default_factory=Path)
     data: dict = dataclasses.field(default_factory=dict)
 
     def add(self, *object):
@@ -247,12 +247,11 @@ class Project:
         self.submodules = [File(x) for x in self.repo.submodules]
 
         # the files in the project.
+        self.all = list(map(File, git.Git(self.path).ls_files().splitlines()))
         self.files = [
             File(x)
-            for x in map(File, git.Git(self.repo.working_dir).ls_files().splitlines())
-            if x not in self.submodules
-            and x not in self.submodules
-            and x not in CONVENTIONS
+            for x in self.all
+            if x not in self.submodules and x not in CONVENTIONS
         ]
         # the files in the submodules.
         [
@@ -265,16 +264,16 @@ class Project:
         ]
 
         # the non-conventional directories containing content
-        self.directories = list(
+        self.directories = sorted(
             set(x.parent for x in self.files if x.parent not in CONVENTIONS)
         )
 
         # the top level directories
-        self.top_level = list(
+        self.top_level = sorted(
             map(File, set(x.parts[0] for x in self.directories if x.parts))
         )
 
-        self.suffixes = list(set(x.suffix for x in self.files))
+        self.suffixes = sorted(set(x.suffix for x in self.files))
 
     def __post_init__(self):
         """post initialize globs of content relative the git repository."""
@@ -302,11 +301,11 @@ class Project:
     def _iter_exclude(self):
         import itertools
 
+        docs = Path(self.path, "docs")
         for x in itertools.chain(
-            Path(self.repo.working_dir).iterdir(),
-            Path(self.repo.working_dir, "docs").iterdir(),
+            Path(self.path).iterdir(), docs.iterdir() if docs.exists() else tuple()
         ):
-            exclude = self.get_exclude_by(x.relative_to(self.repo.working_dir))
+            exclude = self.get_exclude_by(x.relative_to(self.path))
             if exclude:
                 yield exclude
 
@@ -322,24 +321,50 @@ class Project:
         """initialize the path specifications to decide what to omit."""
         if not hasattr(self, "gitignore_patterns"):
             import pathspec
-            from .template import gitignore
 
             self.gitignore_patterns = {}
 
-            for pattern in gitignore.splitlines():
+            for pattern in (
+                (Path(__file__).parent / "Python.gitignore").read_text().splitlines()
+            ):
                 if bool(pattern):
                     match = pathspec.patterns.GitWildMatchPattern(pattern.rstrip("/"))
                     if match.include:
                         self.gitignore_patterns[pattern.rstrip("/")] = match
 
-    def get_name_from_directory():
-        """infer the name of the project from the directories."""
-
-    def get_name_from_src_directory():
+    def get_file_from_directory(self):
         """infer the name of a src directory project."""
+        root = self.path
+        if SRC in self.top_level:
+            root /= SRC
+        for dir in root.iterdir():
+            if dir not in self.directories:
+                continue
+            if not dir.stem.lower().isalpha():
+                continue
+            yield dir
 
-    def get_name_from_flat():
+    def get_file_from_flat():
         """infer the name of a project from a flat (gist-like) directory."""
+        description_file = self.get_description_file()
+        test_files = self.get_test_files()
+        for file in self.files:
+            if file == description_file:
+                continue
+            if file in test_files:
+                continue
+
+            if file.stem.startswith("_"):
+                continue
+            if file.suffix in (".rst", ".md", ".py", ".ipynb"):
+                yield file
+
+    def get_file_names(self):
+        """list the potentional names for a project"""
+        if self.top_level:
+            yield from self.get_file_from_directory()
+        else:
+            yield from self.get_file_from_flat()
 
     def get_name(self):
         """get the name of the project distribution.
@@ -354,19 +379,10 @@ class Project:
         - exclude private names.
         """
         # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
-        if not self.top_level:
-            modules = [
-                x
-                for x in self.files
-                if (x.suffix == ".py") and not x.stem.startswith("test_")
-            ]
-            if len(modules) == 1:
-                return modules[0].stem
-        if len(self.top_level) == 1:
-            if self.top_level[0] == self.repo.working_dir / SRC:
-                return  # the name in the src directory.
-            return str(self.top_level[0])
-        return "tmpname"
+        try:
+            return next(self.get_file_names()).stem
+        except StopIteration:
+            return "welp"
 
     def get_version(self):
         """determine a version for the project, if there is no version defer to calver.
@@ -379,10 +395,25 @@ class Project:
     def get_description(self):
         """get from the docstring of the project. raise an error if it doesn't exist."""
         # use the flit convention to get the description.
+        # flit already does this.
         return ""
 
+    def get_description_file(self):
+        """get the description file for a project. it looks like readme or index something."""
+        for file in self.files:
+            if file.stem.lower() in {"readme", "index"}:
+                return file
+
+    def get_description_content_type():
+        """get the description file for a project. it looks like readme or index something."""
+        file = self.get_description_file()
+        return {".md": "text/markdown", ".rst": "text/x-rst"}.get(
+            file and file.suffix.lower() or None, "text/plain"
+        )
+
     def get_long_description(self):
-        return ""
+        file = self.get_description_file()
+        return f"file: {file}" if file else ""
 
     def get_author(self):
         """get the author name from the git revision history.
@@ -406,13 +437,11 @@ class Project:
 
     def get_requires_from_files(self, files):
         """list imports discovered from the files."""
-        return list(
-            set(import_to_pip(merged_imports(self.repo.working_dir / x for x in files)))
-        )
+        return list(set(import_to_pip(merged_imports(self.path / x for x in files))))
 
     def get_requires_from_requirements_txt(self):
         """get any hardcoded dependencies in requirements.txt."""
-        if (self.repo.working_dir / REQUIREMENTS_TXT).exists():
+        if (self.path / REQUIREMENTS_TXT).exists():
             known = [
                 x
                 for x in REQUIREMENTS_TXT.read_text().splitlines()
@@ -442,7 +471,7 @@ class Project:
             for package in self.get_requires_from_files(
                 [x for x in self.files if x not in self.get_test_files()]
             )
-            if package.lower() not in known
+            if package.lower() not in known and package[0].isalpha()
         ]
 
     def get_test_requires(self):
@@ -452,7 +481,7 @@ class Project:
         if ".ipynb" in self.suffixes:
             requires += ["nbval", "importnb"]
         requires += self.get_requires_from_files(
-            self.repo.working_dir / x for x in self.get_test_files()
+            self.path / x for x in self.get_test_files()
         )
         return [x for x in requires if x not in [self.get_name()]]
 
@@ -460,7 +489,10 @@ class Project:
         """test requires live in test and docs folders."""
 
         # infer the sphinx extensions needed because we miss this often.
-        requires = []
+        if CONF in self.files:
+            "infer the dependencies from conf.py."
+        return ["jupyter-book"]
+
         return requires
 
     def get_url(self):
@@ -496,7 +528,7 @@ class Project:
         """list the test like files. we'll access their dependencies separately ."""
         if default:
             return [x for x in self.files if x.stem.startswith("test_")]
-        items = util.collect_test_files(self.repo.working_dir)
+        items = util.collect_test_files(self.path)
         return items
 
     def get_doc_files(self):
@@ -518,8 +550,8 @@ class Project:
         # read entry points from pyproject.toml
         ep = {}
         return ep
-        if (self.repo.working_dir / SETUP_CFG).exists():
-            data = (self.repo.working_dir / SETUP_CFG).load()
+        if (self.path / SETUP_CFG).exists():
+            data = (self.path / SETUP_CFG).load()
             if "options.entry_points" in data:
                 for k, v in data["options.entry_points"].items():
                     ep = merge(
@@ -530,8 +562,8 @@ class Project:
                             if x.strip()
                         },
                     )
-        if (self.repo.working_dir / PYPROJECT_TOML).exists():
-            data = (self.repo.working_dir / PYPROJECT_TOML).load()
+        if (self.path / PYPROJECT_TOML).exists():
+            data = (self.path / PYPROJECT_TOML).load()
             ep = merge(
                 ep,
                 dict(
@@ -557,7 +589,7 @@ class Project:
 
     def to_pre_commit(self):
         """from the suffixes in the content, fill out the precommit based on our opinions."""
-        precommit = self.repo.working_dir / PRECOMMITCONFIG_YML
+        precommit = self.path / PRECOMMITCONFIG_YML
         data = precommit.load() or {}
         if "repos" not in data:
             data["repos"] = []
@@ -609,9 +641,13 @@ class Project:
 
     LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
+    @property
+    def path(self):
+        return File(self.repo.working_dir)
+
     def to_flit(self):
-        print(self)
-        (self.repo.working_dir / PYPROJECT_TOML).update(
+        description_file = self.get_description_file()
+        (self.path / PYPROJECT_TOML).update(
             dict(
                 tool=dict(
                     flit=dict(
@@ -632,14 +668,19 @@ class Project:
                                     "test": self.get_test_requires(),
                                     "doc": self.get_doc_requires(),
                                 },
-                                "description-file": "README.md",
                                 "requires-python": self.get_python_version(),
+                                **(
+                                    description_file
+                                    and {"description-file": str(description_file)}
+                                    or {}
+                                ),
                             },
                         ),
                         scripts={},
                         sdist={},
                         entrypoints=self.get_entry_points(),
-                    )
+                    ),
+                    pytest=dict(ini_options=self.to_pytest_config()),
                 ),
                 **{
                     "build-system": {
@@ -650,11 +691,12 @@ class Project:
             )
         )
 
-    def to_docs_config(self):
-        (self.repo.working_dir / TOC).dump(
+    def to_toc(self):
+        description_file = self.get_description_file()
+        (self.path / TOC).dump(
             [
                 dict(
-                    file=str(README),
+                    file=str(description_file),
                     sections=[
                         dict(file="/".join(x.with_suffix("").parts))
                         for d in self.directories
@@ -664,7 +706,9 @@ class Project:
                 )
             ]
         )
-        (self.repo.working_dir / CONFIG).dump(
+
+    def to_config(self):
+        (self.path / CONFIG).dump(
             dict(
                 title=self.get_name(),
                 author=self.get_author(),
@@ -705,24 +749,63 @@ class Project:
     def to_poetry(self):
         ...
 
+    def to_pytest_config(self):
+        return dict(
+            addopts="-s",
+            norecursedirs=" ".join(map(str, self.get_exclude())),
+            minversion="6.2",
+        )
+
+    def to_gitignore(self):
+        (self.path / GITIGNORE).write_text("\n".join(map(self.get_exclude())))
+
+    def to_manifest(self):
+        (self.path / MANIFEST).write_text(" ".join(map(str, ["include"] + self.files)))
+
 
 # do it tasks.
 
 project = Project()
 
 
+def task_manifest():
+    import doit
+
+    return dict(
+        actions=[project.to_manifest],
+        targets=[project.path / MANIFEST],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+    )
+
+
+def task_gitignore():
+    import doit
+
+    return dict(
+        actions=[project.to_gitignore],
+        targets=[project.path / GITIGNORE],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+    )
+
+
 def task_lint():
     """produce the configuration files for linting and formatting the distribution."""
+    import doit
+
     return dict(
         actions=[project.to_pre_commit],
-        targets=[project.repo.working_dir / PRECOMMITCONFIG_YML],
+        targets=[project.path / PRECOMMITCONFIG_YML],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.suffixes)))],
     )
 
 
 def task_python():
     """produce the configuration files for a python distribution."""
     return dict(
-        actions=[project.to_flit], targets=[project.repo.working_dir / PYPROJECT_TOML]
+        file_dep=project.files,
+        actions=[project.to_flit],
+        task_dep=["manifest"],
+        targets=[project.path / PYPROJECT_TOML],
     )
 
 
@@ -733,9 +816,12 @@ def task_blog():
 
 def task_docs():
     """produce the configuration files for the documentation."""
+    import doit
+
     return dict(
-        actions=[project.to_docs_config],
-        targets=[project.repo.working_dir / TOC, project.repo.working_dir / CONFIG],
+        actions=[project.to_toc, project.to_config],
+        targets=[project.path / TOC, project.path / CONFIG],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
     )
 
 
