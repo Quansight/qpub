@@ -1,4 +1,5 @@
-"""__main__.py"""
+"""the cli & nox session for the qpub application"""
+
 import typer
 import nox
 import pathlib
@@ -39,8 +40,9 @@ def build(ctx: typer.Context, conda: bool = False):
 
 
 @app.command()
-def docs(ctx: typer.Context):
+def docs(ctx: typer.Context, watch: bool = False):
     """build the documentation"""
+    options.watch = watch
     nox.options.sessions += ["docs"]
 
 
@@ -164,15 +166,16 @@ def test(session):
     session.run(*"pytest".split())
 
 
-@nox.session()
+@nox.session(reuse_venv=True)
 def docs(session):
-    session.install(*"jupyter-book".split())
-    session.run(
-        *"jupyter-book build .  --path-output docs --toc docs/_toc.yml --config docs/_config.yml".split()
-    )
+    session.install(*"jupyter-book doit".split())
+    if options.watch:
+        session.run(*f"python -m doit auto --dir . --file {task_file} html".split())
+    else:
+        session.run(*f"python -m doit --dir . --file {task_file} html".split())
 
 
-@nox.session()
+@nox.session(reuse_venv=True)
 def blog(session):
     session
 
@@ -190,8 +193,11 @@ def configure(session):
 
 def main():
     try:
+        # run the typer application to configure the nox sessions
+        # some commands may raise to indicate completed.
         app()
     except SystemExit as exception:
+        # run the nox sessions that were configured.
         if nox.options.sessions:
             if "configure" not in nox.options.sessions:
                 nox.options.sessions.insert(0, "configure")

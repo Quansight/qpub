@@ -691,29 +691,101 @@ class Project:
             )
         )
 
-    def to_toc(self):
-        description_file = self.get_description_file()
-        (self.path / TOC).dump(
-            [
-                dict(
-                    file=str(description_file),
-                    sections=[
-                        dict(file="/".join(x.with_suffix("").parts))
-                        for d in self.directories
-                        for x in self.files
-                        if x.suffix in (".md", ".ipynb") and x.parent == d
-                    ],
-                )
-            ]
-        )
+    def to_toc_yml(self):
+        """
 
-    def to_config(self):
+        book > part > chapter > section
+
+        there are two conventions for jupyter book:
+        1. using sections
+        2. using files
+
+        """
+        (self.path / TOC).dump(self.get_sections())
+
+    def get_sections(self):
+        collated = __import__("collections").defaultdict(list)
+        # collated[None] is the top level
+        collated[(None,)].append(self.get_description_file())
+
+        if collated[(None,)][0] is None:
+            collated.pop()
+
+        if not collated[(None,)]:
+            try:
+                collated[(None,)].append(next(self.get_file_names()))
+            except StopIteration:
+                ...
+
+        for file in sorted(self.files):
+            if file not in sum(collated.values(), []):
+                collated[file.parent.parts].append(file)
+
+        sections = [
+            dict(file=str(collated.pop((None,)).pop(0).with_suffix("")), sections=[])
+        ]
+        # a rough first pass.
+        for part in sorted(collated):
+            if part == (None,):
+                continue
+            for file in collated[part]:
+                if file.suffix.lower() in {".md", ".ipynb", ".rst", ".txt"}:
+                    sections[0]["sections"].append(dict(file=str(file.with_suffix(""))))
+
+        return sections
+
+    def get_section_files(self):
+        ...
+
+    def to_config_yml(self):
+        """configure the book project once and never again.
+
+        https://jupyterbook.org/customize/config.html
+
+        """
         (self.path / CONFIG).dump(
             dict(
                 title=self.get_name(),
                 author=self.get_author(),
-                execute=dict(execute_notebooks="off"),
-                exclude_patterns=[".nox"],
+                copyright="2020",
+                logo="",
+                only_build_toc_files=True,
+                repository=dict(
+                    url=self.get_url(),
+                    path_to_book="",
+                    branch="gh-pages",
+                ),
+                execute=dict(
+                    execute_notebooks="off",
+                ),
+                exclude_patterns=list(map(str, self.get_exclude())),
+                html=dict(
+                    favico="",
+                    use_edit_page_button=True,
+                    use_repository_button=True,
+                    use_issues_button=False,
+                    extra_navbar="",
+                    extra_footer="",
+                    google_analytics_id="",
+                    home_page_in_navbar=True,
+                    baseurl="",
+                    comments=dict(
+                        hypothesis=False,
+                        utterances=False,
+                    ),
+                    launch_buttons=dict(
+                        notebook_interface="lab",
+                        binderhub_url="https://mybinder.org",
+                        jupyterhub_url="",
+                        thebe=True,
+                        colab_url="",
+                    ),
+                ),
+                sphinx=dict(
+                    extra_extensions=[],
+                    local_extensions=[],
+                    config=dict(bibtex_bibfiles=[]),
+                ),
             )
         )
 
@@ -802,7 +874,7 @@ def task_lint():
 def task_python():
     """produce the configuration files for a python distribution."""
     return dict(
-        file_dep=project.files,
+        file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
         actions=[project.to_flit],
         task_dep=["manifest"],
         targets=[project.path / PYPROJECT_TOML],
@@ -819,9 +891,23 @@ def task_docs():
     import doit
 
     return dict(
-        actions=[project.to_toc, project.to_config],
+        actions=[project.to_toc_yml, project.to_config_yml],
         targets=[project.path / TOC, project.path / CONFIG],
         uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+    )
+
+
+def task_html():
+    """produce the configuration files for the documentation."""
+    import doit
+
+    return dict(
+        file_dep=[project.path / TOC, project.path / CONFIG] + project.files,
+        actions=[
+            f"jupyter-book build {project.path}  --path-output docs --toc docs/_toc.yml --config docs/_config.yml"
+        ],
+        targets=[project.path / DOCS / "_build/html"],
+        watch=project.files,
     )
 
 
