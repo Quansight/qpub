@@ -15,6 +15,7 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 import os
 import pathlib
 import typing
+import dataclasses
 
 Path = type(pathlib.Path())
 
@@ -48,6 +49,17 @@ class File(Path):
     the loaders and dumpers edit files in-place, these constraints may not apply to all systems.
     """
 
+    def read(self):
+        return self.load()
+
+    def write(self, object):
+        self.write_text(self.dump(object))
+
+    def update(self, object):
+        return self.write(util.merge(self.read(), object))
+
+    __add__ = update
+
     def load(self):
         """a permissive method to load data from files and edit documents in place."""
         for cls in File.__subclasses__():
@@ -66,61 +78,6 @@ class File(Path):
         else:
             raise TypeError(f"Can't dump type with suffix: {self.suffix}")
 
-    def update(self, object):
-        if self.suffix in INI._suffixes:
-            config = self.load()
-            prior = config.to_dict()
-            self._merge(config, object)
-            if prior != config.to_dict():
-                self.dump(config)
-        else:
-            self.dump(self._merge(self.load() or {}, object))
-
-    @classmethod
-    def _flatten(cls, x):
-        import textwrap
-
-        if hasattr(x, "items"):
-            for k, v in x.items():
-                x[k] = cls._flatten(v)
-        if isinstance(x, list):
-            return "\n" + textwrap.indent("\n".join(x), " " * 4)
-        return x
-
-    @classmethod
-    def _update(cls, a, b):
-        try:
-            a.update(b)
-        except:
-            import configupdater
-
-            a.update(configupdater.ConfigUpdater(b))
-        return a
-
-    @classmethod
-    def _merge(cls, a, b, *c):
-        if hasattr(a, "items"):
-            if not a:
-                return cls._update(a, b)
-
-            for k, v in a.items():
-                if k in b:
-                    a[k] = cls._merge(v, b[k])
-
-            for k, v in b.items():
-                if k not in a:
-                    try:
-                        a[k] = v
-                    except ValueError:
-                        import configupdater
-
-                        a.add_section(k)
-                        a[k].update(v)
-
-        if isinstance(a, (set, list, tuple)):
-            return list(sorted(set(a).union(b)))
-        return a
-
 
 class INI(File):
     """dump and load ini files in place."""
@@ -129,17 +86,17 @@ class INI(File):
 
     def load(self):
         try:
-            object = __import__("configupdater").ConfigUpdater()
-        except:
-            object = __import__("configparser").ConfigParser()
+            __import__("configupdater")
+            callable = util.load_configupdater
+        except ModuleNotFoundError:
+            callable = util.load_configparser
         try:
-            object.read_string(self.read_text())
+            return callable(self.read_text())
         except FileNotFoundError:
-            object.read_string("")
-        return object
+            return callable("")
 
     def dump(self, object):
-        self.write_text(str(flatten(object)) + "\n")
+        return util.dump_config__er(object)
 
 
 class TOML(File):
@@ -149,13 +106,17 @@ class TOML(File):
 
     def load(self):
         try:
-            return __import__("tomlkit").parse(self.read_text())
+            __import__("tomlkit")
+            callable = util.load_tomlkit
+        except ModuleNotFoundError:
+            callable = util.load_toml
+        try:
+            return callable(self.read_text())
         except FileNotFoundError:
-            return __import__("tomlkit").parse("")
+            return callable("")
 
     def dump(self, object):
-
-        self.write_text(__import__("tomlkit").dumps(object) + "\n")
+        return util.dump_toml(object)
 
 
 class YML(File):
@@ -165,23 +126,17 @@ class YML(File):
 
     def load(self):
         try:
-            object = __import__("ruamel.yaml").yaml.YAML()
-            try:
-                return object.load(self.read_text()) or object.load("{}")
-            except FileNotFoundError:
-                return object.load("{}")
+            __import__("ruamel.yaml")
+            callable = util.load_ruamel
         except ModuleNotFoundError:
-            try:
-                return __import__("yaml").safe_load(self.read_text())
-            except FileNotFoundError:
-                return {}
+            callable = util.load_yaml
+        try:
+            return callable(self.read_text())
+        except FileNotFoundError:
+            return callable("{}")
 
     def dump(self, object):
-        with self.open("w") as file:
-            try:
-                __import__("ruamel.yaml").yaml.YAML().dump(object, file)
-            except ModuleNotFoundError:
-                file.write(__import__("yaml").safe_dump(object))
+        return util.dump_yaml(object)
 
 
 class Convention(File):
@@ -223,10 +178,6 @@ CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 # in the sections below we define tasks to configure distributions.
 
 
-import dataclasses
-import git
-
-
 @dataclasses.dataclass(order=True)
 class Project:
     """the Project class provides a consistent interface for inferring project features from
@@ -234,20 +185,45 @@ class Project:
 
     """
 
-    repo: git.Repo = dataclasses.field(default_factory=Path)
+    repo: object = dataclasses.field(default_factory=Path)
     data: dict = dataclasses.field(default_factory=dict)
+
+    @property
+    def path(self):
+        return File(self.repo.working_dir)
+
+    def __truediv__(self, object):
+        return self.path / object
+
+    def __post_init__(self):
+        """post initialize globs of content relative the git repository."""
+
+        # submodules in the repository
+        if isinstance(self.repo, (str, Path)):
+            git = __import__("git")
+            try:
+                self.repo = git.Repo(self.repo)
+            except git.InvalidGitRepositoryError:
+                git.Git(self.repo).init()
+                self.repo = git.Repo(self.repo)
+        self.add()
 
     def add(self, *object):
         """add an object to the project, add will provide heuristics for different objects much the same way `poetry add` does."""
         for object in object:
             if isinstance(object, (str, Path)):
                 self.repo.index.add([str(object)])
+        self.set_state()
 
+    def set_state(self):
+        """set the Project state."""
         # the submodules in the project.
         self.submodules = [File(x) for x in self.repo.submodules]
 
         # the files in the project.
-        self.all = list(map(File, git.Git(self.path).ls_files().splitlines()))
+        self.all = list(
+            map(File, __import__("git").Git(self.path).ls_files().splitlines())
+        )
         self.files = [
             File(x)
             for x in self.all
@@ -257,7 +233,7 @@ class Project:
         [
             self.files.extend(
                 x
-                for x in map(File, git.Git(x).ls_files().splitlines())
+                for x in map(File, __import__("git").Git(x).ls_files().splitlines())
                 if x not in CONVENTIONS
             )
             for x in self.submodules
@@ -275,40 +251,6 @@ class Project:
 
         self.suffixes = sorted(set(x.suffix for x in self.files))
 
-    def __post_init__(self):
-        """post initialize globs of content relative the git repository."""
-
-        # submodules in the repository
-        if isinstance(self.repo, (str, Path)):
-            try:
-                self.repo = git.Repo(self.repo)
-            except git.InvalidGitRepositoryError:
-                git.Git(self.repo).init()
-                self.repo = git.Repo(self.repo)
-        self.add()
-
-    def get_exclude_by(self, object):
-        """return the path that ignores an object.
-
-        exclusion is based off the canonical python.gitignore specification."""
-        self._init_exclude()
-        for k, v in self.gitignore_patterns.items():
-            if any(v.match((str(object),))):
-                return k
-        else:
-            return None
-
-    def _iter_exclude(self):
-        import itertools
-
-        docs = Path(self.path, "docs")
-        for x in itertools.chain(
-            Path(self.path).iterdir(), docs.iterdir() if docs.exists() else tuple()
-        ):
-            exclude = self.get_exclude_by(x.relative_to(self.path))
-            if exclude:
-                yield exclude
-
     def get_exclude(self):
         """get the excluded by the canonical python.gitignore file.
 
@@ -317,34 +259,66 @@ class Project:
         """
         return list(sorted(set(self._iter_exclude())))
 
+    def _iter_exclude(self):
+        import itertools
+
+        docs = self / DOCS
+        for x in itertools.chain(
+            Path(self.path).iterdir(), docs.iterdir() if docs.exists() else tuple()
+        ):
+            exclude = self.get_exclude_by(x.relative_to(self.path))
+            if exclude:
+                yield exclude
+
+    def get_exclude_by(self, object):
+        """return the path that ignores an object.
+
+        exclusion is based off the canonical python.gitignore specification."""
+        if not hasattr(self, "gitignore_patterns"):
+            self._init_exclude()
+
+        for k, v in self.gitignore_patterns.items():
+            if any(v.match((str(object),))):
+                return k
+        else:
+            return None
+
     def _init_exclude(self):
         """initialize the path specifications to decide what to omit."""
-        if not hasattr(self, "gitignore_patterns"):
-            import pathspec
 
-            self.gitignore_patterns = {}
+        self.gitignore_patterns = {}
 
-            for pattern in (
-                (Path(__file__).parent / "Python.gitignore").read_text().splitlines()
-            ):
-                if bool(pattern):
-                    match = pathspec.patterns.GitWildMatchPattern(pattern.rstrip("/"))
-                    if match.include:
-                        self.gitignore_patterns[pattern.rstrip("/")] = match
+        for pattern in (
+            Path(__file__).parent / "Python.gitignore"
+        ).read_text().splitlines() + [".vscode"]:
+            if bool(pattern):
+                match = __import__("pathspec").patterns.GitWildMatchPattern(
+                    pattern.rstrip("/")
+                )
+                if match.include:
+                    self.gitignore_patterns[pattern.rstrip("/")] = match
+
+    def get_posix_names(self):
+        """list the potentional names for a project"""
+        if self.top_level:
+            yield from self.get_file_from_directory()
+        else:
+            yield from self.get_file_from_flat()
 
     def get_file_from_directory(self):
         """infer the name of a src directory project."""
         root = self.path
         if SRC in self.top_level:
             root /= SRC
-        for dir in root.iterdir():
-            if dir not in self.directories:
-                continue
-            if not dir.stem.lower().isalpha():
-                continue
-            yield dir
+        for parent in [self.path, *self.directories]:
+            for dir in parent.iterdir():
+                if dir not in self.directories:
+                    continue
+                if not dir.stem.lower().isalpha():
+                    continue
+                yield dir
 
-    def get_file_from_flat():
+    def get_file_from_flat(self):
         """infer the name of a project from a flat (gist-like) directory."""
         description_file = self.get_description_file()
         test_files = self.get_test_files()
@@ -358,13 +332,6 @@ class Project:
                 continue
             if file.suffix in (".rst", ".md", ".py", ".ipynb"):
                 yield file
-
-    def get_file_names(self):
-        """list the potentional names for a project"""
-        if self.top_level:
-            yield from self.get_file_from_directory()
-        else:
-            yield from self.get_file_from_flat()
 
     def get_name(self):
         """get the name of the project distribution.
@@ -380,7 +347,7 @@ class Project:
         """
         # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
         try:
-            return next(self.get_file_names()).stem
+            return next(self.get_posix_names()).stem
         except StopIteration:
             return "welp"
 
@@ -437,20 +404,21 @@ class Project:
 
     def get_requires_from_files(self, files):
         """list imports discovered from the files."""
-        return list(set(import_to_pip(merged_imports(self.path / x for x in files))))
+        return list(set(util.import_to_pip(util.merged_imports(files))))
 
     def get_requires_from_requirements_txt(self):
         """get any hardcoded dependencies in requirements.txt."""
-        if (self.path / REQUIREMENTS_TXT).exists():
+        if (self / REQUIREMENTS_TXT).exists():
             known = [
                 x
                 for x in REQUIREMENTS_TXT.read_text().splitlines()
                 if not x.lstrip().startswith("#") and x.strip()
             ]
-            import packaging.requirements
-
             return list(
-                packaging.requirements.Requirement.parseString(x).name for x in known
+                __import__("packaging.requirements")
+                .requirements.Requirement.parseString(x)
+                .name
+                for x in known
             )
 
         return []
@@ -466,13 +434,15 @@ class Project:
         known = self.get_requires_from_requirements_txt()
 
         known.append(self.get_name())
-        return [
-            package
-            for package in self.get_requires_from_files(
-                [x for x in self.files if x not in self.get_test_files()]
-            )
-            if package.lower() not in known and package[0].isalpha()
-        ]
+        return sorted(
+            [
+                package
+                for package in self.get_requires_from_files(
+                    [self / x for x in self.files if x not in self.get_test_files()]
+                )
+                if package.lower() not in known and package[0].isalpha()
+            ]
+        )
 
     def get_test_requires(self):
         """test requires live in test and docs folders."""
@@ -481,7 +451,7 @@ class Project:
         if ".ipynb" in self.suffixes:
             requires += ["nbval", "importnb"]
         requires += self.get_requires_from_files(
-            self.path / x for x in self.get_test_files()
+            self / x for x in self.get_test_files()
         )
         return [x for x in requires if x not in [self.get_name()]]
 
@@ -550,8 +520,8 @@ class Project:
         # read entry points from pyproject.toml
         ep = {}
         return ep
-        if (self.path / SETUP_CFG).exists():
-            data = (self.path / SETUP_CFG).load()
+        if (self / SETUP_CFG).exists():
+            data = (self / SETUP_CFG).load()
             if "options.entry_points" in data:
                 for k, v in data["options.entry_points"].items():
                     ep = merge(
@@ -562,8 +532,8 @@ class Project:
                             if x.strip()
                         },
                     )
-        if (self.path / PYPROJECT_TOML).exists():
-            data = (self.path / PYPROJECT_TOML).load()
+        if (self / PYPROJECT_TOML).exists():
+            data = (self / PYPROJECT_TOML).load()
             ep = merge(
                 ep,
                 dict(
@@ -589,7 +559,7 @@ class Project:
 
     def to_pre_commit(self):
         """from the suffixes in the content, fill out the precommit based on our opinions."""
-        precommit = self.path / PRECOMMITCONFIG_YML
+        precommit = self / PRECOMMITCONFIG_YML
         data = precommit.load() or {}
         if "repos" not in data:
             data["repos"] = []
@@ -641,54 +611,48 @@ class Project:
 
     LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
 
-    @property
-    def path(self):
-        return File(self.repo.working_dir)
-
     def to_flit(self):
         description_file = self.get_description_file()
-        (self.path / PYPROJECT_TOML).update(
-            dict(
-                tool=dict(
-                    flit=dict(
-                        metadata=dict(
-                            module=self.get_name(),
-                            author=self.get_author(),
-                            maintainer=self.get_author(),
-                            requires=self.get_requires(),
-                            classifiers=self.get_classifiers(),
-                            keywords=self.get_keywords(),
-                            license=self.get_license(),
-                            urls={},
-                            **{
-                                "author-email": self.get_email(),
-                                "maintainer-email": self.get_email(),
-                                "home-page": self.get_url(),
-                                "requires-extra": {
-                                    "test": self.get_test_requires(),
-                                    "doc": self.get_doc_requires(),
-                                },
-                                "requires-python": self.get_python_version(),
-                                **(
-                                    description_file
-                                    and {"description-file": str(description_file)}
-                                    or {}
-                                ),
+        (self / PYPROJECT_TOML) + dict(
+            tool=dict(
+                flit=dict(
+                    metadata=dict(
+                        module=self.get_name(),
+                        author=self.get_author(),
+                        maintainer=self.get_author(),
+                        requires=self.get_requires(),
+                        classifiers=self.get_classifiers(),
+                        keywords=self.get_keywords(),
+                        license=self.get_license(),
+                        urls={},
+                        **{
+                            "author-email": self.get_email(),
+                            "maintainer-email": self.get_email(),
+                            "home-page": self.get_url(),
+                            "requires-extra": {
+                                "test": self.get_test_requires(),
+                                "doc": self.get_doc_requires(),
                             },
-                        ),
-                        scripts={},
-                        sdist={},
-                        entrypoints=self.get_entry_points(),
+                            "requires-python": self.get_python_version(),
+                            **(
+                                description_file
+                                and {"description-file": str(description_file)}
+                                or {}
+                            ),
+                        },
                     ),
-                    pytest=dict(ini_options=self.to_pytest_config()),
+                    scripts={},
+                    sdist={},
+                    entrypoints=self.get_entry_points(),
                 ),
-                **{
-                    "build-system": {
-                        "requires": "flit_core>=2,<4".split(),
-                        "build-backend": "flit_core.buildapi",
-                    }
-                },
-            )
+                pytest=dict(ini_options=self.to_pytest_config()),
+            ),
+            **{
+                "build-system": {
+                    "requires": "flit_core>=2,<4".split(),
+                    "build-backend": "flit_core.buildapi",
+                }
+            },
         )
 
     def to_toc_yml(self):
@@ -701,7 +665,7 @@ class Project:
         2. using files
 
         """
-        (self.path / TOC).dump(self.get_sections())
+        (self / TOC).dump(self.get_sections())
 
     def get_sections(self):
         collated = __import__("collections").defaultdict(list)
@@ -713,7 +677,7 @@ class Project:
 
         if not collated[(None,)]:
             try:
-                collated[(None,)].append(next(self.get_file_names()))
+                collated[(None,)].append(next(self.get_posix_names()))
             except StopIteration:
                 ...
 
@@ -743,7 +707,7 @@ class Project:
         https://jupyterbook.org/customize/config.html
 
         """
-        (self.path / CONFIG).dump(
+        (self / CONFIG).dump(
             dict(
                 title=self.get_name(),
                 author=self.get_author(),
@@ -829,20 +793,36 @@ class Project:
         )
 
     def to_gitignore(self):
-        (self.path / GITIGNORE).write_text("\n".join(map(self.get_exclude())))
+        (self / GITIGNORE).write_text("\n".join(map(str, self.get_exclude())))
 
     def to_manifest(self):
-        (self.path / MANIFEST).write_text(" ".join(map(str, ["include"] + self.files)))
+        (self / MANIFEST).write_text(" ".join(map(str, ["include"] + self.files)))
+
+    def to_github_action(self):
+        """create a github actions to publish dgaf actionss"""
+
+    def to_readthedocs(self):
+        """configure a read the docs deployment with dgaf."""
+
+    def to_requirements(self):
+        """write a requirements file."""
+        (self / REQUIREMENTS_TXT).update
+
+    def to_conda_environment(self):
+        """export a conda environment file."""
 
 
 # do it tasks.
 
-project = Project()
+
+try:
+    doit = __import__("doit")
+    project = Project()
+except ModuleNotFoundError:
+    doit = None
 
 
 def task_manifest():
-    import doit
-
     return dict(
         actions=[project.to_manifest],
         targets=[project.path / MANIFEST],
@@ -851,8 +831,6 @@ def task_manifest():
 
 
 def task_gitignore():
-    import doit
-
     return dict(
         actions=[project.to_gitignore],
         targets=[project.path / GITIGNORE],
@@ -862,8 +840,6 @@ def task_gitignore():
 
 def task_lint():
     """produce the configuration files for linting and formatting the distribution."""
-    import doit
-
     return dict(
         actions=[project.to_pre_commit],
         targets=[project.path / PRECOMMITCONFIG_YML],
@@ -888,8 +864,6 @@ def task_blog():
 
 def task_docs():
     """produce the configuration files for the documentation."""
-    import doit
-
     return dict(
         actions=[project.to_toc_yml, project.to_config_yml],
         targets=[project.path / TOC, project.path / CONFIG],
@@ -899,8 +873,6 @@ def task_docs():
 
 def task_html():
     """produce the configuration files for the documentation."""
-    import doit
-
     return dict(
         file_dep=[project.path / TOC, project.path / CONFIG] + project.files,
         actions=[
@@ -914,111 +886,218 @@ def task_html():
 # utilities functions
 
 
-def rough_source(nb):
-    """extract a rough version of the source in notebook to infer files from"""
-    import json
-    import textwrap
+class util:
+    def rough_source(nb):
+        """extract a rough version of the source in notebook to infer files from"""
 
-    if isinstance(nb, str):
-        nb = json.loads(nb)
+        if isinstance(nb, str):
+            nb = __import__("json").loads(nb)
 
-    return "\n".join(
-        textwrap.dedent("".join(x["source"]))
-        for x in nb.get("cells", [])
-        if x["cell_type"] == "code"
-    )
-
-
-async def infer(file):
-    """infer imports from different kinds of files."""
-    import json
-
-    import aiofiles
-    import depfinder
-
-    async with aiofiles.open(file, "r") as f:
-        if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
-            return file, {}
-        source = await f.read()
-        if file.suffix == ".ipynb":
-            source = rough_source(file.read_text())
-        try:
-            return file, depfinder.main.get_imported_libs(source).describe()
-        except SyntaxError:
-            return file, {}
-
-
-async def infer_files(files):
-    return dict(
-        await __import__("asyncio").gather(
-            *(infer(file) for file in map(pathlib.Path, files))
+        return "\n".join(
+            __import__("textwrap").dedent("".join(x["source"]))
+            for x in nb.get("cells", [])
+            if x["cell_type"] == "code"
         )
-    )
 
+    async def infer(file):
+        """infer imports from different kinds of files."""
+        async with __import__("aiofiles").open(file, "r") as f:
+            if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
+                return file, {}
+            source = await f.read()
+            if file.suffix == ".ipynb":
+                source = util.rough_source(source)
+            try:
+                return (
+                    file,
+                    __import__("depfinder").main.get_imported_libs(source).describe(),
+                )
+            except SyntaxError:
+                return file, {}
 
-def gather_imports(files: typing.List[Path]) -> typing.List[dict]:
-    """"""
-    import asyncio
-    import sys
-    import yaml
+    async def infer_files(files):
+        return dict(
+            await __import__("asyncio").gather(
+                *(util.infer(file) for file in map(Path, files))
+            )
+        )
 
-    if "depfinder" not in sys.modules:
+    def gather_imports(files):
+        """"""
+        if "depfinder" not in __import__("sys").modules:
+            yaml = __import__("yaml")
 
-        dir = Path(__import__("appdirs").user_data_dir("qpub"))
-        __import__("requests_cache").install_cache(str(dir / "qpub"))
-        dir.mkdir(parents=True, exist_ok=True)
-        if not hasattr(yaml, "CSafeLoader"):
-            yaml.CSafeLoader = yaml.SafeLoader
-        import depfinder
+            dir = Path(__import__("appdirs").user_data_dir("qpub"))
+            __import__("requests_cache").install_cache(str(dir / "qpub"))
+            dir.mkdir(parents=True, exist_ok=True)
+            if not hasattr(yaml, "CSafeLoader"):
+                yaml.CSafeLoader = yaml.SafeLoader
+            __import__("depfinder")
 
-        __import__("requests_cache").uninstall_cache()
-    return dict(asyncio.run(infer_files(files)))
+            __import__("requests_cache").uninstall_cache()
+        return dict(__import__("asyncio").run(util.infer_files(files)))
 
+    def merge(a, *c):
+        if not c:
+            return a
+        b, *c = c
+        if c:
+            b = __import__("functools").reduce(util.merge, (b, *c))
+        if hasattr(a, "items"):
+            for k, v in a.items():
+                if k in b:
+                    a[k] = util.merge(v, b[k])
+            for k, v in b.items():
+                if k not in a:
+                    try:
+                        a[k] = v
+                    except ValueError as exception:
+                        if hasattr(a, "add_section"):
+                            a.add_section(k)
+                            a[k].update(v)
+                        else:
+                            raise exception
+            return a
 
-def _merge_shallow(a: dict = None, b: dict = None, *c: dict) -> dict:
-    """merge the results of dictionaries."""
-    if a is None:
-        return {}
-    a = a or {}
-    if b is None:
+        if isinstance(a, (list, tuple)):
+            return a + [x for x in b if x not in a]
+        if isinstance(a, set):
+            return list(sorted(set(a).union(b)))
         return a
-    b = __import__("functools").reduce(_merge_shallow, (b, *c)) if c else b
-    for k, v in b.items():
-        if k not in a:
-            a[k] = a.get(k, [])
-        if isinstance(a[k], set):
-            a[k] = list(a[k])
-        for v in v:
-            a[k] += [] if v in a[k] else [v]
-    return a
 
+    def merged_imports(files):
+        results = util.merge(*util.gather_imports(files).values())
+        return sorted(
+            set(
+                list(results.get("required", []))
+                + list(results.get("questionable", []))
+            )
+        )
 
-def merged_imports(files: typing.List[Path]) -> dict:
-    results = _merge_shallow(*gather_imports(files).values())
-    return list(results.get("required", [])) + list(results.get("questionable", []))
+    def import_to_pip(list):
+        global IMPORT_TO_PIP
+        if not IMPORT_TO_PIP:
+            IMPORT_TO_PIP = {
+                x["import_name"]: x["pypi_name"]
+                for x in __import__("depfinder").utils.mapping_list
+            }
+        return [IMPORT_TO_PIP.get(x, x) for x in list]
+
+    def pypi_to_conda(list):
+        global PIP_TO_CONDA
+        if not PIP_TO_CONDA:
+            PIP_TO_CONDA = {
+                x["import_name"]: x["conda_name"]
+                for x in __import__("depfinder").utils.mapping_list
+            }
+        return [PIP_TO_CONDA.get(x, x) for x in list]
+
+    # file loader loader/dumper functions
+
+    def ensure_trailing_eol(callable):
+        """a decorator to comply with our linting opinion."""
+        import functools
+
+        @functools.wraps(callable)
+        def main(object):
+            str = callable(object)
+            return str.rstrip() + "\n"
+
+        return main
+
+    def load_configparser(str):
+        object = __import__("configparser").ConfigParser(default_section=None)
+        object.read_string(str)
+        return expand_cfg(object)
+
+    def load_configupdater(str):
+        object = __import__("configupdater").ConfigUpdater()
+        object.read_string(str)
+        return expand_cfg(object)
+
+    @ensure_trailing_eol
+    def dump_config__er(object):
+        next = __import__("io").StringIO()
+        object = compact_cfg(object)
+        if isinstance(object, dict):
+            import configparser
+
+            parser = configparser.ConfigParser(default_section=None)
+            parser.read_dict(object)
+            object = parser
+        object.write(next)
+        return next.getvalue()
+
+    def expand_cfg(object):
+        """special conditions for config files so configparser and configuupdates work together."""
+        for main, section in object.items():
+            for key, value in section.items():
+                if isinstance(value, str) and value.startswith("\n"):
+                    value = textwrap.dedent(value).splitlines()[1:]
+                object[main][key] = value
+        return object
+
+    def compact_cfg(object):
+        for main, section in object.items():
+            for key, value in section.items():
+                if isinstance(value, list):
+                    value = textwrap.indent("\n".join(value), " " * 4)
+                object[main][key] = value
+        return object
+
+    def load_text(str):
+        return [x for x in str.splitlines()]
+
+    @ensure_trailing_eol
+    def dump_text(object):
+        return "\n".join(object)
+
+    def load_toml(str):
+        return __import__("toml").loads(str)
+
+    def load_tomlkit(str):
+        return __import__("tomlkit").parse(str)
+
+    @ensure_trailing_eol
+    def dump_toml(object):
+        try:
+            tomlkit = __import__("tomlkit")
+            if isinstance(object, tomlkit.toml_document.TOMLDocument):
+                return tomlkit.dumps(object)
+        except ModuleNotFoundError:
+            pass
+        return __import__("toml").dumps(object)
+
+    def load_yaml(str):
+        return __import__("yaml").safe_load(str)
+
+    def load_ruamel(str):
+        object = __import__("ruamel.yaml").yaml.YAML()
+        return object.load(str)
+
+    @ensure_trailing_eol
+    def dump_yaml(object):
+        try:
+            ruamel = __import__("ruamel.yaml").yaml
+            if isinstance(object, ruamel.YAML):
+                next = __import__("io").StringIO()
+                object.dump(next)
+                return next.getvalue()
+        except ModuleNotFoundError:
+            pass
+        return __import__("yaml").safe_dump(object)
+
+    def to_dict(object):
+        if hasattr(object, "items"):
+            data = {}
+            for k, v in object.items():
+                if k is None:
+                    continue
+                data[k] = to_dict(v)
+            else:
+                return data
+        return object
 
 
 IMPORT_TO_PIP = None
 PIP_TO_CONDA = None
-
-
-def import_to_pip(list):
-    import depfinder
-
-    global IMPORT_TO_PIP
-    if not IMPORT_TO_PIP:
-        IMPORT_TO_PIP = {
-            x["import_name"]: x["pypi_name"] for x in depfinder.utils.mapping_list
-        }
-    return [IMPORT_TO_PIP.get(x, x) for x in list]
-
-
-def pypi_to_conda(list):
-    import depfinder
-
-    global PIP_TO_CONDA
-    if not PIP_TO_CONDA:
-        PIP_TO_CONDA = {
-            x["import_name"]: x["conda_name"] for x in depfinder.utils.mapping_list
-        }
-    return [PIP_TO_CONDA.get(x, x) for x in list]
