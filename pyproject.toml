@@ -14,36 +14,5 @@ pycodestyle = ["-W503", "-E722", "-E999"]
 [tool.flit.scripts]
 dgaf = "dgaf.__main__:main"
 
-[tool.flit.metadata]
-module = "dgaf"
-author = "tonyfast"
-maintainer = "tonyfast"
-requires = ["nox", "typer"]
-classifiers = []
-keywords = ""
-license = ""
-author-email = "tony.fast@gmail.com"
-maintainer-email = "tony.fast@gmail.com"
-home-page = "https://github.com/deathbeds/dgaf.git"
-requires-python = ">=3.7"
-description-file = "README.md"
-
-[tool.flit.metadata.urls]
-
 [tool.flit.metadata.requires-extra]
-test = ["pytest", "pytest-sugar", "nbval", "importnb", "nbformat", "pytest"]
-docs = ["jupyter-book"]
-
-[tool.flit.sdist]
-
-[tool.flit.entrypoints]
-
-[tool.pytest]
-[tool.pytest.ini_options]
-addopts = "-s"
-norecursedirs = "*.egg-info .eggs .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ dist docs/_build"
-minversion = "6.2"
-
-[build-system]
-requires = ["flit_core>=2,<4"]
-build-backend = "flit_core.buildapi"
+nox = ["doit", "GitPython", "depfinder", "aiofiles", "appdirs", "typer", "nox", "pathspec", "requests-cache", "tomlkit",]
