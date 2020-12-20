@@ -85,11 +85,11 @@ class INI(File):
     _suffixes = ".ini", ".cfg"
 
     def load(self):
-        try:
-            __import__("configupdater")
-            callable = util.load_configupdater
-        except ModuleNotFoundError:
-            callable = util.load_configparser
+        # try:
+        #     __import__("configupdater")
+        #     callable = util.load_configupdater
+        # except ModuleNotFoundError:
+        #     callable = util.load_configparser
         try:
             return callable(self.read_text())
         except FileNotFoundError:
@@ -156,6 +156,7 @@ REQUIREMENTS_TXT = Convention("requirements.txt")
 SETUP_CFG = Convention("setup.cfg")
 SETUP_PY = Convention("setup.py")
 SRC = Convention("src")
+GIT = Convention(".git")
 GITIGNORE = Convention(".gitignore")
 DOCS = Convention("docs")
 BUILD = DOCS / "_build"  # abides the sphinx gitignore convention.
@@ -179,51 +180,21 @@ CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
 
 @dataclasses.dataclass(order=True)
-class Project:
-    """the Project class provides a consistent interface for inferring project features from
-    the content of directories and git repositories.
-
-    """
-
-    repo: object = dataclasses.field(default_factory=Path)
-    data: dict = dataclasses.field(default_factory=dict)
-
-    @property
-    def path(self):
-        return File(self.repo.working_dir)
-
-    def __truediv__(self, object):
-        return self.path / object
+class FileSystem:
+    is_vcs = False
+    dir: str = "."
+    all: list = dataclasses.field(default_factory=list)
+    submodules: list = dataclasses.field(default_factory=list)
+    files: list = dataclasses.field(default_factory=list)
+    directories: list = dataclasses.field(default_factory=list)
+    top_level: list = dataclasses.field(default_factory=list)
+    suffixes: list = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
-        """post initialize globs of content relative the git repository."""
+        self.dir = Path(self.dir)
+        if not self.all:
+            self.all = list(x for x in File(self.dir).rglob("*") if not x.is_dir())
 
-        # submodules in the repository
-        if isinstance(self.repo, (str, Path)):
-            git = __import__("git")
-            try:
-                self.repo = git.Repo(self.repo)
-            except git.InvalidGitRepositoryError:
-                git.Git(self.repo).init()
-                self.repo = git.Repo(self.repo)
-        self.add()
-
-    def add(self, *object):
-        """add an object to the project, add will provide heuristics for different objects much the same way `poetry add` does."""
-        for object in object:
-            if isinstance(object, (str, Path)):
-                self.repo.index.add([str(object)])
-        self.set_state()
-
-    def set_state(self):
-        """set the Project state."""
-        # the submodules in the project.
-        self.submodules = [File(x) for x in self.repo.submodules]
-
-        # the files in the project.
-        self.all = list(
-            map(File, __import__("git").Git(self.path).ls_files().splitlines())
-        )
         self.files = [
             File(x)
             for x in self.all
@@ -238,10 +209,16 @@ class Project:
             )
             for x in self.submodules
         ]
-
+        self.exclude = self.get_exclude_paths()
+        self.content = [x for x in self.files if x not in self.exclude]
         # the non-conventional directories containing content
         self.directories = sorted(
-            set(x.parent for x in self.files if x.parent not in CONVENTIONS)
+            set(
+                x.parent.relative_to(self.dir)
+                for x in self.content
+                if x.parent not in CONVENTIONS
+                if x.parent.absolute() != self.dir.absolute()
+            )
         )
 
         # the top level directories
@@ -251,24 +228,41 @@ class Project:
 
         self.suffixes = sorted(set(x.suffix for x in self.files))
 
-    def get_exclude(self):
+    def get_author(self):
+        return ""
+
+    def get_email(self):
+        return ""
+
+    def get_url(self):
+        return ""
+
+    def get_exclude_patterns(self):
         """get the excluded by the canonical python.gitignore file.
 
         this method can construct a per project gitignore file rather than
         included the world.
         """
-        return list(sorted(set(self._iter_exclude())))
+        return list(sorted(set(dict(self._iter_exclude()).values())))
 
-    def _iter_exclude(self):
+    def get_exclude_paths(self):
+        """get the excluded by the canonical python.gitignore file.
+
+        this method can construct a per project gitignore file rather than
+        included the world.
+        """
+        return list(sorted(dict(self._iter_exclude(self.files))))
+
+    def _iter_exclude(self, files=None):
         import itertools
 
-        docs = self / DOCS
-        for x in itertools.chain(
-            Path(self.path).iterdir(), docs.iterdir() if docs.exists() else tuple()
+        docs = self.dir / DOCS
+        for x in files or itertools.chain(
+            self.dir.iterdir(), docs.iterdir() if docs.exists() else tuple()
         ):
-            exclude = self.get_exclude_by(x.relative_to(self.path))
+            exclude = self.get_exclude_by(x.relative_to(self.dir))
             if exclude:
-                yield exclude
+                yield x, exclude
 
     def get_exclude_by(self, object):
         """return the path that ignores an object.
@@ -290,7 +284,7 @@ class Project:
 
         for pattern in (
             Path(__file__).parent / "Python.gitignore"
-        ).read_text().splitlines() + [".vscode"]:
+        ).read_text().splitlines() + ".vscode _build".split():
             if bool(pattern):
                 match = __import__("pathspec").patterns.GitWildMatchPattern(
                     pattern.rstrip("/")
@@ -298,40 +292,120 @@ class Project:
                 if match.include:
                     self.gitignore_patterns[pattern.rstrip("/")] = match
 
-    def get_posix_names(self):
-        """list the potentional names for a project"""
-        if self.top_level:
-            yield from self.get_file_from_directory()
-        else:
-            yield from self.get_file_from_flat()
-
-    def get_file_from_directory(self):
-        """infer the name of a src directory project."""
-        root = self.path
-        if SRC in self.top_level:
-            root /= SRC
-        for parent in [self.path, *self.directories]:
-            for dir in parent.iterdir():
-                if dir not in self.directories:
-                    continue
-                if not dir.stem.lower().isalpha():
-                    continue
-                yield dir
-
-    def get_file_from_flat(self):
-        """infer the name of a project from a flat (gist-like) directory."""
-        description_file = self.get_description_file()
+    def get_module_name_from_files(self):
         test_files = self.get_test_files()
-        for file in self.files:
-            if file == description_file:
-                continue
-            if file in test_files:
-                continue
+        canonical, tests, pythonic, named, post = [], [], [], [], []
+        post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
+        for x in sorted(self.content):
+            if x.suffix in {".md", ".py", ".rst", ".ipynb"}:
+                if x.stem.lower() in {"readme", "index"}:
+                    canonical += [x]
+                elif x in test_files:
+                    tests += [x]
+                elif post_pattern.match(x.stem):
+                    post += [x]
+                else:
+                    try:
+                        __import__("ast").parse(x.stem)
+                        pythonic += [x]
+                    except SyntaxError:
+                        named += [x]
+        if pythonic:
+            return pythonic[0].stem
 
-            if file.stem.startswith("_"):
-                continue
-            if file.suffix in (".rst", ".md", ".py", ".ipynb"):
-                yield file
+        if post:
+            "fix the name"
+        if canonical:
+            "figure out a name some how"
+
+    def get_module_name_from_directories(self):
+        if len(self.top_level) == 1:
+            return self.top_level[0].stem
+
+    def get_module_name(self):
+        if self.top_level:
+            return self.get_module_name_from_directories()
+        return self.get_module_name_from_files()
+
+    def get_test_files(self, default=True):
+        """list the test like files. we'll access their dependencies separately ."""
+        if default:
+            return [x for x in self.content if x.stem.startswith("test_")]
+        items = util.collect_test_files(self.path)
+        return items
+
+    def get_untracked_files(self):
+        return []
+
+
+@dataclasses.dataclass(order=True)
+class Git(FileSystem):
+    is_vcs = True
+    repo: "git.Repo" = None
+
+    def __post_init__(self):
+        self.all = list(
+            map(File, __import__("git").Git(self.dir).ls_files().splitlines())
+        )
+        self.repo = __import__("git").Repo(self.dir)
+        super().__post_init__()
+
+    def get_author(self):
+        return self.repo.commit().author.name
+
+    def get_email(self):
+        return self.repo.commit().author.email
+
+    def get_url(self):
+        try:
+            return self.repo.remote("origin").url
+        except ValueError:
+            return ""
+
+    def get_untracked_files(self):
+        return self.repo.untracked_files
+
+
+@dataclasses.dataclass(order=True)
+class Project:
+    """the Project class provides a consistent interface for inferring project features from
+    the content of directories and git repositories.
+
+    """
+
+    dir: object = dataclasses.field(default_factory=Path)
+    fs: FileSystem = dataclasses.field(default_factory=dict)
+
+    @property
+    def path(self):
+        return File(self.dir)
+
+    def __truediv__(self, object):
+        return self.path / object
+
+    def __post_init__(self):
+        """post initialize globs of content relative the git repository."""
+
+        self.fs = ((self / GIT).exists() and Git or FileSystem)(self.dir)
+        # self.add()
+
+    @property
+    def files(self):
+        return self.fs.content
+
+    @property
+    def suffixes(self):
+        return self.fs.suffixes
+
+    def add(self, *object):
+        """add an object to the project, add will provide heuristics for different objects much the same way `poetry add` does."""
+        if self.fs.is_vcs:
+            for object in object:
+                if isinstance(object, (str, Path)):
+                    self.fs.repo.index.add([str(object)])
+
+            self.fs.repo.index.commit("dgaf added files.")
+            self.fs.__post_init__()
 
     def get_name(self):
         """get the name of the project distribution.
@@ -346,10 +420,10 @@ class Project:
         - exclude private names.
         """
         # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
-        try:
-            return next(self.get_posix_names()).stem
-        except StopIteration:
-            return "welp"
+        return self.fs.get_module_name()
+
+    def get_exclude(self):
+        return self.fs.get_exclude_patterns()
 
     def get_version(self):
         """determine a version for the project, if there is no version defer to calver.
@@ -363,11 +437,13 @@ class Project:
         """get from the docstring of the project. raise an error if it doesn't exist."""
         # use the flit convention to get the description.
         # flit already does this.
+        # get the description from a markdown cell if it exists.
+        # get it from the docstring
         return ""
 
     def get_description_file(self):
         """get the description file for a project. it looks like readme or index something."""
-        for file in self.files:
+        for file in self.fs.files:
             if file.stem.lower() in {"readme", "index"}:
                 return file
 
@@ -386,21 +462,13 @@ class Project:
         """get the author name from the git revision history.
 
         we can only infer an author if a commit is generated."""
-        try:
-            return self.repo.commit().author.name
-        except:
-            # need a commit to know the author.
-            return ""
+        return self.fs.get_author()
 
     def get_email(self):
         """get the author name from the git revision history.
 
         we can only infer an author if a commit is generated."""
-        try:
-            return self.repo.commit().author.email
-        except ValueError:
-            # need to make a commit
-            return ""
+        return self.fs.get_email()
 
     def get_requires_from_files(self, files):
         """list imports discovered from the files."""
@@ -467,11 +535,7 @@ class Project:
 
     def get_url(self):
         """get the url(s) for the project from the git history."""
-        try:
-            return self.repo.remote("origin").url
-        except:
-            # let the user know there is no remote
-            return ""
+        return self.fs.get_url()
 
     def get_classifiers(self):
         """some classifiers can probably be inferred."""
@@ -565,8 +629,8 @@ class Project:
             data["repos"] = []
 
         for suffix in [None] + list(set(x.suffix for x in self.files)):
-            if suffix in Project.LINT_DEFAULTS:
-                for kind in Project.LINT_DEFAULTS[suffix]:
+            if suffix in util.LINT_DEFAULTS:
+                for kind in util.LINT_DEFAULTS[suffix]:
                     for repo in data["repos"]:
                         if repo["repo"] == kind["repo"]:
                             repo["rev"] = repo.get("rev", None) or kind.get("rev", None)
@@ -581,43 +645,16 @@ class Project:
 
         precommit.dump(data)
 
-    LINT_DEFAULTS = {
-        None: [
-            dict(
-                repo="https://github.com/pre-commit/pre-commit-hooks",
-                rev="v2.3.0",
-                hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
-            )
-        ],
-        ".yml": [
-            dict(
-                repo="https://github.com/pre-commit/pre-commit-hooks",
-                hooks=[dict(id="check-yaml")],
-            )
-        ],
-        ".py": [
-            dict(
-                repo="https://github.com/psf/black",
-                rev="19.3b0",
-                hooks=[dict(id="black")],
-            ),
-            dict(
-                repo="https://github.com/life4/flakehell",
-                rev="v.0.7.0",
-                hooks=[dict(id="flakehell")],
-            ),
-        ],
-    }
-
-    LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
-
     def to_flit(self):
         description_file = self.get_description_file()
+        url = self.get_url()
+        name = self.get_name()
+        version = self.get_version()
         (self / PYPROJECT_TOML) + dict(
             tool=dict(
                 flit=dict(
                     metadata=dict(
-                        module=self.get_name(),
+                        module=name,
                         author=self.get_author(),
                         maintainer=self.get_author(),
                         requires=self.get_requires(),
@@ -628,10 +665,9 @@ class Project:
                         **{
                             "author-email": self.get_email(),
                             "maintainer-email": self.get_email(),
-                            "home-page": self.get_url(),
                             "requires-extra": {
                                 "test": self.get_test_requires(),
-                                "doc": self.get_doc_requires(),
+                                "docs": self.get_doc_requires(),
                             },
                             "requires-python": self.get_python_version(),
                             **(
@@ -639,6 +675,7 @@ class Project:
                                 and {"description-file": str(description_file)}
                                 or {}
                             ),
+                            **(url and {"home-page": url} or {}),
                         },
                     ),
                     scripts={},
@@ -654,6 +691,27 @@ class Project:
                 }
             },
         )
+        adds = [self / PYPROJECT_TOML]
+        # the case where isnt any python source.
+        if not ((self / name).exists() or (self / name).with_suffix(".py").exists()):
+            (self / name).with_suffix(".py").write_text(
+                f"""
+"{name}"
+__version__ = "{version}"
+with __import__("importnb").Notebook():
+    from {name} import *\n"""
+            )
+            adds += [
+                (self / name).with_suffix(".py"),
+                (self / name).with_suffix(".ipynb"),
+            ]
+            if self.fs.is_vcs and self.fs.get_untracked_files():
+                (self / GITIGNORE).open("a")
+                (self / GITIGNORE).write_text(
+                    "\n".join(["", *map(str, self.fs.get_untracked_files())])
+                )
+                adds += [self / GITIGNORE]
+        self.add(*adds)
 
     def to_toc_yml(self):
         """
@@ -714,14 +772,8 @@ class Project:
                 copyright="2020",
                 logo="",
                 only_build_toc_files=True,
-                repository=dict(
-                    url=self.get_url(),
-                    path_to_book="",
-                    branch="gh-pages",
-                ),
-                execute=dict(
-                    execute_notebooks="off",
-                ),
+                repository=dict(url=self.get_url(), path_to_book="", branch="gh-pages"),
+                execute=dict(execute_notebooks="off"),
                 exclude_patterns=list(map(str, self.get_exclude())),
                 html=dict(
                     favico="",
@@ -733,10 +785,7 @@ class Project:
                     google_analytics_id="",
                     home_page_in_navbar=True,
                     baseurl="",
-                    comments=dict(
-                        hypothesis=False,
-                        utterances=False,
-                    ),
+                    comments=dict(hypothesis=False, utterances=False),
                     launch_buttons=dict(
                         notebook_interface="lab",
                         binderhub_url="https://mybinder.org",
@@ -753,8 +802,14 @@ class Project:
             )
         )
 
+    def to_setup_py(self):
+        (self / SETUP_PY).write_text("""__import__("setuptools").setup()""")
+
     def to_setuptools(self):
-        dict(
+        requires = self.get_requires()
+        test_requires = self.get_test_requires()
+        docs_requires = self.get_doc_requires()
+        (self / SETUP_CFG) + dict(
             metadata=dict(
                 name=self.get_name(),
                 version=self.get_version(),
@@ -777,8 +832,7 @@ class Project:
                 scripts=[],
                 setup_requires=[],
                 install_requires=requires,
-                extras_require={},
-                entry_points={},
+                # extras_require={"test": test_requires, "docs": docs_requires},
             ),
         )
 
@@ -857,6 +911,25 @@ def task_python():
     )
 
 
+def task_setup_py():
+    """produce the configuration files for a python distribution."""
+    return dict(
+        actions=[project.to_setup_py],
+        targets=[project / SETUP_PY],
+        uptodate=[(project / SETUP_PY).exists()],
+    )
+
+
+def task_setuptools():
+    """produce the configuration files for a python distribution."""
+    return dict(
+        file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+        actions=[project.to_setuptools],
+        task_dep=["manifest"],
+        targets=[project / SETUP_CFG],
+    )
+
+
 def task_blog():
     """produce the configuration files for a blog."""
     return dict(actions=[])
@@ -866,7 +939,7 @@ def task_docs():
     """produce the configuration files for the documentation."""
     return dict(
         actions=[project.to_toc_yml, project.to_config_yml],
-        targets=[project.path / TOC, project.path / CONFIG],
+        targets=[project / TOC, project / CONFIG],
         uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
     )
 
@@ -874,7 +947,7 @@ def task_docs():
 def task_html():
     """produce the configuration files for the documentation."""
     return dict(
-        file_dep=[project.path / TOC, project.path / CONFIG] + project.files,
+        file_dep=[project / TOC, project / CONFIG] + project.files,
         actions=[
             f"jupyter-book build {project.path}  --path-output docs --toc docs/_toc.yml --config docs/_config.yml"
         ],
@@ -887,6 +960,37 @@ def task_html():
 
 
 class util:
+
+    LINT_DEFAULTS = {
+        None: [
+            dict(
+                repo="https://github.com/pre-commit/pre-commit-hooks",
+                rev="v2.3.0",
+                hooks=[dict(id="end-of-file-fixer"), dict(id="trailing-whitespace")],
+            )
+        ],
+        ".yml": [
+            dict(
+                repo="https://github.com/pre-commit/pre-commit-hooks",
+                hooks=[dict(id="check-yaml")],
+            )
+        ],
+        ".py": [
+            dict(
+                repo="https://github.com/psf/black",
+                rev="19.3b0",
+                hooks=[dict(id="black")],
+            ),
+            dict(
+                repo="https://github.com/life4/flakehell",
+                rev="v.0.7.0",
+                hooks=[dict(id="flakehell")],
+            ),
+        ],
+    }
+
+    LINT_DEFAULTS[".yaml"] = LINT_DEFAULTS[".yml"]
+
     def rough_source(nb):
         """extract a rough version of the source in notebook to infer files from"""
 
@@ -937,12 +1041,14 @@ class util:
             __import__("requests_cache").uninstall_cache()
         return dict(__import__("asyncio").run(util.infer_files(files)))
 
-    def merge(a, *c):
-        if not c:
-            return a
-        b, *c = c
-        if c:
-            b = __import__("functools").reduce(util.merge, (b, *c))
+    def merge(*args):
+        if not args:
+            return {}
+        if len(args) == 1:
+            return args[0]
+        a, b, *args = args
+        if args:
+            b = __import__("functools").reduce(util.merge, (b, *args))
         if hasattr(a, "items"):
             for k, v in a.items():
                 if k in b:
@@ -958,12 +1064,13 @@ class util:
                         else:
                             raise exception
             return a
-
-        if isinstance(a, (list, tuple)):
-            return a + [x for x in b if x not in a]
+        if isinstance(a, tuple):
+            return a + tuple(x for x in b if x not in a)
+        if isinstance(a, list):
+            return a + list(x for x in b if x not in a)
         if isinstance(a, set):
             return list(sorted(set(a).union(b)))
-        return a
+        return a or b
 
     def merged_imports(files):
         results = util.merge(*util.gather_imports(files).values())
@@ -1008,17 +1115,17 @@ class util:
     def load_configparser(str):
         object = __import__("configparser").ConfigParser(default_section=None)
         object.read_string(str)
-        return expand_cfg(object)
+        return util.expand_cfg(object)
 
     def load_configupdater(str):
         object = __import__("configupdater").ConfigUpdater()
         object.read_string(str)
-        return expand_cfg(object)
+        return util.expand_cfg(object)
 
     @ensure_trailing_eol
     def dump_config__er(object):
         next = __import__("io").StringIO()
-        object = compact_cfg(object)
+        object = util.compact_cfg(object)
         if isinstance(object, dict):
             import configparser
 
@@ -1033,7 +1140,7 @@ class util:
         for main, section in object.items():
             for key, value in section.items():
                 if isinstance(value, str) and value.startswith("\n"):
-                    value = textwrap.dedent(value).splitlines()[1:]
+                    value = __import__("textwrap").dedent(value).splitlines()[1:]
                 object[main][key] = value
         return object
 
@@ -1041,7 +1148,7 @@ class util:
         for main, section in object.items():
             for key, value in section.items():
                 if isinstance(value, list):
-                    value = textwrap.indent("\n".join(value), " " * 4)
+                    value = __import__("textwrap").indent("\n".join(value), " " * 4)
                 object[main][key] = value
         return object
 

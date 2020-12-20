@@ -5,11 +5,24 @@ import nox
 import pathlib
 
 app = typer.Typer(chain=True)
+init = typer.Typer()
+# app.add_typer(init, "init")
 nox.options.sessions = []
 
 from .__init__ import *
 
 task_file = pathlib.Path(__file__).parent / "__init__.py"
+
+
+class Complete(Exception):
+    """an exception to signify the program is complete"""
+
+
+@app.command()
+def add(ctx: typer.Context):
+    """add something to project"""
+    # i don't know what this does yet, but it is git stuff likely
+    nox.options.session += ["add"]
 
 
 @app.command()
@@ -187,7 +200,7 @@ def configure(session):
         *"doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     session.run(
-        *f"""python -m doit --dir . --file {task_file} lint docs python""".split()
+        *f"""python -m doit --dir . --file {task_file} lint docs python gitignore""".split()
     )
 
 
