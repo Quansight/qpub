@@ -45,7 +45,6 @@ addopts = "-s"
 norecursedirs = "*.egg-info .eggs .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ dist docs/_build"
 minversion = "6.2"
 
-
 [build-system]
 requires = ["flit_core>=2,<4"]
 build-backend = "flit_core.buildapi"
