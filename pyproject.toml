@@ -30,7 +30,7 @@ home-page = "https://github.com/deathbeds/dgaf.git"
 
 [tool.flit.metadata.requires-extra]
 nox = ["doit", "GitPython", "depfinder", "aiofiles", "appdirs", "typer", "nox", "pathspec", "requests-cache", "tomlkit",]
-test = ["pytest", "pytest-sugar", "nbval", "importnb", "nbformat", "pytest"]
+test = ["pytest", "pytest-sugar", "nbval", "importnb", "nbformat", "pytest", "dgaf"]
 docs = ["jupyter-book"]
 
 [tool.flit.metadata.urls]
