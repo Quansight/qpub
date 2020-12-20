@@ -12,50 +12,42 @@ jobs:
       with:
         python-version: 3.8
     - run: |
-        pip install doit
-    - run: |
-        doit setup
-    - name: Install local package
-      run: |
-        python -m qpub --install --no-test --no-lint
-    - name: Test
-      run: qpub --install --test --no-lint
-    - name: Lint
-      run: qpub --install --lint --no-test
-  test:
-    name: ${{ matrix.os }} ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    needs: smoke
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.7, 3.8]
-        exclude:
-        - os: ubuntu-latest
-          python-version: 3.8
+        pip install nox
+        nox -s install test
+  # test:
+  #   name: ${{ matrix.os }} ${{ matrix.python-version }}
+  #   runs-on: ${{ matrix.os }}
+  #   needs: smoke
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: [ubuntu-latest, macos-latest, windows-latest]
+  #       python-version: [3.7, 3.8]
+  #       exclude:
+  #       - os: ubuntu-latest
+  #         python-version: 3.8
 
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v2
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
 
-      - run: python -m pip install --upgrade pip wheel pyyaml doit
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          echo "::set-output name=dir::$(pip cache dir)"
-      - name: pip cache
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-{{ hashFiles('requirements-dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.python-version }}-
-            ${{ runner.os }}-pip-
-      # setup things separate from the install to identify build problems.
-      - run: doit setup
-      - run: python -m qpub --install --no-test
-      - run: qpub --install
+  #     - run: python -m pip install --upgrade pip wheel pyyaml doit
+  #     - name: Get pip cache dir
+  #       id: pip-cache
+  #       run: |
+  #         echo "::set-output name=dir::$(pip cache dir)"
+  #     - name: pip cache
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: ${{ steps.pip-cache.outputs.dir }}
+  #         key: ${{ runner.os }}-pip-${{ matrix.python-version }}-{{ hashFiles('requirements-dev.txt') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pip-${{ matrix.python-version }}-
+  #           ${{ runner.os }}-pip-
+  #     # setup things separate from the install to identify build problems.
+  #     - run: doit setup
+  #     - run: python -m qpub --install --no-test
+  #     - run: qpub --install
