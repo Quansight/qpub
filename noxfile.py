@@ -17,11 +17,13 @@ def develop(session):
     session.run(*"python -m dgaf develop".split())
 
 
-@session
+@nox.session(reuse_venv=True)
 def test(session):
-    session.install(".")
+    session.run(*"python -m dgaf configure".split())
+    session.install(".[nox]", "importnb")
     # dgaf runs the tests in a virutal environment
-    session.run(*"python -m dgaf lint test".split())
+
+    session.run(*"pytest".split() + list(session.posargs))
 
 
 @session
