@@ -1,14 +1,5 @@
 """qpub.py
-q(uick) p(ubishing) is a swiss army knife for configuring projects.
-
-it configures python distributions, linting and formatting, testing
-conditions, and documentation.
-
-it is meant for ideas with little content, like gist, but can scale with
-large projects that abide community conventions.
-
-
-
+q(uick) p(ubishing) configures python distribution and documentaton tools.
 
 """
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
@@ -16,8 +7,11 @@ import os
 import pathlib
 import typing
 import dataclasses
+import itertools
 
 Path = type(pathlib.Path())
+
+DOIT_CFG = dict(verbosity=2)
 
 
 class options:
@@ -25,19 +19,33 @@ class options:
 
     options are passed to doit using environment variables in nox."""
 
-    backend: str = os.environ.get("QPUB_BACKEND", "flit")
-    install: bool = os.environ.get("QPUB_INSTALL", False)
-    develop: bool = os.environ.get("QPUB_DEVELOP", False)
+    python: str = os.environ.get("QPUB_PYTHON", "infer")
     conda: bool = os.environ.get("QPUB_CONDA", False)
+    generate_types: bool = os.environ.get("QPUB_GENERATE_TYPES", False)
+    docs: str = os.environ.get("QPUB_GENERATE_TYPES", "jb")
     pdf: bool = os.environ.get("QPUB_DOCS_PDF", False)
-    blog: bool = os.environ.get("QPUB_BLOG", False)
-    html: bool = os.environ.get("QPUB_DOCS_HTML", False)
+    doit: bool = os.environ.get("QPUB_DOIt", False)
     watch: bool = os.environ.get("QPUB_DOCS_WATCH", False)
-    lint: bool = os.environ.get("QPUB_LINT", False)
 
     @classmethod
     def dump(cls):
-        return {f"QPUB_{x.upper()}": getattr(cls, x) for x in cls.__annotations__}
+        return {f"QPUB_{x.upper()}": str(getattr(cls, x)) for x in cls.__annotations__}
+
+
+class UnknownBackend(BaseException):
+    """the python configure is unknown"""
+
+
+class ExtraMetadataRequired(BaseException):
+    """the python configure is unknown"""
+
+
+class NotImplementedYetError(BaseException):
+    """a feature we want, but don't have."""
+
+
+class UntitledException(BaseException):
+    """cannot infer a name for an untitled project."""
 
 
 # Files and File Utilities
@@ -49,16 +57,11 @@ class File(Path):
     the loaders and dumpers edit files in-place, these constraints may not apply to all systems.
     """
 
-    def read(self):
-        return self.load()
-
     def write(self, object):
         self.write_text(self.dump(object))
 
     def update(self, object):
         return self.write(util.merge(self.read(), object))
-
-    __add__ = update
 
     def load(self):
         """a permissive method to load data from files and edit documents in place."""
@@ -77,6 +80,8 @@ class File(Path):
                     return cls.dump(self, object)
         else:
             raise TypeError(f"Can't dump type with suffix: {self.suffix}")
+
+    __add__, read = update, load
 
 
 class INI(File):
@@ -149,6 +154,9 @@ class Convention(File):
 
 # conventional file names.
 
+DOIT_DB_DAT = Convention(".doit.db.dat")
+DOIT_DB_DIR = DOIT_DB_DAT.with_suffix(".dir")
+DOIT_DB_BAK = DOIT_DB_DAT.with_suffix(".bak")
 
 PRECOMMITCONFIG_YML = Convention(".pre-commit-config.yaml")
 PYPROJECT_TOML = Convention("pyproject.toml")
@@ -183,23 +191,44 @@ CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 class FileSystem:
     is_vcs = False
     dir: str = "."
-    all: list = dataclasses.field(default_factory=list)
-    submodules: list = dataclasses.field(default_factory=list)
+    all: list = dataclasses.field(default_factory=list, repr=False)
+    submodules: list = dataclasses.field(default_factory=list, repr=False)
     files: list = dataclasses.field(default_factory=list)
-    directories: list = dataclasses.field(default_factory=list)
+    directories: list = dataclasses.field(default_factory=list, repr=False)
     top_level: list = dataclasses.field(default_factory=list)
     suffixes: list = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         self.dir = Path(self.dir)
-        if not self.all:
-            self.all = list(x for x in File(self.dir).rglob("*") if not x.is_dir())
 
+        if not self.all:
+            docs = File(self.dir, "docs")
+            build = docs / "_build"
+            interest = list(
+                itertools.chain(
+                    File(self.dir).iterdir(),
+                    (build.iterdir() if build.exists() else tuple()),
+                )
+            )
+            self.exclude = dict(self._iter_exclude(interest))
+            self.all = []
+            for file in interest:
+                if file.is_dir():
+                    if file not in self.exclude:
+                        self.all += [
+                            x for x in file.rglob("*") if not self.get_exclude_by(x)
+                        ]
+
+                else:
+                    if (file not in self.exclude) and (file.parent not in self.exclude):
+                        self.all += [file]
+        self.conventions = [File(x) for x in self.all if x in CONVENTIONS]
         self.files = [
             File(x)
             for x in self.all
-            if x not in self.submodules and x not in CONVENTIONS
+            if x not in self.submodules and x not in self.conventions
         ]
+        self.conventions = []
         # the files in the submodules.
         [
             self.files.extend(
@@ -209,7 +238,7 @@ class FileSystem:
             )
             for x in self.submodules
         ]
-        self.exclude = self.get_exclude_paths()
+
         self.content = [x for x in self.files if x not in self.exclude]
         # the non-conventional directories containing content
         self.directories = sorted(
@@ -281,22 +310,28 @@ class FileSystem:
         """initialize the path specifications to decide what to omit."""
 
         self.gitignore_patterns = {}
-
-        for pattern in (
-            Path(__file__).parent / "Python.gitignore"
-        ).read_text().splitlines() + ".vscode _build".split():
-            if bool(pattern):
-                match = __import__("pathspec").patterns.GitWildMatchPattern(
-                    pattern.rstrip("/")
-                )
-                if match.include:
-                    self.gitignore_patterns[pattern.rstrip("/")] = match
+        for file in (
+            Path(__file__).parent / "Python.gitignore",
+            Path(__file__).parent / "Nikola.gitignore",
+            Path(__file__).parent / "JupyterNotebooks.gitignore",
+        ):
+            for pattern in (
+                file.read_text().splitlines() + ".vscode _build .gitignore".split()
+            ):
+                if bool(pattern):
+                    match = __import__("pathspec").patterns.GitWildMatchPattern(pattern)
+                    if match.include:
+                        self.gitignore_patterns[pattern] = match
 
     def get_module_name_from_files(self):
         test_files = self.get_test_files()
         canonical, tests, pythonic, named, post = [], [], [], [], []
         post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
+        print(22)
         for x in sorted(self.content):
+            if x.stem.startswith(("_", ".")):
+                """preceeding underscores shield the naming"""
+                continue
             if x.suffix in {".md", ".py", ".rst", ".ipynb"}:
                 if x.stem.lower() in {"readme", "index"}:
                     canonical += [x]
@@ -310,22 +345,56 @@ class FileSystem:
                         pythonic += [x]
                     except SyntaxError:
                         named += [x]
-        if pythonic:
-            return pythonic[0].stem
 
-        if post:
-            "fix the name"
+        if len(pythonic) > 1:
+            stems = []
+            print(pythonic)
+            pythonic = [
+                stems.append(file.stem) or file
+                for file in pythonic
+                if file.stem not in stems
+            ]
+
+        if len(set(pythonic)) == 1:
+            return list(set(pythonic))[0].stem, pythonic[0]
+        elif pythonic:
+            name = self.get_name_from_config()
+            if name is None:
+                raise ExtraMetadataRequired(
+                    "dgaf cannot infer names from multiple files. explicitly define a project name."
+                )
+            return name, None
+
+        if len(post) == 1:
+            post = post[0]
+            year, month, day, name = post.split("-", 3)
+            return name, post[0]
+        elif post:
+            raise ExtraMetadataRequired(
+                "dgaf cannot infer names from multiple posts. make a top level python project or explicitly name the project."
+            )
+
         if canonical:
-            "figure out a name some how"
+            canonical = " ".join(canonical)
+            raise ExtraMetadataRequired(
+                f"dgaf cannot infer canonical names (eg. {canonical}. explicitly define a name or make a python project."
+            )
+
+    def get_name_from_config(self):
+        return None
 
     def get_module_name_from_directories(self):
         if len(self.top_level) == 1:
             return self.top_level[0].stem
+        raise ExtraMetadataRequired(
+            f"dgaf cannont infer from multiple directories. explicitly define a project name."
+        )
 
     def get_module_name(self):
+        print("what")
         if self.top_level:
             return self.get_module_name_from_directories()
-        return self.get_module_name_from_files()
+        return self.get_module_name_from_files()[0]
 
     def get_test_files(self, default=True):
         """list the test like files. we'll access their dependencies separately ."""
@@ -347,7 +416,9 @@ class Git(FileSystem):
         self.all = list(
             map(File, __import__("git").Git(self.dir).ls_files().splitlines())
         )
+        self.exclude = dict(self._iter_exclude(self.all))
         self.repo = __import__("git").Repo(self.dir)
+
         super().__post_init__()
 
     def get_author(self):
@@ -431,6 +502,8 @@ class Project:
         it would be good to support semver, calver, and agever (for blogs).
         """
         # use the flit convention to get the version.
+        # there are a bunch of version convention we can look for bumpversion, semver, rever
+        # if the name is a post name then infer the version from there
         return __import__("datetime").date.today().strftime("%Y.%m.%d")
 
     def get_description(self):
@@ -529,7 +602,9 @@ class Project:
         # infer the sphinx extensions needed because we miss this often.
         if CONF in self.files:
             "infer the dependencies from conf.py."
-        return ["jupyter-book"]
+        requires = []
+        if options.docs == "jb":
+            requires += ["jupyter-book"]
 
         return requires
 
@@ -551,12 +626,12 @@ class Project:
         return ""
 
     def get_keywords(self):
-        return ""
+        return []
 
     def get_python_version(self):
         import sys
 
-        return f">={sys.version_info.major}.{sys.version_info.minor}"
+        return f"{sys.version_info.major}.{sys.version_info.minor}"
 
     def get_test_files(self, default=True):
         """list the test like files. we'll access their dependencies separately ."""
@@ -650,47 +725,53 @@ class Project:
         url = self.get_url()
         name = self.get_name()
         version = self.get_version()
-        (self / PYPROJECT_TOML) + dict(
-            tool=dict(
-                flit=dict(
-                    metadata=dict(
-                        module=name,
-                        author=self.get_author(),
-                        maintainer=self.get_author(),
-                        requires=self.get_requires(),
-                        classifiers=self.get_classifiers(),
-                        keywords=self.get_keywords(),
-                        license=self.get_license(),
-                        urls={},
-                        **{
-                            "author-email": self.get_email(),
-                            "maintainer-email": self.get_email(),
-                            "requires-extra": {
-                                "test": self.get_test_requires(),
-                                "docs": self.get_doc_requires(),
+        data = util.merge(
+            (self / PYPROJECT_TOML).load(),
+            dict(
+                tool=dict(
+                    flit=dict(
+                        metadata=dict(
+                            module=name,
+                            author=self.get_author(),
+                            maintainer=self.get_author(),
+                            requires=self.get_requires(),
+                            classifiers=self.get_classifiers(),
+                            keywords=" ".join(self.get_keywords()),
+                            license=self.get_license(),
+                            urls={},
+                            **{
+                                "author-email": self.get_email(),
+                                "maintainer-email": self.get_email(),
+                                "requires-extra": {
+                                    "test": self.get_test_requires(),
+                                    "docs": self.get_doc_requires(),
+                                },
+                                "requires-python": ">=" + self.get_python_version(),
+                                **(
+                                    description_file
+                                    and {"description-file": str(description_file)}
+                                    or {}
+                                ),
+                                **(url and {"home-page": url} or {}),
                             },
-                            "requires-python": self.get_python_version(),
-                            **(
-                                description_file
-                                and {"description-file": str(description_file)}
-                                or {}
-                            ),
-                            **(url and {"home-page": url} or {}),
-                        },
+                        ),
+                        scripts={},
+                        sdist={},
+                        entrypoints=self.get_entry_points(),
                     ),
-                    scripts={},
-                    sdist={},
-                    entrypoints=self.get_entry_points(),
+                    pytest=dict(ini_options=self.to_pytest_config()),
                 ),
-                pytest=dict(ini_options=self.to_pytest_config()),
             ),
-            **{
+        )
+        data.update(
+            {
                 "build-system": {
                     "requires": "flit_core>=2,<4".split(),
                     "build-backend": "flit_core.buildapi",
                 }
-            },
+            }
         )
+        (self / PYPROJECT_TOML).write(data)
         adds = [self / PYPROJECT_TOML]
         # the case where isnt any python source.
         if not ((self / name).exists() or (self / name).with_suffix(".py").exists()):
@@ -711,7 +792,7 @@ with __import__("importnb").Notebook():
                     "\n".join(["", *map(str, self.fs.get_untracked_files())])
                 )
                 adds += [self / GITIGNORE]
-        self.add(*adds)
+        # self.add(*adds)
 
     def to_toc_yml(self):
         """
@@ -723,19 +804,21 @@ with __import__("importnb").Notebook():
         2. using files
 
         """
-        (self / TOC).dump(self.get_sections())
+        (self / TOC).write(self.get_sections())
 
     def get_sections(self):
         collated = __import__("collections").defaultdict(list)
         # collated[None] is the top level
         collated[(None,)].append(self.get_description_file())
 
+        # if there no description file then pop back
         if collated[(None,)][0] is None:
-            collated.pop()
+            collated[(None,)].pop()
 
+        # populate collated top level with the canonical file.
         if not collated[(None,)]:
             try:
-                collated[(None,)].append(next(self.get_posix_names()))
+                collated[(None,)].append(self.fs.get_module_name_from_files()[1])
             except StopIteration:
                 ...
 
@@ -765,20 +848,23 @@ with __import__("importnb").Notebook():
         https://jupyterbook.org/customize/config.html
 
         """
-        (self / CONFIG).dump(
+        url = self.get_url()
+        (self / CONFIG).write(
             dict(
                 title=self.get_name(),
                 author=self.get_author(),
                 copyright="2020",
                 logo="",
                 only_build_toc_files=True,
-                repository=dict(url=self.get_url(), path_to_book="", branch="gh-pages"),
+                repository=dict(url=url, path_to_book="", branch="gh-pages")
+                if url
+                else {},
                 execute=dict(execute_notebooks="off"),
                 exclude_patterns=list(map(str, self.get_exclude())),
                 html=dict(
                     favico="",
-                    use_edit_page_button=True,
-                    use_repository_button=True,
+                    use_edit_page_button=bool(url),
+                    use_repository_button=bool(url),
                     use_issues_button=False,
                     extra_navbar="",
                     extra_footer="",
@@ -786,18 +872,11 @@ with __import__("importnb").Notebook():
                     home_page_in_navbar=True,
                     baseurl="",
                     comments=dict(hypothesis=False, utterances=False),
-                    launch_buttons=dict(
-                        notebook_interface="lab",
-                        binderhub_url="https://mybinder.org",
-                        jupyterhub_url="",
-                        thebe=True,
-                        colab_url="",
-                    ),
                 ),
                 sphinx=dict(
                     extra_extensions=[],
-                    local_extensions=[],
-                    config=dict(bibtex_bibfiles=[]),
+                    local_extensions={},
+                    config=dict(),
                 ),
             )
         )
@@ -828,7 +907,7 @@ with __import__("importnb").Notebook():
             ),
             options=dict(
                 zip_safe=False,
-                python_requires=self.get_python_version(),
+                python_requires=">=" + self.get_python_version(),
                 scripts=[],
                 setup_requires=[],
                 install_requires=requires,
@@ -837,7 +916,46 @@ with __import__("importnb").Notebook():
         )
 
     def to_poetry(self):
-        ...
+        """configuration for poetry
+
+        https://python-poetry.org/docs/pyproject/"""
+        build_system = {
+            "build-system": {
+                "requires": ["poetry_core>=1.0.0"],
+                "build-backend": "poetry.core.masonry.api",
+            }
+        }
+        data = util.merge(
+            (self / PYPROJECT_TOML).load(),
+            dict(
+                tool=dict(
+                    poetry=dict(
+                        name=self.get_name(),
+                        version=self.get_version(),
+                        description=self.get_description(),
+                        license=self.get_license(),
+                        authors=[f"name <email@email.com>"],
+                        maintainers=[],
+                        readme=str(self.get_description_file()),
+                        homepage=self.get_url(),
+                        repository=self.get_url(),
+                        documentation=self.get_url(),
+                        keywords=self.get_keywords(),
+                        classifiers=self.get_classifiers(),
+                        packages=[],  # if the structure is weird
+                        include=[],
+                        exclude=[],
+                        dependencies=dict(python=f"^{self.get_python_version()}"),
+                        plugins={},
+                        urls={},
+                    )
+                ),
+                pytest=dict(ini_options=self.to_pytest_config()),
+            ),
+        )
+        data.update(build_system)
+
+        (self / PYPROJECT_TOML).write(data)
 
     def to_pytest_config(self):
         return dict(
@@ -865,6 +983,15 @@ with __import__("importnb").Notebook():
     def to_conda_environment(self):
         """export a conda environment file."""
 
+    def to_doit(self):
+        """make a dodo.py file"""
+
+    def to_nox(self):
+        """make a noxfile.py file"""
+
+    def to_readthedocs(self):
+        """https://docs.readthedocs.io/en/stable/config-file/v2.html"""
+
 
 # do it tasks.
 
@@ -872,7 +999,9 @@ with __import__("importnb").Notebook():
 try:
     doit = __import__("doit")
     project = Project()
-except ModuleNotFoundError:
+
+except ModuleNotFoundError as e:
+    print(e)
     doit = None
 
 
@@ -903,11 +1032,47 @@ def task_lint():
 
 def task_python():
     """produce the configuration files for a python distribution."""
-    return dict(
-        file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
-        actions=[project.to_flit],
-        task_dep=["manifest"],
-        targets=[project.path / PYPROJECT_TOML],
+    doit = __import__("doit")
+
+    if options.python == "infer":
+        options.python = "flit"
+
+    if SETUP_PY in project.files:
+        options.python = "setuptools"
+
+    uptodate = [doit.tools.config_changed(options.python)]
+    if options.python == "flit":
+        return dict(
+            file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+            actions=[project.to_flit],
+            task_dep=[],
+            targets=[project.path / PYPROJECT_TOML],
+            uptodate=uptodate,
+        )
+    if options.python == "poetry":
+        requires = " ".join(project.get_requires())
+        test_requires = " ".join(project.get_test_requires())
+
+        return dict(
+            file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+            actions=[
+                project.to_poetry,
+                f"""poetry add {requires} --lock""",
+                f"""poetry add {test_requires} --dev --lock""",
+            ],
+            task_dep=[],
+            targets=[project.path / PYPROJECT_TOML],
+            uptodate=uptodate,
+            verbosity=2,
+        )
+
+    if options.python == "setuptools":
+        return dict(task_dep=["setup_py"], uptodate=uptodate)
+
+    raise UnknownBackend(
+        f"""{options.python} is not one of {
+        "infer flit poetry setuptools"
+    }"""
     )
 
 
@@ -937,23 +1102,39 @@ def task_blog():
 
 def task_docs():
     """produce the configuration files for the documentation."""
+    docs = project / "docs"
+
     return dict(
-        actions=[project.to_toc_yml, project.to_config_yml],
-        targets=[project / TOC, project / CONFIG],
+        actions=[
+            (doit.tools.create_folder, [docs]),
+            project.to_toc_yml,
+            project.to_config_yml,
+        ],
+        targets=[docs / TOC, docs / CONFIG],
         uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
     )
 
 
 def task_html():
     """produce the configuration files for the documentation."""
-    return dict(
-        file_dep=[project / TOC, project / CONFIG] + project.files,
-        actions=[
-            f"jupyter-book build {project.path}  --path-output docs --toc docs/_toc.yml --config docs/_config.yml"
-        ],
-        targets=[project.path / DOCS / "_build/html"],
-        watch=project.files,
-    )
+    if options.docs == "jb":
+        return dict(
+            file_dep=[project / TOC, project / CONFIG] + project.files,
+            actions=[
+                f"jupyter-book build {project.path}  --path-output docs --toc docs/_toc.yml --config docs/_config.yml"
+            ],
+            targets=[project.path / DOCS / "_build/html"],
+            watch=project.files,
+        )
+    if options.docs == "sphinx":
+        return dict(
+            file_dep=[project / CONF] + project.files,
+            actions=[f"sphinx-build {project.path} "],
+            targets=[project.path / DOCS / "_build/html"],
+            watch=project.files,
+        )
+    if options.docs == "mkdocs":
+        raise NotImplementedYetError("we want mkdocs, but need your help.")
 
 
 # utilities functions
@@ -1169,8 +1350,7 @@ class util:
     def dump_toml(object):
         try:
             tomlkit = __import__("tomlkit")
-            if isinstance(object, tomlkit.toml_document.TOMLDocument):
-                return tomlkit.dumps(object)
+            return tomlkit.dumps(object)
         except ModuleNotFoundError:
             pass
         return __import__("toml").dumps(object)

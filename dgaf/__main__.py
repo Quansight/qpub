@@ -5,8 +5,9 @@ import nox
 import pathlib
 
 app = typer.Typer(chain=True)
-init = typer.Typer()
-# app.add_typer(init, "init")
+init = typer.Typer(name="init")
+gist = typer.Typer(name="gist")
+app.add_typer(init)
 nox.options.sessions = []
 
 from .__init__ import *
@@ -26,15 +27,19 @@ def add(ctx: typer.Context):
 
 
 @app.command()
-def configure(ctx: typer.Context, lint: bool = True):
+def configure(ctx: typer.Context, lint: bool = True, python="infer"):
     """write/update configuration files for a project."""
+    options.python = python
     nox.options.sessions += ["configure"]
 
 
 @app.command()
-def develop(ctx: typer.Context, conda: bool = False):
+def develop(
+    ctx: typer.Context,
+    conda: bool = False,
+):
     """develop a project"""
-    nox.options.sessions += ["develop"]
+    __import__("nox").options.sessions += ["develop"]
     conda and nox.session(venv_backend="conda")(develop)
 
 
@@ -56,6 +61,7 @@ def build(ctx: typer.Context, conda: bool = False):
 def docs(ctx: typer.Context, watch: bool = False):
     """build the documentation"""
     options.watch = watch
+    options.docs = "jb"
     nox.options.sessions += ["docs"]
 
 
@@ -66,8 +72,9 @@ def lint(ctx: typer.Context):
 
 
 @app.command()
-def test(ctx: typer.Context):
+def test(ctx: typer.Context, stubs: bool = False):
     """test the project"""
+    options.generate_types = stubs
     nox.options.sessions += ["test"]
 
 
@@ -75,6 +82,13 @@ def test(ctx: typer.Context):
 def blog(ctx: typer.Context):
     """transform the blog to html"""
     nox.options.sessions += ["blog"]
+
+
+@app.command()
+def doit(ctx: typer.Context, file: pathlib.Path = ""):
+    "run a file of doit tasks in a closed nox environment."
+    nox.options.session += ["doit"]
+    # need to pass extra arguments through the cli.
 
 
 def nox_runner(module):
@@ -176,16 +190,22 @@ def test(session):
     """pre-commit is installed at the top level because it is good at managing environments."""
     session.run(*"pip install colorlog".split())
     session.run(*"pip install .[test]".split())
-    session.run(*"pytest".split())
+    if options.generate_types:
+        session.run(*"pip install monkeytype".split())
+        session.run(*"monkeytype run -m pytest".split())
+    else:
+        session.run(*"pytest".split())
 
 
 @nox.session(reuse_venv=True)
 def docs(session):
-    session.install(*"jupyter-book doit".split())
+    session.install(
+        *"jupyter-book doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
+    )
     if options.watch:
-        session.run(*f"python -m doit auto --dir . --file {task_file} html".split())
+        session.run(*f"python -m doit auto --dir . --file {task_file} -s html".split())
     else:
-        session.run(*f"python -m doit --dir . --file {task_file} html".split())
+        session.run(*f"python -m doit --dir . --file {task_file} -s html".split())
 
 
 @nox.session(reuse_venv=True)
@@ -200,7 +220,20 @@ def configure(session):
         *"doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     session.run(
-        *f"""python -m doit --dir . --file {task_file} lint docs python gitignore""".split()
+        *f"""python -m doit --dir . --file {task_file} lint docs python gitignore""".split(),
+        env=options.dump(),
+    )
+
+
+@nox.session(reuse_venv=True)
+def doit(session):
+    """produce the configuration for different distributions."""
+    session.install(*"doit".split())
+    session.install(*project.get_requires())
+    file = project.fs.get_module_name()[1]
+    session.run(
+        *f"""python -m doit --dir . --file {file} """.split() + session.posargs,
+        env=options.dump(),
     )
 
 
