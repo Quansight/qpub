@@ -1,4 +1,11 @@
 """the cli & nox session for the qpub application"""
+#  ██████╗██╗     ██╗
+# ██╔════╝██║     ██║
+# ██║     ██║     ██║
+# ██║     ██║     ██║
+# ╚██████╗███████╗██║
+#  ╚═════╝╚══════╝╚═╝
+
 
 import typer
 import nox
@@ -27,10 +34,14 @@ def add(ctx: typer.Context):
 
 
 @app.command()
-def configure(ctx: typer.Context, lint: bool = True, python="infer"):
+def configure(
+    ctx: typer.Context, lint: bool = True, python: str = "infer", venv: bool = True
+):
     """write/update configuration files for a project."""
     options.python = python
     nox.options.sessions += ["configure"]
+    if not venv:
+        nox.session(python=False)(configure)
 
 
 @app.command()
@@ -203,9 +214,9 @@ def docs(session):
         *"jupyter-book doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     if options.watch:
-        session.run(*f"python -m doit auto --dir . --file {task_file} -s html".split())
+        session.run(*f"python -m dgaf.tasks auto --dir . -s html".split())
     else:
-        session.run(*f"python -m doit --dir . --file {task_file} -s html".split())
+        session.run(*f"python -m dgaf.tasks --dir . --file {task_file} -s html".split())
 
 
 @nox.session(reuse_venv=True)
@@ -220,13 +231,13 @@ def configure(session):
         *"doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     session.run(
-        *f"""python -m doit --dir . --file {task_file} lint docs python gitignore""".split(),
+        *f"""python -m dgaf.tasks lint docs python gitignore""".split(),
         env=options.dump(),
     )
 
 
 @nox.session(reuse_venv=True)
-def doit(session):
+def doit(session, module: str = None, file: Path = None):
     """produce the configuration for different distributions."""
     session.install(*"doit".split())
     session.install(*project.get_requires())
@@ -256,3 +267,10 @@ if __name__ == "__main__":
     assert (
         False
     ), "We should never have reached here, because the program will have raised."
+
+# ███████╗██╗███╗   ██╗
+# ██╔════╝██║████╗  ██║
+# █████╗  ██║██╔██╗ ██║
+# ██╔══╝  ██║██║╚██╗██║
+# ██║     ██║██║ ╚████║
+# ╚═╝     ╚═╝╚═╝  ╚═══╝
