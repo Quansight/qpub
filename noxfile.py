@@ -35,7 +35,7 @@ def test(session):
         "pandas",
         ".[test]",
     )
-    session.install(".[test]")
+    session.run("dgaf")
     # dgaf runs the tests in a virutal environment
     if "type" in session.posargs:
         session.install("monkeytype")
