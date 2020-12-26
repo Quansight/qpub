@@ -30,6 +30,8 @@ def test(session):
         "pathspec",
         "requests-cache",
         "tomlkit",
+        "flit",
+        "poetry",
         ".",
         ".[test]",
     )
