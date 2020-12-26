@@ -17,9 +17,9 @@ def develop(session):
     session.run(*"python -m dgaf develop".split())
 
 
-@nox.session(reuse_venv=True)
+@nox.session(python=False)
 def test(session):
-    session.install(".", ".[test]")
+    session.install(".[test]")
     # dgaf runs the tests in a virutal environment
     if "type" in session.posargs:
         session.install("monkeytype")
