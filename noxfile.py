@@ -19,11 +19,14 @@ def develop(session):
 
 @nox.session(reuse_venv=True)
 def test(session):
-    session.run(*"python -m dgaf configure".split())
     session.install(".[nox]", "importnb")
     # dgaf runs the tests in a virutal environment
-
-    session.run(*"pytest".split() + list(session.posargs))
+    if "type" in session.posargs:
+        session.install("monkeytype")
+        yuck = session.posargs.pop(session.posargs.index("type"))
+        session.run(*"monkeytype run -m pytest".split() + list(session.posargs))
+    else:
+        session.run(*"pytest".split() + list(session.posargs))
 
 
 @session
