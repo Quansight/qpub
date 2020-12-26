@@ -36,7 +36,7 @@ def docs(session):
 
 @session
 def install(session):
-    session.install(*"pytest setuptools --upgrade".split())
+    session.install(*"pytest>6.2".split())
     session.run(*"python -m dgaf install".split())
 
 
