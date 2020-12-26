@@ -19,6 +19,20 @@ def develop(session):
 
 @session
 def test(session):
+    session.install(
+        "doit",
+        "GitPython",
+        "depfinder",
+        "aiofiles",
+        "appdirs",
+        "typer",
+        "nox",
+        "pathspec",
+        "requests-cache",
+        "tomlkit",
+        ".",
+        ".[test]",
+    )
     session.install(".[test]")
     # dgaf runs the tests in a virutal environment
     if "type" in session.posargs:
@@ -36,7 +50,9 @@ def docs(session):
 
 @session
 def install(session):
-    session.install(*"pytest>6.2".split())
+    session.install(
+        *"pytest>6.2".split(),
+    )
     session.run(*"python -m dgaf install".split())
 
 
