@@ -41,11 +41,11 @@ def task_python():
     doit = __import__("doit")
 
     if options.python == "infer":
-        if not project.top_level:
+        if not project.fs.top_level:
             options.python = "flit"
-        elif SRC in project.top_level:
+        elif SRC in project.fs.top_level:
             options.python = "poetry"
-        elif len(project.top_level) > 1:
+        elif len(project.fs.top_level) > 1:
             options.python = "setuptools"
         elif SETUP_PY in project.files:
             options.python = "setuptools"
@@ -127,23 +127,24 @@ def task_docs():
             project.to_toc_yml,
             project.to_config_yml,
         ],
-        targets=[docs / TOC, docs / CONFIG],
+        targets=[project / TOC, project / CONFIG],
         uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
     )
 
 
-def task_jb():
+def task_html():
     """produce the configuration files for the documentation."""
     docs = project / "docs"
+    if options.docs == "infer":
+        options.docs = "jb"
 
     return dict(
+        file_dep=[project / TOC, project / CONFIG],
         actions=[
-            (doit.tools.create_folder, [docs]),
-            project.to_toc_yml,
-            project.to_config_yml,
+            "jb build --path-output docs --toc docs/_toc.yml --config docs/_config.yml ."
         ],
-        targets=[docs / TOC, docs / CONFIG],
-        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+        targets=[BUILD / "html"],
+        uptodate=[],
     )
 
 
@@ -163,5 +164,4 @@ if __name__ == "__main__":
     doit = __import__("doit")
     project = Project()
     main = doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader(globals()))
-    main.run(["list"])
     sys.exit(main.run(sys.argv[1:]))

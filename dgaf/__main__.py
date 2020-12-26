@@ -69,10 +69,11 @@ def build(ctx: typer.Context, conda: bool = False):
 
 
 @app.command()
-def docs(ctx: typer.Context, watch: bool = False):
+def docs(ctx: typer.Context, watch: bool = False, serve: bool = False):
     """build the documentation"""
     options.watch = watch
-    options.docs = "jb"
+    options.serve = serve
+    options.docs = "infer"
     nox.options.sessions += ["docs"]
 
 

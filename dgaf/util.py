@@ -1,4 +1,5 @@
 Path = type(__import__("pathlib").Path())
+post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
 
 
 class File(Path):

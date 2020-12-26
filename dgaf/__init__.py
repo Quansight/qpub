@@ -29,10 +29,11 @@ class options:
     python: str = os.environ.get("QPUB_PYTHON", "infer")
     conda: bool = os.environ.get("QPUB_CONDA", False)
     generate_types: bool = os.environ.get("QPUB_GENERATE_TYPES", False)
-    docs: str = os.environ.get("QPUB_GENERATE_TYPES", "jb")
+    docs: str = os.environ.get("QPUB_GENERATE_TYPES", "infer")
     pdf: bool = os.environ.get("QPUB_DOCS_PDF", False)
     doit: bool = os.environ.get("QPUB_DOIt", False)
     watch: bool = os.environ.get("QPUB_DOCS_WATCH", False)
+    serve: bool = os.environ.get("QPUB_SERVE", False)
 
     @classmethod
     def dump(cls):
@@ -182,8 +183,11 @@ class FileSystem:
 
         docs = self.dir / DOCS
         for x in files or itertools.chain(
-            self.dir.iterdir(), docs.iterdir() if docs.exists() else tuple()
+            self.dir.iterdir(), (docs.iterdir() if docs.exists() else tuple())
         ):
+            if x.is_dir():
+                x /= "tmp"
+
             exclude = self.get_exclude_by(x.relative_to(self.dir))
             if exclude:
                 yield x, exclude
@@ -222,7 +226,7 @@ class FileSystem:
     def get_module_name_from_files(self):
         test_files = self.get_test_files()
         canonical, tests, pythonic, named, post = [], [], [], [], []
-        post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
+
         for x in sorted(self.content):
             if x.stem.startswith(("_", ".")):
                 """preceeding underscores shield the naming"""
@@ -232,7 +236,7 @@ class FileSystem:
                     canonical += [x]
                 elif x in test_files:
                     tests += [x]
-                elif post_pattern.match(x.stem):
+                elif util.post_pattern.match(x.stem):
                     post += [x]
                 else:
                     try:
@@ -261,9 +265,9 @@ class FileSystem:
             return name, None
 
         if len(post) == 1:
-            post = post[0]
+            post = post[0].stem
             year, month, day, name = post.split("-", 3)
-            return name, post[0]
+            return name.replace(*"-_"), post[0]
         elif post:
             raise ExtraMetadataRequired(
                 "dgaf cannot infer names from multiple posts. make a top level python project or explicitly name the project."
@@ -775,7 +779,7 @@ with __import__("importnb").Notebook():
                 if url
                 else {},
                 execute=dict(execute_notebooks="off"),
-                exclude_patterns=list(map(str, self.get_exclude())),
+                exclude_patterns=[str(x).rstrip("/") for x in self.get_exclude()],
                 html=dict(
                     favico="",
                     use_edit_page_button=bool(url),

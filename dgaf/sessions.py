@@ -109,12 +109,15 @@ def test(session):
 @nox.session(reuse_venv=True)
 def docs(session):
     session.install(
-        *"jupyter-book doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
+        *"jupyter-book>=0.9 doit GitPython depfinder aiofiles appdirs typer nox pathspec requests-cache tomlkit".split()
     )
     if options.watch:
         session.run(*f"python -m dgaf.tasks auto --dir . -s html".split())
     else:
-        session.run(*f"python -m dgaf.tasks --dir . --file {task_file} -s html".split())
+        session.run(*f"python -m dgaf.tasks html".split())
+
+    if options.serve:
+        session.run(*f"python -m http.server -d docs/_build/html".split())
 
 
 @nox.session(reuse_venv=True)
