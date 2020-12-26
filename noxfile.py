@@ -17,7 +17,7 @@ def develop(session):
     session.run(*"python -m dgaf develop".split())
 
 
-@nox.session(python=False)
+@session
 def test(session):
     session.install(".[test]")
     # dgaf runs the tests in a virutal environment
@@ -36,6 +36,7 @@ def docs(session):
 
 @session
 def install(session):
+    session.install(*"pytest setuptools --upgrade".split())
     session.run(*"python -m dgaf install".split())
 
 
