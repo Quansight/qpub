@@ -1,6 +1,14 @@
 from .__init__ import *
 
-DOIT_CONFIG = dict(verbosity=2)
+doit = __import__("doit")
+
+
+class Reporter(doit.reporter.ConsoleReporter):
+    def execute_task(self, task):
+        self.outstream.write("MyReporter --> %s\n" % task.title())
+
+
+DOIT_CONFIG = dict(verbosity=2, reporter=Reporter)
 
 
 def task_manifest():
@@ -33,10 +41,16 @@ def task_python():
     doit = __import__("doit")
 
     if options.python == "infer":
-        options.python = "flit"
-
-    if SETUP_PY in project.files:
-        options.python = "setuptools"
+        if not project.top_level:
+            options.python = "flit"
+        elif SRC in project.top_level:
+            options.python = "poetry"
+        elif len(project.top_level) > 1:
+            options.python = "setuptools"
+        elif SETUP_PY in project.files:
+            options.python = "setuptools"
+        else:
+            options.python = "flit"
 
     uptodate = [doit.tools.config_changed(options.python)]
     if options.python == "flit":
@@ -59,7 +73,7 @@ def task_python():
                 f"""poetry add {test_requires} --dev --lock""",
             ],
             task_dep=[],
-            targets=[project.path / PYPROJECT_TOML],
+            targets=[project.path / PYPROJECT_TOML, project.path / POETRY_LOCK],
             uptodate=uptodate,
             verbosity=2,
         )
@@ -98,6 +112,11 @@ def task_blog():
     return dict(actions=[])
 
 
+def task_nikola():
+    """produce the configuration files for a blog."""
+    return dict(actions=[])
+
+
 def task_docs():
     """produce the configuration files for the documentation."""
     docs = project / "docs"
@@ -111,6 +130,31 @@ def task_docs():
         targets=[docs / TOC, docs / CONFIG],
         uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
     )
+
+
+def task_jb():
+    """produce the configuration files for the documentation."""
+    docs = project / "docs"
+
+    return dict(
+        actions=[
+            (doit.tools.create_folder, [docs]),
+            project.to_toc_yml,
+            project.to_config_yml,
+        ],
+        targets=[docs / TOC, docs / CONFIG],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+    )
+
+
+def task_sphinx():
+    """produce the configuration files for the documentation."""
+    return dict(actions=[], targets=[project / CONF])
+
+
+def task_mkdocs():
+    """produce the configuration files for the documentation."""
+    return dict(actions=[])
 
 
 if __name__ == "__main__":

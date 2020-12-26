@@ -17,6 +17,7 @@ import typing
 import dataclasses
 import itertools
 from . import util
+from .exceptions import *
 from .util import Path, File, Convention
 
 
@@ -66,6 +67,8 @@ CONF = Convention("conf.py")
 CONFTEST = Convention("conftest.py")
 NOXFILE = Convention("noxfile.py")
 DODO = Convention("dodo.py")
+POETRY_LOCK = Convention("poetry.lock")
+MKDOCS = Convention("mkdocs.yml")  # https://www.mkdocs.org/
 
 MANIFEST = Convention("MANIFEST.in")
 ENVIRONMENT_YML = Convention("environment.yml")
@@ -276,11 +279,32 @@ class FileSystem:
         return None
 
     def get_module_name_from_directories(self):
+        if SRC in self.top_level:
+            return self.get_module_name_from_src_directories()
         if len(self.top_level) == 1:
             return self.top_level[0].stem
         raise ExtraMetadataRequired(
             f"dgaf cannont infer from multiple directories. explicitly define a project name."
         )
+
+    def get_module_name_from_src_directories(self):
+        dirs, scripts = [], []
+        for file in (self.dir / SRC).iterdir():
+            if file.stem.startswith("_"):
+                continue
+            if file.is_dir():
+                dirs.append(file)
+            elif file.is_file():
+                scripts.append(file)
+        if dirs:
+            if len(dirs) == 1:
+                return dirs[0].stem
+            raise ExtraMetadataRequired("can't infer the name from the src project")
+        if scripts:
+            if len(scripts) == 1:
+                return scripts[0].stem
+            raise ExtraMetadataRequired("can't infer the name from the src project")
+        raise ExtraMetadataRequired("can't infer the name from the src project")
 
     def get_module_name(self):
         if self.top_level:
@@ -887,7 +911,6 @@ with __import__("importnb").Notebook():
 
     def to_readthedocs(self):
         """https://docs.readthedocs.io/en/stable/config-file/v2.html"""
-
 
 
 # ███████╗██╗███╗   ██╗
