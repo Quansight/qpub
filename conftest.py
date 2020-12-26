@@ -1,5 +1,7 @@
 import pytest
 
+pytest_plugins = ["pytester"]
+
 sample_script = """'a script for testing.'
 __version__ = "0.1.0"
 import pandas
@@ -11,6 +13,7 @@ def main():
 test_script = """
 import hypothesis
 
+
 def test_main():
     import sample_project
     assert len(sample_project.main())
@@ -18,15 +21,13 @@ def test_main():
 
 
 @pytest.fixture
-def simple_python_script_project(tmp_path):
+def simple_python_script_project(pytester):
     """a  """
-    path = tmp_path / "sample_project.py"
-    test = tmp_path / "test_project.py"
-    path.write_text(sample_script)
+    script = pytester.makepyfile("sample_project")
+    script.write_text(sample_script)
+    test = pytester.makepyfile("sample_project")
     test.write_text(test_script)
-    yield tmp_path
-    path.unlink()
-    test.unlink()
+    yield pytester
 
 
 @pytest.fixture
