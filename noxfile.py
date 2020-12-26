@@ -32,7 +32,7 @@ def test(session):
         "tomlkit",
         "flit",
         "poetry",
-        "pandas" ".",
+        "pandas",
         ".[test]",
     )
     session.install(".[test]")
