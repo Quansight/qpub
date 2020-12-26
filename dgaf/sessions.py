@@ -97,8 +97,7 @@ def lint(session):
 @nox.session(reuse_venv=True)
 def test(session):
     """pre-commit is installed at the top level because it is good at managing environments."""
-    session.run(*"pip install colorlog".split())
-    session.run(*"pip install .[test]".split())
+    session.run(*"pip install  colorlog . .[test]".split())
     if options.generate_types:
         session.run(*"pip install monkeytype".split())
         session.run(*"monkeytype run -m pytest".split())
