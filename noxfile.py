@@ -19,23 +19,7 @@ def develop(session):
 
 @session
 def test(session):
-    session.install(
-        "doit",
-        "GitPython",
-        "depfinder",
-        "aiofiles",
-        "appdirs",
-        "typer",
-        "nox",
-        "pathspec",
-        "requests-cache",
-        "tomlkit",
-        "flit",
-        "poetry",
-        "pandas",
-        "json-e",
-        ".[test]",
-    )
+    session.install("pandas", ".[configure, test]")
     session.run("dgaf")
     # dgaf runs the tests in a virutal environment
     if "type" in session.posargs:
