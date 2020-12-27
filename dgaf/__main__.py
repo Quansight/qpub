@@ -35,13 +35,23 @@ def add(ctx: typer.Context):
 
 @app.command()
 def configure(
-    ctx: typer.Context, lint: bool = True, python: str = "infer", venv: bool = True
+    ctx: typer.Context,
+    dir: pathlib.Path = None,
+    lint: bool = True,
+    python: str = "infer",
+    venv: bool = True,
 ):
     """write/update configuration files for a project."""
     options.python = python
     nox.options.sessions += ["configure"]
+    if dir is not None:
+        import os
+
+        os.chdir(dir)
     if not venv:
-        nox.session(python=False)(configure)
+        from .sessions import configure
+
+        nox.session(python=False, reuse_venv=None)(configure)
 
 
 @app.command()

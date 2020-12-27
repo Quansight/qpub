@@ -78,6 +78,8 @@ GITHUB = Convention(".github")
 WORKFLOWS = GITHUB / "workflows"
 CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
+BUILDSYSTEM = "build-system"
+
 
 # the cli program stops here. there rest work for the tasks
 # in the sections below we define tasks to configure distributions.
@@ -639,58 +641,57 @@ class Project:
 
         precommit.dump(data)
 
-    def to_flit(self):
-        description_file = self.get_description_file()
+    def serialize(self, infer=False):
         url = self.get_url()
-        name = self.get_name()
-        version = self.get_version()
-        data = util.merge(
-            (self / PYPROJECT_TOML).load(),
-            dict(
-                tool=dict(
-                    flit=dict(
-                        metadata=dict(
-                            module=name,
-                            author=self.get_author(),
-                            maintainer=self.get_author(),
-                            requires=self.get_requires(),
-                            classifiers=self.get_classifiers(),
-                            keywords=" ".join(self.get_keywords()),
-                            license=self.get_license(),
-                            urls={},
-                            **{
-                                "author-email": self.get_email(),
-                                "maintainer-email": self.get_email(),
-                                "requires-extra": {
-                                    "test": self.get_test_requires(),
-                                    "docs": self.get_doc_requires(),
-                                },
-                                "requires-python": ">=" + self.get_python_version(),
-                                **(
-                                    description_file
-                                    and {"description-file": str(description_file)}
-                                    or {}
-                                ),
-                                **(url and {"home-page": url} or {}),
-                            },
-                        ),
-                        scripts={},
-                        sdist={},
-                        entrypoints=self.get_entry_points(),
-                    ),
-                    pytest=dict(ini_options=self.to_pytest_config()),
-                ),
-            ),
+        if url.endswith(".git"):
+            url = url[:-4]
+        exclude = map(str, self.get_exclude())
+        exclude = [x[:-1] if x.endswith("/") else x for x in exclude]
+
+        data = dict(
+            name=self.get_name(),
+            version=self.get_version(),
+            url=url,
+            author=self.get_author(),
+            email=self.get_email(),
+            classifiers=self.get_classifiers(),
+            license=self.get_license(),
+            description=self.get_description(),
+            long_description=str(self.get_description_file()),
+            keywords=self.get_keywords(),
+            platforms=[],
+            python_version=self.get_python_version(),
+            exclude=exclude,
         )
-        data.update(
-            {
-                "build-system": {
-                    "requires": "flit_core>=2,<4".split(),
-                    "build-backend": "flit_core.buildapi",
-                }
-            }
+
+        if infer:
+            data.update(
+                requires=self.get_requires(),
+                test_requires=self.get_test_requires(),
+                docs_requires=self.get_doc_requires(),
+            )
+
+        return data
+
+    def as_flit(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "flit.json").read_text()
+            ),
+            self.serialize(True),
+        )
+
+    def to_flit(self):
+        data = self.as_flit()
+        data = util.merge(
+            self.as_pytest(),
+            {BUILDSYSTEM: data.pop(BUILDSYSTEM)},
+            (self / PYPROJECT_TOML).load(),
+            data,
         )
         (self / PYPROJECT_TOML).write(data)
+        name = data["tool"]["flit"]["metadata"]["module"]
+        version = self.get_version()
         adds = [self / PYPROJECT_TOML]
         # the case where isnt any python source.
         if not ((self / name).exists() or (self / name).with_suffix(".py").exists()):
@@ -701,17 +702,6 @@ __version__ = "{version}"
 with __import__("importnb").Notebook():
     from {name} import *\n"""
             )
-            adds += [
-                (self / name).with_suffix(".py"),
-                (self / name).with_suffix(".ipynb"),
-            ]
-            if self.fs.is_vcs and self.fs.get_untracked_files():
-                (self / GITIGNORE).open("a")
-                (self / GITIGNORE).write_text(
-                    "\n".join(["", *map(str, self.fs.get_untracked_files())])
-                )
-                adds += [self / GITIGNORE]
-        # self.add(*adds)
 
     def to_toc_yml(self):
         """
@@ -761,124 +751,66 @@ with __import__("importnb").Notebook():
     def get_section_files(self):
         ...
 
+    def as_config(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "_config.json").read_text()
+            ),
+            self.serialize(),
+        )
+
     def to_config_yml(self):
         """configure the book project once and never again.
 
         https://jupyterbook.org/customize/config.html
 
         """
-        url = self.get_url()
-        (self / CONFIG).write(
-            dict(
-                title=self.get_name(),
-                author=self.get_author(),
-                copyright="2020",
-                logo="",
-                only_build_toc_files=True,
-                repository=dict(url=url, path_to_book="", branch="gh-pages")
-                if url
-                else {},
-                execute=dict(execute_notebooks="off"),
-                exclude_patterns=[str(x).rstrip("/") for x in self.get_exclude()],
-                html=dict(
-                    favico="",
-                    use_edit_page_button=bool(url),
-                    use_repository_button=bool(url),
-                    use_issues_button=False,
-                    extra_navbar="",
-                    extra_footer="",
-                    google_analytics_id="",
-                    home_page_in_navbar=True,
-                    baseurl="",
-                    comments=dict(hypothesis=False, utterances=False),
-                ),
-                sphinx=dict(
-                    extra_extensions=[],
-                    local_extensions={},
-                    config=dict(),
-                ),
-            )
-        )
+        (self / CONFIG).write(self.as_config())
 
     def to_setup_py(self):
         (self / SETUP_PY).write_text("""__import__("setuptools").setup()""")
 
+    def as_setuptools(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "setuptools.json").read_text()
+            ),
+            self.serialize(True),
+        )
+
     def to_setuptools(self):
-        requires = self.get_requires()
-        test_requires = self.get_test_requires()
-        docs_requires = self.get_doc_requires()
-        (self / SETUP_CFG) + dict(
-            metadata=dict(
-                name=self.get_name(),
-                version=self.get_version(),
-                url=self.get_url(),
-                author=self.get_author(),
-                author_email=self.get_email(),
-                maintainer=self.get_author(),
-                maintainer_email=self.get_email(),
-                classifiers=self.get_classifiers(),
-                license=self.get_license(),
-                description=self.get_description(),
-                long_description=self.get_long_description(),
-                keywords=self.get_keywords(),
-                platforms=[],
-                requires=requires,
+        data = self.as_setuptools()
+        data = util.merge((self / SETUP_CFG).load(), data)
+        (self / SETUP_CFG).write(data)
+
+    def as_poetry(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "poetry.json").read_text()
             ),
-            options=dict(
-                zip_safe=False,
-                python_requires=">=" + self.get_python_version(),
-                scripts=[],
-                setup_requires=[],
-                install_requires=requires,
-                # extras_require={"test": test_requires, "docs": docs_requires},
+            self.serialize(),
+        )
+
+    def as_pytest(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "pytest.json").read_text()
             ),
+            self.serialize(),
         )
 
     def to_poetry(self):
         """configuration for poetry
 
         https://python-poetry.org/docs/pyproject/"""
-        build_system = {
-            "build-system": {
-                "requires": ["poetry_core>=1.0.0"],
-                "build-backend": "poetry.core.masonry.api",
-            }
-        }
-        description_file = self.get_description_file()
-        data = util.merge(
-            (self / PYPROJECT_TOML).load(),
-            dict(
-                tool=dict(
-                    poetry=dict(
-                        name=self.get_name(),
-                        version=self.get_version(),
-                        description=self.get_description(),
-                        license=self.get_license(),
-                        authors=[f"name <email@email.com>"],
-                        maintainers=[],
-                        homepage=self.get_url(),
-                        repository=self.get_url(),
-                        documentation=self.get_url(),
-                        keywords=self.get_keywords(),
-                        classifiers=self.get_classifiers(),
-                        packages=[],  # if the structure is weird
-                        include=[],
-                        exclude=[],
-                        dependencies=dict(python=f"^{self.get_python_version()}"),
-                        plugins={},
-                        urls={},
-                        **(
-                            dict(readme=str(description_file))
-                            if description_file
-                            else {}
-                        ),
-                    )
-                ),
-                pytest=dict(ini_options=self.to_pytest_config()),
-            ),
-        )
-        data.update(build_system)
 
+        data = self.as_poetry()
+        data = util.merge(
+            self.as_pytest(),
+            {BUILDSYSTEM: data.pop(BUILDSYSTEM)},
+            (self / PYPROJECT_TOML).load(),
+            data,
+        )
         (self / PYPROJECT_TOML).write(data)
 
     def to_pytest_config(self):
