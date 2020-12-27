@@ -33,7 +33,7 @@ def test(session):
         "flit",
         "poetry",
         "pandas",
-        "jsone",
+        "json-e",
         "importlib_metadata",
         ".[test]",
     )
