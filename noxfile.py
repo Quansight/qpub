@@ -33,6 +33,8 @@ def test(session):
         "flit",
         "poetry",
         "pandas",
+        "jsone",
+        "importlib_metadata",
         ".[test]",
     )
     session.run("dgaf")
@@ -43,6 +45,11 @@ def test(session):
         session.run(*"monkeytype run -m pytest".split() + list(session.posargs))
     else:
         session.run(*"pytest".split() + list(session.posargs))
+
+
+@nox.session(reuse_venv=True)
+def test_(session):
+    test(session)
 
 
 @session
