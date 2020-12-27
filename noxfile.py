@@ -34,7 +34,6 @@ def test(session):
         "poetry",
         "pandas",
         "json-e",
-        "importlib_metadata",
         ".[test]",
     )
     session.run("dgaf")

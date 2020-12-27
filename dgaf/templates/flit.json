@@ -24,7 +24,14 @@
                         "maintainer-email": "${email}",
                         "urls": {},
                         "requires-python": ">=${python_version}",
-                        "requires-extra": {}
+                        "requires-extra": {
+                            "test": {
+                                "$eval": "test_requires"
+                            },
+                            "docs": {
+                                "$eval": "docs_requires"
+                            }
+                        }
                     },
                     {
                         "$if": "len(url)>0",
