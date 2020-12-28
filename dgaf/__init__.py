@@ -14,11 +14,14 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 import os
 import pathlib
 import typing
+import re
 import dataclasses
 import itertools
 from . import util
 from .exceptions import *
 from .util import Path, File, Convention
+
+post_pattern = re.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 class options:
@@ -82,87 +85,47 @@ BUILDSYSTEM = "build-system"
 
 
 # the cli program stops here. there rest work for the tasks
-# in the sections below we define tasks to configure distributions.
+# in the sections below we define tasks to configure distribution
 
 
 @dataclasses.dataclass(order=True)
-class FileSystem:
-    is_vcs = False
-    dir: str = "."
-    all: list = dataclasses.field(default_factory=list, repr=False)
-    submodules: list = dataclasses.field(default_factory=list, repr=False)
-    files: list = dataclasses.field(default_factory=list)
-    directories: list = dataclasses.field(default_factory=list, repr=False)
-    top_level: list = dataclasses.field(default_factory=list)
-    suffixes: list = dataclasses.field(default_factory=list)
+class Chapter:
+    dir: pathlib.Path = "."
+    index: None = None
+    repo: object = None
+    parent: object = None
+    docs: object = None
+    posts: list = dataclasses.field(default_factory=list)
+    pages: list = dataclasses.field(default_factory=list)
+    modules: list = dataclasses.field(default_factory=list)
+    tests: list = dataclasses.field(default_factory=list)
+    chapters: list = dataclasses.field(default_factory=list)
+    _chapters: list = dataclasses.field(default_factory=list)
+    conventions: list = dataclasses.field(default_factory=list, repr=False)
+    hidden: list = dataclasses.field(default_factory=list, repr=False)
+    exclude: object = None
 
-    def __post_init__(self):
-        self.dir = Path(self.dir)
+    def get_name(self):
+        if self.chapters:
+            if DOCS in self.chapters:
+                self.chapters.pop(self.chapters.index(DOCS))
+            if SRC in self.chapters:
+                return Chapter(self.dir / SRC).get_name()
+            if len(self.chapters) == 1:
+                return self.chapters[0].stem
+        if self.modules:
+            if len(self.modules) == 1:
+                return self.modules[0].stem
+            else:
+                raise BaseException
 
-        if not self.all:
-            docs = File(self.dir, "docs")
-            build = docs / "_build"
-            interest = list(
-                itertools.chain(
-                    File(self.dir).iterdir(),
-                    (build.iterdir() if build.exists() else tuple()),
-                )
-            )
-            self.exclude = dict(self._iter_exclude(interest))
-            self.all = []
-            for file in interest:
-                if file.is_dir():
-                    if file not in self.exclude:
-                        self.all += [
-                            x for x in file.rglob("*") if not self.get_exclude_by(x)
-                        ]
-
-                else:
-                    if (file not in self.exclude) and (file.parent not in self.exclude):
-                        self.all += [file]
-        self.conventions = [File(x) for x in self.all if x in CONVENTIONS]
-        self.files = [
-            File(x)
-            for x in self.all
-            if x not in self.submodules and x not in self.conventions
-        ]
-        self.conventions = []
-        # the files in the submodules.
-        [
-            self.files.extend(
-                x
-                for x in map(File, __import__("git").Git(x).ls_files().splitlines())
-                if x not in CONVENTIONS
-            )
-            for x in self.submodules
-        ]
-
-        self.content = [x for x in self.files if x not in self.exclude]
-        # the non-conventional directories containing content
-        self.directories = sorted(
-            set(
-                x.parent.relative_to(self.dir)
-                for x in self.content
-                if x.parent not in CONVENTIONS
-                if x.parent.absolute() != self.dir.absolute()
-            )
-        )
-
-        # the top level directories
-        self.top_level = sorted(
-            map(File, set(x.parts[0] for x in self.directories if x.parts))
-        )
-
-        self.suffixes = sorted(set(x.suffix for x in self.files))
-
-    def get_author(self):
-        return ""
-
-    def get_email(self):
-        return ""
-
-    def get_url(self):
-        return ""
+        if self.posts:
+            if len(self.posts) == 1:
+                return self.posts[0].stem.split("-", 3)[-1].replace(*"-_")
+        if self.pages:
+            if len(self.pages) == 1:
+                return self.pages[0].stem
+        raise BaseException
 
     def get_exclude_patterns(self):
         """get the excluded by the canonical python.gitignore file.
@@ -173,24 +136,18 @@ class FileSystem:
         return list(sorted(set(dict(self._iter_exclude()).values())))
 
     def get_exclude_paths(self):
-        """get the excluded by the canonical python.gitignore file.
-
-        this method can construct a per project gitignore file rather than
-        included the world.
-        """
-        return list(sorted(dict(self._iter_exclude(self.files))))
+        """get the excluded by the canonical python.gitignore file."""
+        return list(sorted(dict(self._iter_exclude())))
 
     def _iter_exclude(self, files=None):
-        import itertools
-
-        docs = self.dir / DOCS
         for x in files or itertools.chain(
-            self.dir.iterdir(), (docs.iterdir() if docs.exists() else tuple())
+            self.dir.iterdir(),
+            (self.docs.files(True, True, True, True, True) if self.docs else tuple()),
         ):
             if x.is_dir():
                 x /= "tmp"
 
-            exclude = self.get_exclude_by(x.relative_to(self.dir))
+            exclude = self.get_exclude_by(x.relative_to(self.root().dir))
             if exclude:
                 yield x, exclude
 
@@ -225,197 +182,124 @@ class FileSystem:
                     if match.include:
                         self.gitignore_patterns[pattern] = match
 
-    def get_module_name_from_files(self):
-        test_files = self.get_test_files()
-        canonical, tests, pythonic, named, post = [], [], [], [], []
+    def root(self):
+        return self.parent.root() if self.parent else self
 
-        for x in sorted(self.content):
-            if x.stem.startswith(("_", ".")):
-                """preceeding underscores shield the naming"""
-                continue
-            if x.suffix in {".md", ".py", ".rst", ".ipynb"}:
-                if x.stem.lower() in {"readme", "index"}:
-                    canonical += [x]
-                elif x in test_files:
-                    tests += [x]
-                elif util.post_pattern.match(x.stem):
-                    post += [x]
-                else:
-                    try:
-                        __import__("ast").parse(x.stem)
-                        pythonic += [x]
-                    except SyntaxError:
-                        named += [x]
-
-        if len(pythonic) > 1:
-            stems = []
-            print(pythonic)
-            pythonic = [
-                stems.append(file.stem) or file
-                for file in pythonic
-                if file.stem not in stems
-            ]
-
-        if len(set(pythonic)) == 1:
-            return list(set(pythonic))[0].stem, pythonic[0]
-        elif pythonic:
-            name = self.get_name_from_config()
-            if name is None:
-                raise ExtraMetadataRequired(
-                    "dgaf cannot infer names from multiple files. explicitly define a project name."
-                )
-            return name, None
-
-        if len(post) == 1:
-            post = post[0].stem
-            year, month, day, name = post.split("-", 3)
-            return name.replace(*"-_"), post[0]
-        elif post:
-            raise ExtraMetadataRequired(
-                "dgaf cannot infer names from multiple posts. make a top level python project or explicitly name the project."
-            )
-
-        if canonical:
-            canonical = " ".join(canonical)
-            raise ExtraMetadataRequired(
-                f"dgaf cannot infer canonical names (eg. {canonical}. explicitly define a name or make a python project."
-            )
-
-    def get_name_from_config(self):
-        return None
-
-    def get_module_name_from_directories(self):
-        if SRC in self.top_level:
-            return self.get_module_name_from_src_directories()
-        if len(self.top_level) == 1:
-            return self.top_level[0].stem
-        raise ExtraMetadataRequired(
-            f"dgaf cannont infer from multiple directories. explicitly define a project name."
+    def __post_init__(self):
+        if not isinstance(self.dir, pathlib.Path):
+            self.dir = pathlib.Path(self.dir or "")
+        self.repo = (
+            (self.dir / GIT).exists() and __import__("git").Repo(self.dir / GIT) or None
+        )
+        pathspec = __import__("pathspec")
+        self.exclude = pathspec.PathSpec.from_lines(
+            pathspec.patterns.GitWildMatchPattern,
+            self.get_exclude_patterns() + [".git"],
+        )
+        contents = (
+            self.repo
+            and list(map(File, __import__("git").Git(self.dir).ls_files().splitlines()))
+            or None
         )
 
-    def get_module_name_from_src_directories(self):
-        dirs, scripts = [], []
-        for file in (self.dir / SRC).iterdir():
-            if file.stem.startswith("_"):
-                continue
-            if file.is_dir():
-                dirs.append(file)
-            elif file.is_file():
-                scripts.append(file)
-        if dirs:
-            if len(dirs) == 1:
-                return dirs[0].stem
-            raise ExtraMetadataRequired("can't infer the name from the src project")
-        if scripts:
-            if len(scripts) == 1:
-                return scripts[0].stem
-            raise ExtraMetadataRequired("can't infer the name from the src project")
-        raise ExtraMetadataRequired("can't infer the name from the src project")
+        for parent in contents or []:
+            if parent.parent not in contents:
+                contents += [parent.parent]
 
-    def get_module_name(self):
-        if self.top_level:
-            return self.get_module_name_from_directories()
-        return self.get_module_name_from_files()[0]
+        for file in self.dir.iterdir():
+            local = file.relative_to(self.dir)
+            if contents is not None:
+                if local not in contents:
+                    continue
+
+            if local in {DOCS}:
+                self.docs = Chapter(dir=file, parent=self)
+            elif local in {SRC}:
+                self.chapters += [x for x in file.iterdir() if x.is_dir()]
+            elif local in CONVENTIONS:
+                self.conventions += [file]
+            elif local.stem.startswith((".",)):
+                self.hidden += [file]
+            elif file.is_dir():
+                if self.exclude.match_file(local / ".tmp"):
+                    ...
+                else:
+                    self.chapters += [file]
+                continue
+            elif local.stem.startswith(("_",)):
+                if local.stem.endswith("_"):
+                    self.modules += [file]
+                else:
+                    self.hidden += [file]
+            elif self.exclude.match_file(local):
+                continue
+            elif file.suffix not in {".ipynb", ".md", ".rst", ".py"}:
+                continue
+            elif file.stem.lower() in {"readme", "index"}:
+                self.index = file
+            elif post_pattern.match(file.stem):
+                self.posts += [file]
+            elif util.is_pythonic(file.stem):
+                if file.stem.startswith("test_"):
+                    self.tests += [file]
+                else:
+                    self.modules += [file]
+            else:
+                self.pages += [file]
+
+        for k in "chapters posts tests modules pages conventions".split():
+            setattr(self, k, sorted(getattr(self, k), reverse=k in {"posts"}))
+
+        self._chapters = list(Chapter(dir=x, parent=self) for x in self.chapters)
+
+    def get_author(self):
+        if self.repo:
+            return self.repo.commit().author.name
+        return ""
+
+    def get_email(self):
+        if self.repo:
+            return self.repo.commit().author.email
+        return ""
+
+    def get_url(self):
+        if self.repo:
+            if hasattr(self.repo.remotes, "origin"):
+                return self.repo.remotes.origin.url
+        return ""
+
+    get_exclude = get_exclude_patterns
+
+    def get_classifiers(self):
+        """some classifiers can probably be inferred."""
+        return []
+
+    def get_license(self):
+        """should be a trove classifier"""
+        # import trove_classifiers
+
+        # infer the trove framework
+        # make a gui for adding the right classifiers.
+
+        return ""
+
+    def get_keywords(self):
+        return []
+
+    def get_python_version(self):
+        import sys
+
+        return f"{sys.version_info.major}.{sys.version_info.minor}"
 
     def get_test_files(self, default=True):
         """list the test like files. we'll access their dependencies separately ."""
         if default:
-            return [x for x in self.content if x.stem.startswith("test_")]
+            return list(self.files(tests=True))
         items = util.collect_test_files(self.path)
         return items
 
     def get_untracked_files(self):
         return []
-
-
-@dataclasses.dataclass(order=True)
-class Git(FileSystem):
-    is_vcs = True
-    repo: "git.Repo" = None
-
-    def __post_init__(self):
-        self.all = list(
-            map(File, __import__("git").Git(self.dir).ls_files().splitlines())
-        )
-        self.exclude = dict(self._iter_exclude(self.all))
-        self.repo = __import__("git").Repo(self.dir)
-
-        super().__post_init__()
-
-    def get_author(self):
-        return self.repo.commit().author.name
-
-    def get_email(self):
-        return self.repo.commit().author.email
-
-    def get_url(self):
-        try:
-            return self.repo.remote("origin").url
-        except ValueError:
-            return ""
-
-    def get_untracked_files(self):
-        return self.repo.untracked_files
-
-
-@dataclasses.dataclass(order=True)
-class Project:
-    """the Project class provides a consistent interface for inferring project features from
-    the content of directories and git repositories.
-
-    """
-
-    dir: object = dataclasses.field(default_factory=Path)
-    fs: FileSystem = dataclasses.field(default_factory=dict)
-
-    @property
-    def path(self):
-        return File(self.dir)
-
-    def __truediv__(self, object):
-        return self.path / object
-
-    def __post_init__(self):
-        """post initialize globs of content relative the git repository."""
-
-        self.fs = ((self / GIT).exists() and Git or FileSystem)(self.dir)
-        # self.add()
-
-    @property
-    def files(self):
-        return self.fs.content
-
-    @property
-    def suffixes(self):
-        return self.fs.suffixes
-
-    def add(self, *object):
-        """add an object to the project, add will provide heuristics for different objects much the same way `poetry add` does."""
-        if self.fs.is_vcs:
-            for object in object:
-                if isinstance(object, (str, Path)):
-                    self.fs.repo.index.add([str(object)])
-
-            self.fs.repo.index.commit("dgaf added files.")
-            self.fs.__post_init__()
-
-    def get_name(self):
-        """get the name of the project distribution.
-
-        this method is used to infer the project names for setuptools, flit, or poetry. projects make
-        have the form of:
-        - flat repository with no directories.
-        - a project with a src directory.
-        - folders with custom names
-
-        what is the canonical name for a collection of folders?
-        - exclude private names.
-        """
-        # we know default pytest settings so we shouldnt have to invoke pytest to find tests if the folder is flat.
-        return self.fs.get_module_name()
-
-    def get_exclude(self):
-        return self.fs.get_exclude_patterns()
 
     def get_version(self):
         """determine a version for the project, if there is no version defer to calver.
@@ -437,9 +321,8 @@ class Project:
 
     def get_description_file(self):
         """get the description file for a project. it looks like readme or index something."""
-        for file in self.fs.files:
-            if file.stem.lower() in {"readme", "index"}:
-                return file
+        if self.index and self.index.stem.lower() in {"readme", "index"}:
+            return self.index
 
     def get_description_content_type():
         """get the description file for a project. it looks like readme or index something."""
@@ -451,18 +334,6 @@ class Project:
     def get_long_description(self):
         file = self.get_description_file()
         return f"file: {file}" if file else ""
-
-    def get_author(self):
-        """get the author name from the git revision history.
-
-        we can only infer an author if a commit is generated."""
-        return self.fs.get_author()
-
-    def get_email(self):
-        """get the author name from the git revision history.
-
-        we can only infer an author if a commit is generated."""
-        return self.fs.get_email()
 
     def get_requires_from_files(self, files):
         """list imports discovered from the files."""
@@ -499,9 +370,7 @@ class Project:
         return sorted(
             [
                 package
-                for package in self.get_requires_from_files(
-                    [self / x for x in self.files if x not in self.get_test_files()]
-                )
+                for package in self.get_requires_from_files(self.files(content=True))
                 if package.lower() not in known and package[0].isalpha()
             ]
         )
@@ -521,7 +390,7 @@ class Project:
         """test requires live in test and docs folders."""
 
         # infer the sphinx extensions needed because we miss this often.
-        if CONF in self.files:
+        if CONF in self.conventions:
             "infer the dependencies from conf.py."
         requires = []
         if options.docs == "jb":
@@ -529,93 +398,83 @@ class Project:
 
         return requires
 
-    def get_url(self):
-        """get the url(s) for the project from the git history."""
-        return self.fs.get_url()
-
-    def get_classifiers(self):
-        """some classifiers can probably be inferred."""
-        return []
-
-    def get_license(self):
-        """should be a trove classifier"""
-        # import trove_classifiers
-
-        # infer the trove framework
-        # make a gui for adding the right classifiers.
-
-        return ""
-
-    def get_keywords(self):
-        return []
-
-    def get_python_version(self):
-        import sys
-
-        return f"{sys.version_info.major}.{sys.version_info.minor}"
-
-    def get_test_files(self, default=True):
-        """list the test like files. we'll access their dependencies separately ."""
-        if default:
-            return [x for x in self.files if x.stem.startswith("test_")]
-        items = util.collect_test_files(self.path)
-        return items
-
-    def get_doc_files(self):
-        """get the files that correspond to documentation.
-
-
-        * docs folder may have different depdencies for execution.
-        * is the readme docs? it is docs and test i think.
-        """
-        return [x for x in self.files if x.parts[0] == "docs"]
-
-    def get_entry_points(self):
-        """combine entrypoints from all files.
-
-        is there a convention for entry points?
-        can we infer anything?
-        """
-        # read entry points from setup.cfg
-        # read entry points from pyproject.toml
-        ep = {}
-        return ep
-        if (self / SETUP_CFG).exists():
-            data = (self / SETUP_CFG).load()
-            if "options.entry_points" in data:
-                for k, v in data["options.entry_points"].items():
-                    ep = merge(
-                        ep,
-                        {
-                            k: dict(x.split("=", 1))
-                            for x in v.value.splitlines()
-                            if x.strip()
-                        },
-                    )
-        if (self / PYPROJECT_TOML).exists():
-            data = (self / PYPROJECT_TOML).load()
-            ep = merge(
-                ep,
-                dict(
-                    console_scripts=data.get("tool", {})
-                    .get("flit", {})
-                    .get("scripts", {})
-                ),
+    def files(
+        self, content=False, posts=False, docs=False, tests=False, conventions=False
+    ):
+        if self.index:
+            yield self.index
+        if posts:
+            yield from self.posts
+        if docs:
+            yield from self.pages
+            if self.docs:
+                yield from self.docs.files(
+                    content=content,
+                    posts=posts,
+                    docs=docs,
+                    tests=tests,
+                    conventions=conventions,
+                )
+        if content:
+            yield from self.modules
+        if tests:
+            yield from self.tests
+        for chapter in self._chapters:
+            yield from chapter.files(
+                content=content,
+                posts=posts,
+                docs=docs,
+                tests=tests,
+                conventions=conventions,
             )
-            ep = merge(
-                ep, data.get("tool", {}).get("flit", {}).get("entrypoints", {})
-            )  # other ep
-            ep = merge(
-                ep,
-                dict(
-                    console_scripts=data.get("tool", {})
-                    .get("poetry", {})
-                    .get("scripts", {})
-                ),
-            )  # poetry console_scripts
-            ep = merge(ep, data.get("tool", {}).get("poetry", {}).get("plugins", {}))
+        if conventions:
+            yield from self.conventions
 
-        return ep
+    @property
+    def path(self):
+        return File(self.dir)
+
+    def __truediv__(self, object):
+        return self.path / object
+
+
+class Project(Chapter):
+    """the Project class provides a consistent interface for inferring project features from
+    the content of directories and git repositories.
+
+    """
+
+    @property
+    def suffixes(self):
+        return sorted(set(x.suffix for x in self.files(True, True, True, True, True)))
+
+    def as_toc(self, recurse=False):
+        index = self.index
+        if index is None:
+            for object in (self.pages, self.posts, self.tests, self.modules):
+                if object:
+                    index = object[0]
+                    break
+
+        data = dict(file=str(index.with_suffix("")), sections=[])
+        for x in itertools.chain(
+            self.pages, self.posts, self.tests, self.modules, self.chapters
+        ):
+            if x == index:
+                continue
+            if x in self.chapters:
+                try:
+                    data["sections"].append(
+                        recurse
+                        and self._chapters(self.chapters.index(x)).as_toc(recurse)
+                        or x
+                    )
+                except:
+                    ...
+            else:
+                data["sections"].append(dict(file=str(x.with_suffix(""))))
+
+        return data
 
     def to_pre_commit(self):
         """from the suffixes in the content, fill out the precommit based on our opinions."""
@@ -624,7 +483,7 @@ class Project:
         if "repos" not in data:
             data["repos"] = []
 
-        for suffix in [None] + list(set(x.suffix for x in self.files)):
+        for suffix in [None] + self.suffixes:
             if suffix in util.LINT_DEFAULTS:
                 for kind in util.LINT_DEFAULTS[suffix]:
                     for repo in data["repos"]:
@@ -713,43 +572,7 @@ with __import__("importnb").Notebook():
         2. using files
 
         """
-        (self / TOC).write(self.get_sections())
-
-    def get_sections(self):
-        collated = __import__("collections").defaultdict(list)
-        # collated[None] is the top level
-        collated[(None,)].append(self.get_description_file())
-
-        # if there no description file then pop back
-        if collated[(None,)][0] is None:
-            collated[(None,)].pop()
-
-        # populate collated top level with the canonical file.
-        if not collated[(None,)]:
-            try:
-                collated[(None,)].append(self.fs.get_module_name_from_files()[1])
-            except StopIteration:
-                ...
-
-        for file in sorted(self.files):
-            if file not in sum(collated.values(), []):
-                collated[file.parent.parts].append(file)
-
-        sections = [
-            dict(file=str(collated.pop((None,)).pop(0).with_suffix("")), sections=[])
-        ]
-        # a rough first pass.
-        for part in sorted(collated):
-            if part == (None,):
-                continue
-            for file in collated[part]:
-                if file.suffix.lower() in {".md", ".ipynb", ".rst", ".txt"}:
-                    sections[0]["sections"].append(dict(file=str(file.with_suffix(""))))
-
-        return sections
-
-    def get_section_files(self):
-        ...
+        (self / TOC).write(self.as_toc(True))
 
     def as_config(self):
         return __import__("jsone").render(
@@ -824,7 +647,9 @@ with __import__("importnb").Notebook():
         (self / GITIGNORE).write_text("\n".join(map(str, self.get_exclude())))
 
     def to_manifest(self):
-        (self / MANIFEST).write_text(" ".join(map(str, ["include"] + self.files)))
+        (self / MANIFEST).write_text(
+            " ".join(map(str, ["include"] + self.files(True, True, True, True, True)))
+        )
 
     def to_github_action(self):
         """create a github actions to publish dgaf actionss"""

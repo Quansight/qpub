@@ -368,3 +368,14 @@ class YML(File):
 
 IMPORT_TO_PIP = None
 PIP_TO_CONDA = None
+
+
+def is_pythonic(object):
+    import ast, pathlib
+
+    object = pathlib.Path(object)
+    try:
+        ast.parse(object.stem)
+    except SyntaxError:
+        return False
+    return "-" not in object.stem

@@ -15,7 +15,7 @@ def task_manifest():
     return dict(
         actions=[project.to_manifest],
         targets=[project.path / MANIFEST],
-        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files())))],
     )
 
 
@@ -23,7 +23,7 @@ def task_gitignore():
     return dict(
         actions=[project.to_gitignore],
         targets=[project.path / GITIGNORE],
-        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files())))],
     )
 
 
@@ -41,13 +41,13 @@ def task_python():
     doit = __import__("doit")
 
     if options.python == "infer":
-        if not project.fs.top_level:
+        if not project._chapters:
             options.python = "flit"
-        elif SRC in project.fs.top_level:
+        elif SRC in project.chapters:
             options.python = "poetry"
-        elif len(project.fs.top_level) > 1:
+        elif len(project.chapters) > 1:
             options.python = "setuptools"
-        elif SETUP_PY in project.files:
+        elif SETUP_PY in project.files(True, True, True, True, True):
             options.python = "setuptools"
         else:
             options.python = "flit"
@@ -55,7 +55,7 @@ def task_python():
     uptodate = [doit.tools.config_changed(options.python)]
     if options.python == "flit":
         return dict(
-            file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+            file_dep=[x for x in project.files() if x in {".py", ".ipynb"}],
             actions=[project.to_flit],
             task_dep=[],
             targets=[project.path / PYPROJECT_TOML],
@@ -66,7 +66,7 @@ def task_python():
         test_requires = " ".join(project.get_test_requires())
 
         return dict(
-            file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+            file_dep=[x for x in project.files() if x in {".py", ".ipynb"}],
             actions=[
                 project.to_poetry,
                 f"""poetry add {requires} --lock""",
@@ -100,7 +100,7 @@ def task_setup_py():
 def task_setuptools():
     """produce the configuration files for a python distribution."""
     return dict(
-        file_dep=[x for x in project.files if x in {".py", ".ipynb"}],
+        file_dep=[x for x in project.files() if x in {".py", ".ipynb"}],
         actions=[project.to_setuptools],
         task_dep=["manifest"],
         targets=[project / SETUP_CFG],
@@ -128,7 +128,7 @@ def task_docs():
             project.to_config_yml,
         ],
         targets=[project / TOC, project / CONFIG],
-        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files)))],
+        uptodate=[doit.tools.config_changed(" ".join(map(str, project.files())))],
     )
 
 
