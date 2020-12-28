@@ -110,7 +110,7 @@ class Chapter:
             if DOCS in self.chapters:
                 self.chapters.pop(self.chapters.index(DOCS))
             if SRC in self.chapters:
-                return Chapter(self.dir / SRC).get_name()
+                return Project(self.dir / SRC).get_name()
             if len(self.chapters) == 1:
                 return self.chapters[0].stem
         if self.modules:
@@ -213,7 +213,7 @@ class Chapter:
                     continue
 
             if local in {DOCS}:
-                self.docs = Chapter(dir=file, parent=self)
+                self.docs = Project(dir=file, parent=self)
             elif local in {SRC}:
                 self.chapters += [x for x in file.iterdir() if x.is_dir()]
             elif local in CONVENTIONS:
@@ -250,7 +250,7 @@ class Chapter:
         for k in "chapters posts tests modules pages conventions".split():
             setattr(self, k, sorted(getattr(self, k), reverse=k in {"posts"}))
 
-        self._chapters = list(Chapter(dir=x, parent=self) for x in self.chapters)
+        self._chapters = list(Project(dir=x, parent=self) for x in self.chapters)
 
     def get_author(self):
         if self.repo:
@@ -455,21 +455,30 @@ class Project(Chapter):
                 if object:
                     index = object[0]
                     break
-
+        if not index:
+            raise NoIndex()
         data = dict(file=str(index.with_suffix("")), sections=[])
         for x in itertools.chain(
-            self.pages, self.posts, self.tests, self.modules, self.chapters
+            self.pages,
+            (self.docs,) if self.docs else (),
+            self.posts,
+            self.tests,
+            self.modules,
+            self.chapters,
         ):
             if x == index:
                 continue
-            if x in self.chapters:
+            if self.docs and (x == self.docs):
+                try:
+                    data["sections"].append(self.docs.as_toc(recurse))
+                except NoIndex:
+                    ...
+            elif x in self.chapters:
                 try:
                     data["sections"].append(
-                        recurse
-                        and self._chapters(self.chapters.index(x)).as_toc(recurse)
-                        or x
+                        self._chapters[self.chapters.index(x)].as_toc(recurse)
                     )
-                except:
+                except NoIndex:
                     ...
             else:
                 data["sections"].append(dict(file=str(x.with_suffix(""))))

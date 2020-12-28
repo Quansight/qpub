@@ -12,3 +12,7 @@ class NotImplementedYetError(BaseException):
 
 class UntitledException(BaseException):
     """cannot infer a name for an untitled project."""
+
+
+class NoIndex(BaseException):
+    ...
