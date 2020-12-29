@@ -1,93 +1,103 @@
 # `qpub` - automating publishing workflows
 
-sphinx as the engine for docs
-tox/pytest as the engine for tests
-poetry as the engine for environments
+`dgaf` is a literate packaging for transforming scripts, notebooks, and other documents into python distributions, tests, and documentation.
 
-`qpub` works with files
+`dgaf` combines popular python conventions to infer configuration information from content. it allows authors to focus on their content, and they rewarded with python distributions for following best practices.
 
-`qpub` is make to publish artifacts from python source including notebooks, markdown, rst, and python files. `qpub` focuses on ambiguous, nascent content; it provides popular opinions for representing the content as tests, documentation, development and installation files. `qhub` generates complete _slow_ configuration files from the partial information within the underlying _fast_ content.
+## quickstart
 
-* Poetry is a tool for dependency management and packaging in Python. It allows you to declare the libraries your project depends on and it will manage (install/update) them for you.
-* doit comes from the idea of bringing the power of build-tools to execute any kind of task
-
-
-conventions for packaging and testing require complete information to configure their outcomes. often the information underlying the information for configurations.
-
-the `qpub` api is designed to provide consistent command line interactions from local, remote, and CI development.
-
-## motivation from python packaging.
-
-
-`dgaf` uses repository information to generate _slow_ configuration files from partial information stored from _fast_ files.
-
-the git repository retains the context of a project's changes in entropy over time. within a programming ecosystem there are canonical conventions that allow communities to identify each other. the conventions retain cultural histories of the software and become difficult to change. meanwhile, content uses convention as technology to convey computational concepts.
-
-the kinetics of conventions are slower than the those of content; generally the the context is fixed unless divise organizational events occur.
-
-        d(context)/dt << d(convention)/dt << d(content)/dt
-
-a meeting, assembly; an agreement
-
-conventions are coherent interfaces between literature and software.
-
-# deathbeds generalized automation framework
-
-the deathbeds generalized automation framework provides opinionated tools for publishing python. typically, python tools require complete configurations to acheive their goals. configuration metadata tends to be redudant across different files
-
-`dgaf` relies on configurations in the `"pyproject.toml"` too infer installation and development environments;
-projects abiding the `"pyproject.toml"` convention can be this _awesome list_.
-
-`dgaf` is a consistent CLI for publishing different forms of content in different environments (eg. local develop/install, github actions testing, publishing to github pages, deploying binders). it encodes different opinions for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `dgaf` tries to aggregate best present and future practices for publishing different code artifacts.
-
-`dgaf` is good for small project where content is :crown:. for older projects, `dgaf` may be a good test for transitioning old build chains to modern python conventions.
-
-## what does `dgaf` do?
-
-`dgaf` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `dgaf` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or
-
-
- works across different environments like conda, pip, and tox. it can infer these environment conditions from partial information in canonical configuration files and tracked content. with the configuration files, it can execute difference services for publishing facets of the project.
-
-some features of `dgaf` are:
-
-* `dgaf infer` discovers dependencies and updates the requirements in different configuration files.
-* `dgaf setup` installs the environment dependencies
-* `dgaf develop` makes a development package of the project
-* `dgaf install` installs the project.
-* `dgaf test` run the tests
-* `dgaf docs` generates a table of contents and builds the docs with jupyter book
-* `dgaf postbuild` builds a development version of the package for binder
-
-### extra configuration
-
-`dgaf` will merge and append to existing configurations in smart ways. extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
-
-### `dgaf` flags
-
-`dgaf` uses the `.gitignore` files to control different features. a default `dgaf` `.gitignore` will specify the configuration files that `dgaf` generates; a specific process is ignored by prepending an `!` to a configuration
+the quickest way to begin is to:
 
 ```bash
-tox.ini # generates tox configuration
-!tox.ini # skips tox configuration
+# have some content in a directory
+pushd some_place_with_content
+# install dgaf
+pip install dgaf
+# run the add command to configure the project
+dgaf add
 ```
 
-## requirements
+## `dgaf add`
 
-`dg     af` requires a git repository with content.
-# development
+`dgaf add` runs `dgaf add lint py docs blog` by default and will:
+
+1. configure a `".pre-commit-config.yaml"` to use `pre_commit` for linting and formatting.
+2. configure a python distribution in `"pyproject.toml"` using `flit, poetry or setuptools` backends.
+3. configure a table of contents, `"docs/_toc.yml"` for the `jupyter_book` documentation
+4. create the documentation configuration file
+
+```bash
+dgaf add actions readthedocs postbuild conda requirements
+```
+
+all of the configuration files are created by inferring information from the file system or github repository. `dgaf` can generate configuration for other tools like readthedocs, github actions, conda, pip.
+
+## `dgaf run`
+
+`dgaf` can run the services that it knows how to configure. the tasks are executed in virtual environments to avoid polluting your environment.
 
 
-https://mozillascience.github.io/working-open-workshop/contributing/
-https://gist.github.com/bollwyvl/f6aac8d4e68e5594fad2ae7a3cacc74b
-https://gist.github.com/tonyfast/f74eb42f2a998d8e428a752ceb0cb1d1
-https://github.com/carlosperate/awesome-pyproject
-https://twitter.com/SourabhSKatoch/status/1330068683222183936?s=20
-https://setuptools.readthedocs.io/en/latest/userguide/declarative_config.html
-https://pre-commit.com/hooks.html
-https://github.com/nbQA-dev/nbQA
-https://docs.python.org/3/distutils/configfile.html
-https://pyscaffold.org/en/latest/features.html
+currently `dgaf` can:
+
+```bash
+dgaf run build develop install test docs blog lint
+```
+
+* build and install python packages
+* test packages
+* build documentation
+* format a blog
+* lint the project
+
+
+## use cases
+
+### I have one ~~notebook, script, markdown file~~ document
+
+`dgaf` turns these document forms into a python package, a test object, and documentation. A common way to share this document would be to share it as a gist. `dgaf` does this with the `dgaf gist` subcommand.
+
+```bash
+dgaf gist push # this only work with the gh cli
+```
+
+the single document is uploaded with a `"postBuild"` file that runs `dgaf` on the respective binder. the resulting binder represents a full development environment for the content.
+
+### I have a bunch of documents
+
+`dgaf` uses the relationships between files and directories to configure the development tools.
+
+documents in a folder ... uses the directory as the name
+documents in a folder ... exclude some common name conventions like `"github" and "docs"`
+
+top-level documents ...
+top-level documents ... require a name
+
+folders in the top-level... require an explicit name
+
+### smoke testing
+
+a smoke test is a top-level context independent test. it tests from source
+
+## development
+
+`dgaf` uses `nox`
+
+```bash
+nox -s develop
+```
+
+## currently some of the configurations are incomplete.
+
+* https://mozillascience.github.io/working-open-workshop/contributing/
+* https://gist.github.com/bollwyvl/f6aac8d4e68e5594fad2ae7a3cacc74b
+* https://gist.github.com/tonyfast/f74eb42f2a998d8e428a752ceb0cb1d1
+* https://github.com/carlosperate/awesome-pyproject
+* https://twitter.com/SourabhSKatoch/status/1330068683222183936?s=20
+* https://setuptools.readthedocs.io/en/latest/userguide/declarative_config.html
+* https://pre-commit.com/hooks.html
+* https://github.com/nbQA-dev/nbQA
+* https://docs.python.org/3/distutils/configfile.html
+* https://pyscaffold.org/en/latest/features.html
 
 should we pre install a bunch of different pytest opinions?
 
