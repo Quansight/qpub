@@ -16,4 +16,8 @@ dgaf = "dgaf.__main__:main"
 
 
 [tool.flit.metadata.requires-extra]
-configure = ["doit", "GitPython", "depfinder", "aiofiles", "appdirs", "typer", "nox", "json-e", "pathspec", "requests-cache", "tomlkit"]
+configure = [
+    "doit", "GitPython", "depfinder", 
+    "aiofiles", "appdirs", "typer", 
+    "json-e", "pathspec", "flit", "poetry",
+    "requests-cache", "tomlkit", "nox"]
