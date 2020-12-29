@@ -19,7 +19,7 @@ import dataclasses
 import itertools
 from . import util
 from .exceptions import *
-from .util import Path, File, Convention
+from .util import Path, File, Convention, cached
 
 post_pattern = re.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
@@ -90,7 +90,7 @@ BUILDSYSTEM = "build-system"
 
 @dataclasses.dataclass(order=True)
 class Chapter:
-    dir: pathlib.Path = "."
+    dir: pathlib.Path = ""
     index: None = None
     repo: object = None
     parent: object = None
@@ -105,89 +105,9 @@ class Chapter:
     hidden: list = dataclasses.field(default_factory=list, repr=False)
     exclude: object = None
 
-    def get_name(self):
-        if self.chapters:
-            if DOCS in self.chapters:
-                self.chapters.pop(self.chapters.index(DOCS))
-            if SRC in self.chapters:
-                return Project(self.dir / SRC).get_name()
-            if len(self.chapters) == 1:
-                return self.chapters[0].stem
-        if self.modules:
-            if len(self.modules) == 1:
-                return self.modules[0].stem
-            else:
-                raise BaseException
-
-        if self.posts:
-            if len(self.posts) == 1:
-                return self.posts[0].stem.split("-", 3)[-1].replace(*"-_")
-        if self.pages:
-            if len(self.pages) == 1:
-                return self.pages[0].stem
-        raise BaseException
-
-    def get_exclude_patterns(self):
-        """get the excluded by the canonical python.gitignore file.
-
-        this method can construct a per project gitignore file rather than
-        included the world.
-        """
-        return list(sorted(set(dict(self._iter_exclude()).values())))
-
-    def get_exclude_paths(self):
-        """get the excluded by the canonical python.gitignore file."""
-        return list(sorted(dict(self._iter_exclude())))
-
-    def _iter_exclude(self, files=None):
-        for x in files or itertools.chain(
-            self.dir.iterdir(),
-            (self.docs.files(True, True, True, True, True) if self.docs else tuple()),
-        ):
-            if x.is_dir():
-                x /= "tmp"
-
-            exclude = self.get_exclude_by(x.relative_to(self.root().dir))
-            if exclude:
-                yield x, exclude
-
-    def get_exclude_by(self, object):
-        """return the path that ignores an object.
-
-        exclusion is based off the canonical python.gitignore specification."""
-        if not hasattr(self, "gitignore_patterns"):
-            self._init_exclude()
-
-        for k, v in self.gitignore_patterns.items():
-            if any(v.match((str(object),))):
-                return k
-        else:
-            return None
-
-    def _init_exclude(self):
-        """initialize the path specifications to decide what to omit."""
-
-        self.gitignore_patterns = {}
-        for file in (
-            Path(__file__).parent / "Python.gitignore",
-            Path(__file__).parent / "Nikola.gitignore",
-            Path(__file__).parent / "JupyterNotebooks.gitignore",
-        ):
-            for pattern in (
-                file.read_text().splitlines()
-                + ".local .vscode _build .gitignore".split()
-            ):
-                if bool(pattern):
-                    match = __import__("pathspec").patterns.GitWildMatchPattern(pattern)
-                    if match.include:
-                        self.gitignore_patterns[pattern] = match
-
-    def root(self):
-        return self.parent.root() if self.parent else self
-
     def __post_init__(self):
         if not isinstance(self.dir, pathlib.Path):
-            self.dir = pathlib.Path(self.dir or "")
+            self.dir = pathlib.Path(self.dir)
         self.repo = (
             (self.dir / GIT).exists() and __import__("git").Repo(self.dir / GIT) or None
         )
@@ -252,151 +172,8 @@ class Chapter:
 
         self._chapters = list(Project(dir=x, parent=self) for x in self.chapters)
 
-    def get_author(self):
-        if self.repo:
-            return self.repo.commit().author.name
-        return ""
-
-    def get_email(self):
-        if self.repo:
-            return self.repo.commit().author.email
-        return ""
-
-    def get_url(self):
-        if self.repo:
-            if hasattr(self.repo.remotes, "origin"):
-                return self.repo.remotes.origin.url
-        return ""
-
-    get_exclude = get_exclude_patterns
-
-    def get_classifiers(self):
-        """some classifiers can probably be inferred."""
-        return []
-
-    def get_license(self):
-        """should be a trove classifier"""
-        # import trove_classifiers
-
-        # infer the trove framework
-        # make a gui for adding the right classifiers.
-
-        return ""
-
-    def get_keywords(self):
-        return []
-
-    def get_python_version(self):
-        import sys
-
-        return f"{sys.version_info.major}.{sys.version_info.minor}"
-
-    def get_test_files(self, default=True):
-        """list the test like files. we'll access their dependencies separately ."""
-        if default:
-            return list(self.files(tests=True))
-        items = util.collect_test_files(self.path)
-        return items
-
-    def get_untracked_files(self):
-        return []
-
-    def get_version(self):
-        """determine a version for the project, if there is no version defer to calver.
-
-        it would be good to support semver, calver, and agever (for blogs).
-        """
-        # use the flit convention to get the version.
-        # there are a bunch of version convention we can look for bumpversion, semver, rever
-        # if the name is a post name then infer the version from there
-        return __import__("datetime").date.today().strftime("%Y.%m.%d")
-
-    def get_description(self):
-        """get from the docstring of the project. raise an error if it doesn't exist."""
-        # use the flit convention to get the description.
-        # flit already does this.
-        # get the description from a markdown cell if it exists.
-        # get it from the docstring
-        return ""
-
-    def get_description_file(self):
-        """get the description file for a project. it looks like readme or index something."""
-        if self.index and self.index.stem.lower() in {"readme", "index"}:
-            return self.index
-
-    def get_description_content_type():
-        """get the description file for a project. it looks like readme or index something."""
-        file = self.get_description_file()
-        return {".md": "text/markdown", ".rst": "text/x-rst"}.get(
-            file and file.suffix.lower() or None, "text/plain"
-        )
-
-    def get_long_description(self):
-        file = self.get_description_file()
-        return f"file: {file}" if file else ""
-
-    def get_requires_from_files(self, files):
-        """list imports discovered from the files."""
-        return list(set(util.import_to_pip(util.merged_imports(files))))
-
-    def get_requires_from_requirements_txt(self):
-        """get any hardcoded dependencies in requirements.txt."""
-        if (self / REQUIREMENTS_TXT).exists():
-            known = [
-                x
-                for x in REQUIREMENTS_TXT.read_text().splitlines()
-                if not x.lstrip().startswith("#") and x.strip()
-            ]
-            return list(
-                __import__("packaging.requirements")
-                .requirements.Requirement.parseString(x)
-                .name
-                for x in known
-            )
-
-        return []
-
-    def get_requires(self):
-        """get the requirements for the project.
-
-        use heuristics that investigate a few places where requirements may be specified.
-
-        the expectation is that pip requirements might be pinned in a requirements file
-        or anaconda environment file.
-        """
-        known = self.get_requires_from_requirements_txt()
-
-        known.append(self.get_name())
-        return sorted(
-            [
-                package
-                for package in self.get_requires_from_files(self.files(content=True))
-                if package.lower() not in known and package[0].isalpha()
-            ]
-        )
-
-    def get_test_requires(self):
-        """test requires live in test and docs folders."""
-
-        requires = ["pytest", "pytest-sugar"]
-        if ".ipynb" in self.suffixes:
-            requires += ["nbval", "importnb"]
-        requires += self.get_requires_from_files(
-            self / x for x in self.get_test_files()
-        )
-        return [x for x in requires if x not in [self.get_name()]]
-
-    def get_doc_requires(self):
-        """test requires live in test and docs folders."""
-
-        # infer the sphinx extensions needed because we miss this often.
-        if CONF in self.conventions:
-            "infer the dependencies from conf.py."
-        requires = []
-        if options.docs == "jb":
-            requires += ["jupyter-book"]
-
-        return requires
+    def root(self):
+        return self.parent.root() if self.parent else self
 
     def files(
         self, content=False, posts=False, docs=False, tests=False, conventions=False
@@ -438,7 +215,248 @@ class Chapter:
         return self.path / object
 
 
-class Project(Chapter):
+class Distribution(Chapter):
+    @cached
+    def get_name(self):
+        """get the project name"""
+        if self.chapters:
+            if DOCS in self.chapters:
+                self.chapters.pop(self.chapters.index(DOCS))
+            if SRC in self.chapters:
+                return Project(self.dir / SRC).get_name()
+            if len(self.chapters) == 1:
+                return self.chapters[0].stem
+        if self.modules:
+            if len(self.modules) == 1:
+                return self.modules[0].stem
+            else:
+                raise BaseException
+
+        if self.posts:
+            if len(self.posts) == 1:
+                return self.posts[0].stem.split("-", 3)[-1].replace(*"-_")
+        if self.pages:
+            if len(self.pages) == 1:
+                return self.pages[0].stem
+        raise BaseException
+
+    @cached
+    def get_exclude_patterns(self):
+        """get the excluded by the gitignore files"""
+        return list(sorted(set(dict(self._iter_exclude()).values())))
+
+    @cached
+    def get_exclude_paths(self):
+        """get the excluded by the canonical python.gitignore file."""
+        return list(sorted(dict(self._iter_exclude())))
+
+    def _iter_exclude(self, files=None):
+        for x in files or itertools.chain(
+            self.dir.iterdir(),
+            (self.docs.files(True, True, True, True, True) if self.docs else tuple()),
+        ):
+            if x.is_dir():
+                x /= "tmp"
+
+            exclude = self.get_exclude_by(x.relative_to(self.root().dir))
+            if exclude:
+                yield x, exclude
+
+    def get_exclude_by(self, object):
+        """return the path that ignores an object.
+
+        exclusion is based off the canonical python.gitignore specification."""
+        if not hasattr(self, "gitignore_patterns"):
+            self._init_exclude()
+
+        for k, v in self.gitignore_patterns.items():
+            if any(v.match((str(object),))):
+                return k
+        else:
+            return None
+
+    def _init_exclude(self):
+        """initialize the path specifications to decide what to omit."""
+
+        self.gitignore_patterns = {}
+        for file in (
+            Path(__file__).parent / "templates" / "Python.gitignore",
+            Path(__file__).parent / "templates" / "Nikola.gitignore",
+            Path(__file__).parent / "templates" / "JupyterNotebooks.gitignore",
+        ):
+            for pattern in (
+                file.read_text().splitlines()
+                + ".local .vscode _build .gitignore".split()
+            ):
+                if bool(pattern):
+                    match = __import__("pathspec").patterns.GitWildMatchPattern(pattern)
+                    if match.include:
+                        self.gitignore_patterns[pattern] = match
+
+    @cached
+    def get_author(self):
+        if self.repo:
+            return self.repo.commit().author.name
+        return ""
+
+    @cached
+    def get_email(self):
+        if self.repo:
+            return self.repo.commit().author.email
+        return ""
+
+    @cached
+    def get_url(self):
+        if self.repo:
+            if hasattr(self.repo.remotes, "origin"):
+                return self.repo.remotes.origin.url
+        return ""
+
+    get_exclude = get_exclude_patterns
+
+    @cached
+    def get_classifiers(self):
+        """some classifiers can probably be inferred."""
+        return []
+
+    @cached
+    def get_license(self):
+        """should be a trove classifier"""
+        # import trove_classifiers
+
+        # infer the trove framework
+        # make a gui for adding the right classifiers.
+
+        return ""
+
+    @cached
+    def get_keywords(self):
+        return []
+
+    def get_python_version(self):
+        import sys
+
+        return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+    @cached
+    def get_test_files(self, default=True):
+        """list the test like files. we'll access their dependencies separately ."""
+        if default:
+            return list(self.files(tests=True))
+        items = util.collect_test_files(self.path)
+        return items
+
+    def get_untracked_files(self):
+        return []
+
+    @cached
+    def get_version(self):
+        """determine a version for the project, if there is no version defer to calver.
+
+        it would be good to support semver, calver, and agever (for blogs).
+        """
+        # use the flit convention to get the version.
+        # there are a bunch of version convention we can look for bumpversion, semver, rever
+        # if the name is a post name then infer the version from there
+        return __import__("datetime").date.today().strftime("%Y.%m.%d")
+
+    @cached
+    def get_description(self):
+        """get from the docstring of the project. raise an error if it doesn't exist."""
+
+        # look in modules/chapters to see if we can flit this project.
+        if self.modules:
+            ...
+
+        return ""
+
+    @cached
+    def get_description_file(self):
+        """get the description file for a project. it looks like readme or index something."""
+        if self.index and self.index.stem.lower() in {"readme", "index"}:
+            return self.index
+
+    @cached
+    def get_description_content_type():
+        """get the description file for a project. it looks like readme or index something."""
+        file = self.get_description_file()
+        return {".md": "text/markdown", ".rst": "text/x-rst"}.get(
+            file and file.suffix.lower() or None, "text/plain"
+        )
+
+    @cached
+    def get_long_description(self):
+        file = self.get_description_file()
+        return f"file: {file}" if file else ""
+
+    def get_requires_from_files(self, files):
+        """list imports discovered from the files."""
+        return list(set(util.import_to_pip(util.merged_imports(files))))
+
+    def get_requires_from_requirements_txt(self):
+        """get any hardcoded dependencies in requirements.txt."""
+        if (self / REQUIREMENTS_TXT).exists():
+            known = [
+                x
+                for x in REQUIREMENTS_TXT.read_text().splitlines()
+                if not x.lstrip().startswith("#") and x.strip()
+            ]
+            return list(
+                __import__("packaging.requirements")
+                .requirements.Requirement.parseString(x)
+                .name
+                for x in known
+            )
+
+        return []
+
+    @cached
+    def get_requires(self):
+        """get the requirements for the project.
+
+        use heuristics that investigate a few places where requirements may be specified.
+
+        the expectation is that pip requirements might be pinned in a requirements file
+        or anaconda environment file.
+        """
+        known = self.get_requires_from_requirements_txt()
+
+        known.append(self.get_name())
+        return sorted(
+            [
+                package
+                for package in self.get_requires_from_files(self.files(content=True))
+                if package.lower() not in known and package[0].isalpha()
+            ]
+        )
+
+    @cached
+    def get_test_requires(self):
+        """test requires live in test and docs folders."""
+
+        requires = ["pytest", "pytest-sugar"]
+        if ".ipynb" in self.suffixes:
+            requires += ["nbval", "importnb"]
+        requires += self.get_requires_from_files(
+            self / x for x in self.get_test_files()
+        )
+        return [x for x in requires if x not in [self.get_name()]]
+
+    @cached
+    def get_doc_requires(self):
+        """test requires live in test and docs folders."""
+
+        # infer the sphinx extensions needed because we miss this often.
+        if CONF in self.conventions:
+            "infer the dependencies from conf.py."
+        requires = []
+        if options.docs == "jb":
+            requires += ["jupyter-book"]
+
+        return requires
+
+
+class Project(Distribution):
     """the Project class provides a consistent interface for inferring project features from
     the content of directories and git repositories.
 
@@ -489,7 +507,7 @@ class Project(Chapter):
         """from the suffixes in the content, fill out the precommit based on our opinions."""
         precommit = self / PRECOMMITCONFIG_YML
         data = precommit.load() or {}
-        if "repos" not in data:
+        if "    @cachedrepos" not in data:
             data["repos"] = []
 
         for suffix in [None] + self.suffixes:

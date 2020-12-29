@@ -1,5 +1,20 @@
+import functools
+
 Path = type(__import__("pathlib").Path())
 post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
+
+
+def cached(callable):
+    @functools.wraps(callable)
+    def main(self, *args, **kwargs):
+        data = self._cache = getattr(self, "_cache", {})
+        key = self.dir, callable.__name__
+        if (key in data) and (data[key] is not None):
+            return data[key]
+        data[key] = callable(self, *args, **kwargs)
+        return data[key]
+
+    return main
 
 
 class File(Path):
