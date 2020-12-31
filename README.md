@@ -1,6 +1,6 @@
-# `qpub` - automating publishing workflows
+# `qpub` - literate packaging commands
 
-`dgaf` is a literate packaging for transforming scripts, notebooks, and other documents into python distributions, tests, and documentation.
+`dgaf` is an opinionated literate packaging tool for transforming scripts, notebooks, and other documents into python distributions, tests, and documentation.
 
 `dgaf` combines popular python conventions to infer configuration information from content. it allows authors to focus on their content, and they rewarded with python distributions for following best practices.
 
@@ -49,6 +49,11 @@ dgaf run build develop install test docs blog lint
 * format a blog
 * lint the project
 
+## why `dgaf`?
+
+`dgaf` is designed from experience with configuring python projects from nascent content. there is a lot of work to do around the content. each time we want to blog, we spend 20% writing and 80% building the damn thing. `dgaf` wants you to focus on content, by configuring your projects based on its contents.
+
+`dgaf` is at its best with new content, gist sized content, and it is good at automatically building binders.
 
 ## use cases
 
