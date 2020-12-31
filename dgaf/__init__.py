@@ -1,5 +1,4 @@
-"""qpub.py
-q(uick) p(ubishing) configures python distribution and documentaton tools.
+"""q(uick) p(ubishing) configures python distribution and documentaton tools.
 
 """
 #    ___    ____      _   _    ____
@@ -37,6 +36,7 @@ class options:
     doit: bool = os.environ.get("QPUB_DOIt", False)
     watch: bool = os.environ.get("QPUB_DOCS_WATCH", False)
     serve: bool = os.environ.get("QPUB_SERVE", False)
+    pep517: bool = os.environ.get("QPUB_PEP517", False)
 
     @classmethod
     def dump(cls):
@@ -99,6 +99,7 @@ class Chapter:
     pages: list = dataclasses.field(default_factory=list)
     modules: list = dataclasses.field(default_factory=list)
     tests: list = dataclasses.field(default_factory=list)
+    src: object = None
     chapters: list = dataclasses.field(default_factory=list)
     _chapters: list = dataclasses.field(default_factory=list)
     conventions: list = dataclasses.field(default_factory=list, repr=False)
@@ -135,6 +136,7 @@ class Chapter:
             if local in {DOCS}:
                 self.docs = Project(dir=file, parent=self)
             elif local in {SRC}:
+                self.src = SRC
                 self.chapters += [x for x in file.iterdir() if x.is_dir()]
             elif local in CONVENTIONS:
                 self.conventions += [file]
@@ -219,35 +221,73 @@ class Distribution(Chapter):
     @cached
     def get_name(self):
         """get the project name"""
+
+        # get the name of subdirectories if there are any.
         if self.chapters:
-            if DOCS in self.chapters:
-                self.chapters.pop(self.chapters.index(DOCS))
             if SRC in self.chapters:
-                return Project(self.dir / SRC).get_name()
+                self.src = Project(self.dir / SRC, parent=self)
+                return self.src.get_name()
             if len(self.chapters) == 1:
                 return self.chapters[0].stem
+
+        # get the name of modules if there are any.
         if self.modules:
             if len(self.modules) == 1:
                 return self.modules[0].stem
             else:
                 raise BaseException
 
+        # look for dated posted
         if self.posts:
             if len(self.posts) == 1:
                 return self.posts[0].stem.split("-", 3)[-1].replace(*"-_")
+
+        # look for pages.
         if self.pages:
             if len(self.pages) == 1:
                 return self.pages[0].stem
         raise BaseException
 
     @cached
+    def get_description(self):
+        """get from the docstring of the project. raise an error if it doesn't exist."""
+
+        # look in modules/chapters to see if we can flit this project.
+        if self.is_flit():
+            flit = __import__("flit")
+            return flit.common.get_info_from_module(self._flit_module).pop("summary")
+
+        if self.src:
+            return self.src.get_description()
+
+        return ""
+
+    @cached
+    def get_version(self):
+        """determine a version for the project, if there is no version defer to calver.
+
+        it would be good to support semver, calver, and agever (for blogs).
+        """
+        # use the flit convention to get the version.
+        # there are a bunch of version convention we can look for bumpversion, semver, rever
+        # if the name is a post name then infer the version from there
+        if self.is_flit():
+            flit = __import__("flit")
+            return flit.common.get_info_from_module(self._flit_module).pop("version")
+
+        if self.src:
+            return self.src.get_version()
+
+        return __import__("datetime").date.today().strftime("%Y.%m.%d")
+
+    @cached
     def get_exclude_patterns(self):
-        """get the excluded by the gitignore files"""
+        """get the excluded patterns for the current layout"""
         return list(sorted(set(dict(self._iter_exclude()).values())))
 
     @cached
     def get_exclude_paths(self):
-        """get the excluded by the canonical python.gitignore file."""
+        """get the excluded path by the canonical python.gitignore file."""
         return list(sorted(dict(self._iter_exclude())))
 
     def _iter_exclude(self, files=None):
@@ -297,7 +337,7 @@ class Distribution(Chapter):
     def get_author(self):
         if self.repo:
             return self.repo.commit().author.name
-        return ""
+        return "dgaf"
 
     @cached
     def get_email(self):
@@ -326,7 +366,7 @@ class Distribution(Chapter):
 
         # infer the trove framework
         # make a gui for adding the right classifiers.
-
+        "I dont know what the right thing is to say here."
         return ""
 
     @cached
@@ -346,29 +386,18 @@ class Distribution(Chapter):
         items = util.collect_test_files(self.path)
         return items
 
+    @cached
+    def get_docs_files(self, default=True):
+        """list the test like files. we'll access their dependencies separately ."""
+        if default:
+            return list(self.files(docs=True))
+        items = util.collect_test_files(self.path)
+        return items
+
     def get_untracked_files(self):
+        if self.repo:
+            self.repo.untracked_files
         return []
-
-    @cached
-    def get_version(self):
-        """determine a version for the project, if there is no version defer to calver.
-
-        it would be good to support semver, calver, and agever (for blogs).
-        """
-        # use the flit convention to get the version.
-        # there are a bunch of version convention we can look for bumpversion, semver, rever
-        # if the name is a post name then infer the version from there
-        return __import__("datetime").date.today().strftime("%Y.%m.%d")
-
-    @cached
-    def get_description(self):
-        """get from the docstring of the project. raise an error if it doesn't exist."""
-
-        # look in modules/chapters to see if we can flit this project.
-        if self.modules:
-            ...
-
-        return ""
 
     @cached
     def get_description_file(self):
@@ -385,8 +414,10 @@ class Distribution(Chapter):
         )
 
     @cached
-    def get_long_description(self):
+    def get_long_description(self, expand=False):
         file = self.get_description_file()
+        if expand:
+            return file.read_text()
         return f"file: {file}" if file else ""
 
     def get_requires_from_files(self, files):
@@ -452,8 +483,73 @@ class Distribution(Chapter):
         requires = []
         if options.docs == "jb":
             requires += ["jupyter-book"]
-
+        if self.docs:
+            requires += self.get_requires_from_files(self.docs.files)
         return requires
+
+    def is_flit(self):
+        """does the module abide flit conventions:
+
+        1. is the python script or folder with a name
+        2. can the description and version be inferred
+
+        """
+
+        flit = __import__("flit")
+
+        try:
+            setattr(
+                self,
+                "_flit_module",
+                getattr(
+                    self,
+                    "_flit_module",
+                    flit.common.Module(self.get_name(), self.root().dir),
+                ),
+            )
+
+            return True
+        except ValueError:
+            return False
+
+    def is_poetry(self):
+        """is the project otherwise a poetry project"""
+
+        return bool(not self.is_flit()) and bool(self.chapters)
+
+    def is_setuptools(self):
+        """is the project otherwise a poetry project"""
+
+        return True
+
+    def python_backend(self):
+        return (
+            "flit" if self.is_flit() else "poetry" if self.is_poetry() else "setuptools"
+        )
+
+    def docs_backend(self):
+        return "jb"
+
+    def __call__(self):
+        ...
+
+
+class Build(Distribution):
+    @classmethod
+    def create_doit_tasks(cls):
+        self = cls()
+        if self.is_flit():
+            return dict(actions=[f"flit build"])
+        if self.is_poetry():
+            return dict(actions=[f"poetry build"])
+        if self.is_setuptools():
+            return dict(actions=[f"python setup.py sdist bdist_wheel"])
+        raise BaseException
+
+
+class Install(Distribution):
+    def tasks(self):
+        return dict(name="pip-install", actions=[f"pip install ."])
 
 
 class Project(Distribution):
@@ -675,7 +771,9 @@ with __import__("importnb").Notebook():
 
     def to_manifest(self):
         (self / MANIFEST).write_text(
-            " ".join(map(str, ["include"] + self.files(True, True, True, True, True)))
+            " ".join(
+                map(str, ["include"] + list(self.files(True, True, True, True, True)))
+            )
         )
 
     def to_github_action(self):
@@ -700,6 +798,26 @@ with __import__("importnb").Notebook():
     def to_readthedocs(self):
         """https://docs.readthedocs.io/en/stable/config-file/v2.html"""
 
+    def to_whl(self):
+        return "dgaf-2020.12.29-py3-none-any.whl"
+
+    def to_sdist(self):
+        return "qpub-2020.12.01.tar.gz"
+
+    def as_pyproject(self):
+        if self.is_flit():
+            return self.as_flit()
+        if self.is_poetry():
+            return self.as_poetry()
+        return self.as_setuptools()
+
+    def as_docs(self):
+        if self.is_flit():
+            return self.as_flit()
+        if self.is_poetry():
+            return self.as_poetry()
+        return self.as_setuptools()
+
 
 # ███████╗██╗███╗   ██╗
 # ██╔════╝██║████╗  ██║
@@ -707,3 +825,84 @@ with __import__("importnb").Notebook():
 # ██╔══╝  ██║██║╚██╗██║
 # ██║     ██║██║ ╚████║
 # ╚═╝     ╚═╝╚═╝  ╚═══╝
+
+
+class Flit(Project):
+    """flit projects are discovered when a python script
+    or directory exists with docstring and version."""
+
+    def develop(self):
+        return dict()
+
+    def configure(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "flit.json").read_text()
+            ),
+            self.serialize(True),
+        )
+
+
+class Poetry(Project):
+    def develop(self):
+        ...
+
+    def configure(self):
+        return __import__("jsone").render(
+            __import__("json").loads(
+                (Path(__file__).parent / "templates" / "poetry.json").read_text()
+            ),
+            self.serialize(True),
+        )
+
+    def update(self):
+        ...
+
+
+class Setuptools(Project):
+    def develop(self):
+        ...
+
+    def configure(self):
+        ...
+
+
+class JupyterBook(Project):
+    def configure(self):
+        ...
+
+    def html(self):
+        ...
+
+    def pdf(self):
+        ...
+
+
+class Sphinx(Project):
+    def configure(self):
+        ...
+
+    def html(self):
+        ...
+
+    def pdf(self):
+        ...
+
+
+class Mkdocs(Project):
+    def configure(self):
+        ...
+
+
+class Nikola(Project):
+    def configure(self):
+        ...
+
+
+class Pytest(Project):
+    def configure(self):
+        ...
+
+
+class Github(Project):
+    ...

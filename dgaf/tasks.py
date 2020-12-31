@@ -11,6 +11,24 @@ class Reporter(doit.reporter.ConsoleReporter):
 DOIT_CONFIG = dict(verbosity=2, reporter=Reporter)
 
 
+def task_build():
+    "a meta task for building wheels and source distributions"
+    files = list(project.files(True, True, True, True, True))
+    if options.pep517:
+        return dict(
+            file_dep=files,
+            actions=["python -m pep517.build ."],
+            targets=[],
+            # targets=[project.to_whl(), project.to_sdist()]
+        )
+    return dict(
+        file_dep=files,
+        actions=["python setup.py sdist bdist_wheel"],
+        targets=[],
+        # targets=[project.to_whl(), project.to_sdist()]
+    )
+
+
 def task_manifest():
     return dict(
         actions=[project.to_manifest],
@@ -39,7 +57,7 @@ def task_lint():
 def task_python():
     """produce the configuration files for a python distribution."""
     doit = __import__("doit")
-
+    files = list(project.files(True, True, True, True, False))
     if options.python == "infer":
         if not project._chapters:
             options.python = "flit"
@@ -47,26 +65,29 @@ def task_python():
             options.python = "poetry"
         elif len(project.chapters) > 1:
             options.python = "setuptools"
-        elif SETUP_PY in project.files(True, True, True, True, True):
+        elif SETUP_PY in files:
             options.python = "setuptools"
         else:
             options.python = "flit"
 
-    uptodate = [doit.tools.config_changed(options.python)]
     if options.python == "flit":
         return dict(
-            file_dep=[x for x in project.files() if x in {".py", ".ipynb"}],
+            file_dep=[
+                x for x in files if (not project.repo) or (x in {".py", ".ipynb"})
+            ],
             actions=[project.to_flit],
             task_dep=[],
             targets=[project.path / PYPROJECT_TOML],
-            uptodate=uptodate,
+            uptodate=[],
         )
     if options.python == "poetry":
         requires = " ".join(project.get_requires())
         test_requires = " ".join(project.get_test_requires())
 
         return dict(
-            file_dep=[x for x in project.files() if x in {".py", ".ipynb"}],
+            file_dep=[
+                x for x in files if x in self.repo and files or {".py", ".ipynb"}
+            ],
             actions=[
                 project.to_poetry,
                 f"""poetry add {requires} --lock""",
@@ -79,21 +100,16 @@ def task_python():
         )
 
     if options.python == "setuptools":
-        return dict(task_dep=["setup_py"], uptodate=uptodate)
+        return dict(
+            actions=[project.to_setup_py],
+            targets=[project / SETUP_PY],
+            uptodate=[(project / SETUP_PY).exists()],
+        )
 
     raise UnknownBackend(
         f"""{options.python} is not one of {
         "infer flit poetry setuptools"
     }"""
-    )
-
-
-def task_setup_py():
-    """produce the configuration files for a python distribution."""
-    return dict(
-        actions=[project.to_setup_py],
-        targets=[project / SETUP_PY],
-        uptodate=[(project / SETUP_PY).exists()],
     )
 
 
@@ -161,7 +177,6 @@ def task_mkdocs():
 if __name__ == "__main__":
     import sys
 
-    doit = __import__("doit")
     project = Project()
     main = doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader(globals()))
     sys.exit(main.run(sys.argv[1:]))

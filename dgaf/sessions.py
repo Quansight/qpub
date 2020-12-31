@@ -9,31 +9,6 @@ import nox
 from .__init__ import *
 
 
-def nox_runner(module):
-    """a wrapped nox runner specifically for qpub.
-
-    it works off a module loaded into the namespace already
-    rather than a static file.
-    """
-
-    import sys, nox
-
-    argv = sys.argv
-    sys.argv = [__file__]
-    ns = nox._options.options.parse_args()
-    sys.argv = argv
-    # run the tasks ourselves to avoid switching directories
-
-    nox.tasks.merge_noxfile_options(module, ns)
-    manifest = nox.tasks.discover_manifest(module, ns)
-    nox.tasks.filter_manifest(manifest, ns)
-    nox.tasks.verify_manifest_nonempty(manifest, ns)
-    results = nox.tasks.run_manifest(manifest, ns)
-    nox.tasks.print_summary(results, ns)
-    nox.tasks.create_report(results, ns)
-    return nox.tasks.final_reduce(results, ns)
-
-
 @nox.session(python=False)
 def develop(session):
     if PYPROJECT_TOML.exists():
