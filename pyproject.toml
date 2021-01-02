@@ -20,34 +20,10 @@ pycodestyle = ["-W503", "-E722", "-E999"]
 [tool.flit.scripts]
 dgaf = "dgaf.__main__:main"
 
-[tool.flit.metadata]
-module = "dgaf"
-author = "tonyfast"
-maintainer = "tonyfast"
-requires = ["nox", "typer"]
-license = ""
-classifiers = []
-keywords = ""
-author-email = "tony.fast@gmail.com"
-maintainer-email = "tony.fast@gmail.com"
-requires-python = ">=3.7"
-home-page = "https://github.com/deathbeds/dgaf"
-
 [tool.flit.metadata.requires-extra]
 configure = [
     "doit", "GitPython", "depfinder", 
     "aiofiles", "appdirs", "typer", 
     "json-e", "pathspec", "flit", "poetry",
     "requests-cache", "tomlkit", "nox"]
-test = ["pytest", "pytest-sugar", "nbval", "importnb"]
-docs = []
 
-[tool.flit.metadata.urls]
-
-[tool.flit.sdist]
-
-[tool.flit.entrypoints]
-
-[build-system]
-requires = ["flit_core>=2,<4"]
-build-backend = "flit_core.buildapi"
