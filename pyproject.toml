@@ -2,28 +2,39 @@
 [tool.pytest]
 [tool.pytest.ini_options]
 addopts = "-s"
-norecursedirs = "*.egg-info .eggs .gitignore .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ dist"
 minversion = 6.2
+norecursedirs = "*.egg-info .eggs .gitignore .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ dist"
 
 [tool.flakehell]
 base = "https://raw.githubusercontent.com/life4/flakehell/master/pyproject.toml"
+exclude = [".ipynb_checkpoints", "setup.py"]
 format = "grouped"
 max_line_length = 120
 show_source = false
-exclude = [".ipynb_checkpoints", "setup.py"]
 
 [tool.flakehell.plugins]
-pyflakes = ["-F405"]
 pycodestyle = ["-W503", "-E722", "-E999"]
+pyflakes = ["-F405"]
 
 [tool.flit]
 [tool.flit.scripts]
 dgaf = "dgaf.__main__:main"
 
 [tool.flit.metadata.requires-extra]
-configure = [
-    "doit", "GitPython", "depfinder", 
-    "aiofiles", "appdirs", "typer", 
-    "json-e", "pathspec", "flit", "poetry",
-    "requests-cache", "tomlkit", "nox"]
-
+core = [
+  "doit",
+  "GitPython",
+  "pathspec",
+]
+extras = [
+  "depfinder",
+  "aiofiles",
+  "appdirs",
+  "typer",
+  "json-e",
+  "flit",
+  "poetry",
+  "requests-cache",
+  "tomlkit",
+  "nox",
+]
