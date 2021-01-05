@@ -11,9 +11,9 @@ jobs:
     - uses: actions/setup-python@v2
       with:
         python-version: 3.8
-    - run: |
-        pip install nox typer
-        nox -s install test
+    - run: pip install nox typer
+    - run: nox -s install
+    - run: nox -s test
     # test:
     #   name: ${{ matrix.os }} ${{ matrix.python-version }}
     #   runs-on: ${{ matrix.os }}
