@@ -1,0 +1,186 @@
+{
+    "BLOG_AUTHOR": "Your Name",
+    "BLOG_TITLE": "Demo Site",
+    "SITE_URL": "https://example.com/",
+    "BLOG_EMAIL": "joe@demo.site",
+    "BLOG_DESCRIPTION": "This is a demo site for Nikola.",
+    "DEFAULT_LANG": "en",
+    "TRANSLATIONS": {
+        "en": ""
+    },
+    "TRANSLATIONS_PATTERN": "{path}.{lang}.{ext}",
+    "NAVIGATION_LINKS": {
+        "en": [
+            [
+                "/archive.html",
+                "Archives"
+            ],
+            [
+                "/categories/index.html",
+                "Tags"
+            ],
+            [
+                "/rss.xml",
+                "RSS feed"
+            ]
+        ]
+    },
+    "NAVIGATION_ALT_LINKS": {
+        "en": []
+    },
+    "THEME": "bootblog4",
+    "THEME_COLOR": "#5670d4",
+    "THEME_CONFIG": {
+        "en": {
+            "featured_large": false,
+            "featured_small": false,
+            "featured_on_mobile": true,
+            "featured_large_image_on_mobile": true,
+            "featured_strip_html": false,
+            "sidebar": ""
+        }
+    },
+    "POSTS": [
+        [
+            "posts/*.rst",
+            "posts",
+            "post.tmpl"
+        ],
+        [
+            "posts/*.md",
+            "posts",
+            "post.tmpl"
+        ],
+        [
+            "posts/*.txt",
+            "posts",
+            "post.tmpl"
+        ],
+        [
+            "posts/*.html",
+            "posts",
+            "post.tmpl"
+        ]
+    ],
+    "PAGES": [
+        [
+            "pages/*.rst",
+            "pages",
+            "page.tmpl"
+        ],
+        [
+            "pages/*.md",
+            "pages",
+            "page.tmpl"
+        ],
+        [
+            "pages/*.txt",
+            "pages",
+            "page.tmpl"
+        ],
+        [
+            "pages/*.html",
+            "pages",
+            "page.tmpl"
+        ]
+    ],
+    "TIMEZONE": "UTC",
+    "COMPILERS": {
+        "rest": [
+            ".rst",
+            ".txt"
+        ],
+        "markdown": [
+            ".md",
+            ".mdown",
+            ".markdown"
+        ],
+        "textile": [
+            ".textile"
+        ],
+        "txt2tags": [
+            ".t2t"
+        ],
+        "bbcode": [
+            ".bb"
+        ],
+        "wiki": [
+            ".wiki"
+        ],
+        "ipynb": [
+            ".ipynb"
+        ],
+        "html": [
+            ".html",
+            ".htm"
+        ],
+        "php": [
+            ".php"
+        ]
+    },
+    "HIDDEN_TAGS": [
+        "mathjax"
+    ],
+    "CATEGORY_ALLOW_HIERARCHIES": false,
+    "CATEGORY_OUTPUT_FLAT_HIERARCHY": false,
+    "HIDDEN_CATEGORIES": [],
+    "HIDDEN_AUTHORS": [
+        "Guest"
+    ],
+    "FRONT_INDEX_HEADER": {
+        "en": ""
+    },
+    "ATOM_FILENAME_BASE": "feed",
+    "REDIRECTIONS": [],
+    "GITHUB_SOURCE_BRANCH": "src",
+    "GITHUB_DEPLOY_BRANCH": "master",
+    "GITHUB_REMOTE_NAME": "origin",
+    "GITHUB_COMMIT_SOURCE": true,
+    "GALLERIES_USE_THUMBNAIL": false,
+    "GALLERIES_DEFAULT_THUMBNAIL": null,
+    "IMAGE_FOLDERS": {
+        "images": "images"
+    },
+    "INDEX_READ_MORE_LINK": "<p class=\"more\"><a href=\"{link}\">{read_more}\u2026</a></p>",
+    "FEED_READ_MORE_LINK": "<p><a href=\"{link}\">{read_more}\u2026</a> ({min_remaining_read})</p>",
+    "FEED_LINKS_APPEND_QUERY": false,
+    "LICENSE": "",
+    "CONTENT_FOOTER": "Contents &copy; {date}         <a href=\"mailto:{email}\">{author}</a> - Powered by         <a href=\"https://getnikola.com\" rel=\"nofollow\">Nikola</a>         {license}",
+    "CONTENT_FOOTER_FORMATS": {
+        "en": [
+            [],
+            {
+                "email": "joe@demo.site",
+                "author": "Your Name",
+                "date": 2021,
+                "license": ""
+            }
+        ]
+    },
+    "RSS_COPYRIGHT": "Contents \u00a9 {date} <a href=\"mailto:{email}\">{author}</a> {license}",
+    "RSS_COPYRIGHT_PLAIN": "Contents \u00a9 {date} {author} {license}",
+    "RSS_COPYRIGHT_FORMATS": {
+        "en": [
+            [],
+            {
+                "email": "joe@demo.site",
+                "author": "Your Name",
+                "date": 2021,
+                "license": ""
+            }
+        ]
+    },
+    "COMMENT_SYSTEM": "disqus",
+    "COMMENT_SYSTEM_ID": "nikolademo",
+    "STRIP_INDEXES": true,
+    "PRETTY_URLS": true,
+    "MARKDOWN_EXTENSIONS": [
+        "markdown.extensions.fenced_code",
+        "markdown.extensions.codehilite",
+        "markdown.extensions.extra"
+    ],
+    "USE_TAG_METADATA": false,
+    "WARN_ABOUT_TAG_METADATA": false,
+    "GLOBAL_CONTEXT": {},
+    "GLOBAL_CONTEXT_FILLER": []
+}

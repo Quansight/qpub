@@ -9,7 +9,13 @@
         "execute_notebooks": "off"
     },
     "exclude_patterns": {
-        "$eval": "exclude"
+        "$flatten": [{
+                "$eval": "exclude"
+            },
+            [
+                "docs/_build"
+            ]
+        ]
     },
     "html": {
         "favico": "",

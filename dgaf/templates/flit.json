@@ -8,7 +8,8 @@
     "tool": {
         "flit": {
             "metadata": {
-                "$mergeDeep": [{
+                "$mergeDeep": [
+                    {
                         "module": "${name}",
                         "author": "${author}",
                         "maintainer": "${author}",
@@ -43,7 +44,11 @@
                 ]
             },
             "scripts": {},
-            "sdist": {},
+            "sdist": {
+                "include": {
+                    "$eval": "files"
+                }
+            },
             "entrypoints": {}
         }
     }
