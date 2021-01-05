@@ -3,7 +3,7 @@
 [tool.pytest.ini_options]
 addopts = "-s"
 minversion = 6.2
-norecursedirs = "*.egg-info .eggs .gitignore .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ dist"
+norecursedirs = "*.egg-info .eggs .gitignore .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ _build dist docs/_build"
 
 [tool.flakehell]
 base = "https://raw.githubusercontent.com/life4/flakehell/master/pyproject.toml"
@@ -20,12 +20,26 @@ pyflakes = ["-F405"]
 [tool.flit.scripts]
 dgaf = "dgaf.__main__:main"
 
+[tool.flit.metadata]
+author = "tonyfast"
+author-email = "tony.fast@gmail.com"
+classifiers = []
+home-page = "https://github.com/deathbeds/dgaf"
+keywords = ""
+license = ""
+maintainer = "tonyfast"
+maintainer-email = "tony.fast@gmail.com"
+module = "dgaf"
+requires = ["nox", "typer"]
+requires-python = ">=3.7"
+
 [tool.flit.metadata.requires-extra]
 core = [
   "doit",
   "GitPython",
   "pathspec",
 ]
+docs = ["jupyter-book"]
 extras = [
   "depfinder",
   "aiofiles",
@@ -38,3 +52,23 @@ extras = [
   "tomlkit",
   "nox",
 ]
+test = ["pytest", "pytest-sugar", "nbval", "importnb", "conf", "importlib_metadata", "nest_asyncio"]
+
+[tool.flit.metadata.urls]
+
+[tool.flit.sdist]
+include = [
+  "README.md",
+  "docs/readme.md",
+  "docs/tests/",
+  "dgaf/readme.md",
+  "dgaf/",
+  "dgaf/templates/",
+  "LICENSE",
+]
+
+[tool.flit.entrypoints]
+
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core>=2,<4"]
