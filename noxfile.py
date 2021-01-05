@@ -9,47 +9,48 @@ import nox
 
 nox.options.sessions = ["develop"]
 
-session = nox.session(python=False)
 
-
-@session
+@nox.session(python=False)
 def develop(session):
-    session.run(*"python -m dgaf develop".split())
+    """setup to project for development.
+
+    it installs flit, nox, and typer as dependencies.
+    """
+    session.install("flit")
+    session.run(*"flit install -s --deps production".split())
 
 
-@session
+@nox.session(python=False)
 def test(session):
-    session.install("pandas", ".[configure, test]")
-    session.run("dgaf")
-    # dgaf runs the tests in a virutal environment
-    if "type" in session.posargs:
-        session.install("monkeytype")
-        yuck = session.posargs.pop(session.posargs.index("type"))
-        session.run(*"monkeytype run -m pytest".split() + list(session.posargs))
-    else:
-        session.run(*"pytest".split() + list(session.posargs))
+    """test the project using dgaf
+
+    extra arguments after `--` are passed to pytest.
+    the pytest configuration is set in pyproject.toml file.
+    """
+    session.run(*"python -m dgaf add lint --dgaf . lint".split())
+    session.run(*"python -m dgaf test".split(), *session.posargs)
+
+
+@nox.session(python=False)
+def install(session):
+    """install the project for real."""
+    session.run(*"pip install .".split())
+
+
+@nox.session(python=False)
+def uninstall(session):
+    """uninstall the project"""
+    session.run(*"pip uninstall -y dgaf".split())
+
+
+@nox.session(python=False)
+def docs(session):
+    """build the docs with dgaf."""
+    session.run(*"python -m dgaf docs --dgaf .".split(), *session.posargs)
 
 
 @nox.session(reuse_venv=True)
-def test_(session):
-    test(session)
-
-
-@session
-def docs(session):
-    session.run(*"python -m dgaf docs".split())
-
-
-@session
-def install(session):
-    session.install(
-        *"pytest>6.2".split(),
-    )
-    session.run(*"python -m dgaf install".split())
-
-
-@session
-def binder(session):
-    session.run(*"python -m dgaf develop".split())
-    session.run(*"dgaf docs".split())
-    session.run(*"dgaf test".split())
+def uml(session):
+    """export a visual representation of the project."""
+    session.install("pylint")
+    session.run(*"pyreverse -o png -k --ignore=exceptions.py dgaf".split())
