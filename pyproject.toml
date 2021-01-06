@@ -39,7 +39,8 @@ core = [
   "GitPython",
   "pathspec",
 ]
-docs = ["jupyter-book"]
+dev = []
+doc = ["jupyter-book"]
 extras = [
   "depfinder",
   "aiofiles",
@@ -52,20 +53,12 @@ extras = [
   "tomlkit",
   "nox",
 ]
-test = ["pytest", "pytest-sugar", "nbval", "importnb", "conf", "importlib_metadata", "nest_asyncio"]
+test = ["pytest", "pytest-sugar", "nbval", "importnb", "pytest", "poetry", "importlib_metadata", "flit", "nbformat"]
 
 [tool.flit.metadata.urls]
 
 [tool.flit.sdist]
-include = [
-  "README.md",
-  "docs/readme.md",
-  "docs/tests/",
-  "dgaf/readme.md",
-  "dgaf/",
-  "dgaf/templates/",
-  "LICENSE",
-]
+include = []
 
 [tool.flit.entrypoints]
 
