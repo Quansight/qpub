@@ -8,16 +8,17 @@
 
 
 import typer
+import typing
 import nox
 import pathlib
 import sys
 
-from . import sessions
+from . import noxfile
 
 app = typer.Typer()
 nox.options.sessions = []
 
-from .__init__ import *
+from .dodo import PYPROJECT_TOML, options, PRECOMMITCONFIG_YML, TOC, REQUIREMENTS_TXT
 
 # from . import sessions
 
@@ -66,7 +67,7 @@ def add(
     options.interactive = interactive
     options.dgaf = dgaf
 
-    nox.session(reuse_venv=not clean, python=None if venv else False)(sessions.add)
+    nox.session(reuse_venv=not clean, python=None if venv else False)(noxfile.add)
 
     nox.options.sessions += ["add"]
     options.tasks += list(map(str, tasks))
@@ -86,7 +87,7 @@ def develop(
     options.python = backend
     options.dgaf = dgaf
 
-    nox.session(python=False, venv_backend=[None, "conda"][conda])(sessions.develop)
+    nox.session(python=False, venv_backend=[None, "conda"][conda])(noxfile.develop)
 
     nox.options.sessions += ["develop"]
     options.tasks += ["python"]
@@ -97,7 +98,7 @@ def install(ctx: typer.Context, conda: bool = _CONDA):
     """install the distribution."""
     options.conda = conda
 
-    nox.session(python=False)(sessions.install)
+    nox.session(python=False)(noxfile.install)
 
     nox.options.sessions += ["install"]
     options.tasks += ["python"]
@@ -118,7 +119,7 @@ def test(
         python=None if venv else False,
         venv_backend=[None, "conda"][conda],
         reuse_venv=not clean,
-    )(sessions.test)
+    )(noxfile.test)
     options.posargs += ctx.args
     nox.options.sessions += ["test"]
 
@@ -130,7 +131,7 @@ def lint(ctx: typer.Context, venv: bool = typer.Option(True)):
         session = nox.session(reuse_venv=True)
     else:
         session = nox.session(python=False)
-    session(sessions.lint)
+    session(noxfile.lint)
 
     nox.options.sessions += ["lint"]
     options.tasks += ["lint"]
@@ -151,9 +152,9 @@ def docs(
     """build the html docs"""
 
     if venv:
-        nox.session(reuse_venv=not clean)(sessions.docs)
+        nox.session(reuse_venv=not clean)(noxfile.docs)
     else:
-        nox.session(python=False)(sessions.docs)
+        nox.session(python=False)(noxfile.docs)
 
     options.pdf = pdf
     options.docs = backend
@@ -174,7 +175,7 @@ def uninstall(
     """uninstall the project"""
     options.confirm = proceed
 
-    nox.session(python=False)(sessions.uninstall)
+    nox.session(python=False)(noxfile.uninstall)
 
     nox.options.sessions += ["uninstall"]
 
@@ -194,13 +195,42 @@ def main():
     except SystemExit as exception:
         # run the nox sessions that were configured.
         if nox.options.sessions:
-            from . import sessions
+            from . import noxfile
 
             # piptions.sessions += ["add"]
 
             nox.options.sessions = sorted(nox.options.sessions)
-            raise SystemExit(util.nox_runner(vars(sessions)))
+            raise SystemExit(nox_runner(vars(noxfile)))
         raise exception
+
+
+def nox_runner(module, _raise=True):
+    """a wrapped nox runner specifically for qpub.
+
+    it works off a module loaded into the namespace already
+    rather than a static file.
+    """
+
+    import sys, nox
+
+    argv = sys.argv
+    sys.argv = [__file__]
+    ns = nox._options.options.parse_args()
+    sys.argv = argv
+    # run the tasks ourselves to avoid switching directories
+
+    nox.tasks.merge_noxfile_options(module, ns)
+    manifest = nox.tasks.discover_manifest(module, ns)
+    nox.tasks.filter_manifest(manifest, ns)
+    nox.tasks.verify_manifest_nonempty(manifest, ns)
+    results = nox.tasks.run_manifest(manifest, ns)
+    nox.tasks.print_summary(results, ns)
+    nox.tasks.create_report(results, ns)
+
+    object = nox.tasks.final_reduce(results, ns)
+    if _raise:
+        raise sys.exit(object)
+    return object
 
 
 if __name__ == "__main__":
