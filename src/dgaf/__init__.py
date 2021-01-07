@@ -10,3 +10,5 @@
 #   (_(__)(__)__)      (__) (__) (__)
 
 __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
+
+from .dodo import *
