@@ -920,18 +920,12 @@ class Flit(PyProject):
     or directory exists with docstring and version."""
 
     def dump(self):
-        return templated_file(
-            "flit.json",
-            self.metadata(True),
-        )
+        return templated_file("flit.json", self.metadata(True))
 
 
 class Pytest(PyProject):
     def dump(self):
-        return templated_file(
-            "pytest.json",
-            self.metadata(),
-        )
+        return templated_file("pytest.json", self.metadata())
 
 
 class FlakeHell(PyProject):
@@ -941,10 +935,7 @@ class FlakeHell(PyProject):
 
 class Poetry(PyProject):
     def dump(self):
-        return templated_file(
-            "poetry.json",
-            self.metadata(),
-        )
+        return templated_file("poetry.json", self.metadata())
 
 
 class Setuptools(PyProject):
@@ -1037,10 +1028,7 @@ class Sphinx(Docs):
 
 class Mkdocs(Docs):
     def dump(self):
-        return templated_file(
-            "mkdocs.json",
-            self.metadata(),
-        )
+        return templated_file("mkdocs.json", self.metadata())
 
     def add(self):
         (self / MKDOCS).write(self.dump())
@@ -1048,10 +1036,7 @@ class Mkdocs(Docs):
 
 class JupyterBook(Docs):
     def dump_config(self, recurse=False):
-        return templated_file(
-            "_config.json",
-            self.metadata(),
-        )
+        return templated_file("_config.json", self.metadata())
 
     def dump_toc(self, recurse=False):
         index = self.index
@@ -1093,16 +1078,14 @@ class JupyterBook(Docs):
         return data
 
     def add(self):
+        (self / DOCS).mkdir(exist_ok=True)
         (self / TOC).write(JupyterBook.dump_toc(self, True))
         (self / CONFIG).write(JupyterBook.dump_config(self))
 
 
 class Readthedocs(Docs):
     def dump(self):
-        return templated_file(
-            "readthedocs.json",
-            self.metadata(),
-        )
+        return templated_file("readthedocs.json", self.metadata())
 
     def add(self):
         (self / DOCS / READTHEDOCS).write(self.dump())
@@ -1537,7 +1520,6 @@ def packages_from_conda_not_found(out):
     return packages
 
 
-
 class NoIndex(BaseException):
     ...
 
@@ -1552,6 +1534,8 @@ class NoIndex(BaseException):
 
 def main(argv=None, raises=False):
     global project
+    if project is None:
+        project = Project()
     if argv is None:
         argv = __import__("sys").argv[1:]
     main = doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader(globals()))
@@ -1565,6 +1549,7 @@ def run_in_doit():
     return sys.argv[0].endswith("bin/doit")
 
 
+project = None
 if __name__ == "__main__":
     main(None, True)
 elif run_in_doit():
