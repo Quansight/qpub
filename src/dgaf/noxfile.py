@@ -52,14 +52,14 @@ if "_run" not in locals():
     _run = nox.sessions.Session._run
 
 
-def init_conda_session(dir, session):
-
-    if not options.conda:
+def conda_install(dir, session):
+    if not nox.options.default_venv_backend == "conda":
         return []
+
     no_deps = ["--no-deps"]
 
     if not (File(dir) / ENVIRONMENT_YAML).exists():
-        session.run(*f"python -m dgaf.tasks {dir / ENVIRONMENT_YAML}".split())
+        session.run(*f"python -m dgaf.tasks {ENVIRONMENT_YAML}".split())
     env = (File(dir) / ENVIRONMENT_YAML).load()
     c, p = [], []
     for dep in env.get("dependencies", []):
@@ -104,24 +104,14 @@ def session(callable):
 
 @session
 def tasks(session):
-    """tasks for configuring different forms of projects."""
+    """tasks for configuring different forms of projects.
+
+    the tasks write to common configuration convetions like pyproject.toml"""
     session.install(*_core_requirements, *_add_requirements)
     session.run(
         *f"""doit -f {Path(__file__).parent / "dodo.py"}""".split(),
         *options.tasks,
         *session.posargs,
-        env=options.dump(),
-    )
-
-
-@session
-def add(session):
-    session.install(*_core_requirements, *_add_requirements)
-    # nox is never imported when the tasks are run
-    session.install(options.dgaf)
-    session.run(
-        *f"""doit -f {Path(__file__).parent / "dodo.py"}""".split(),
-        *options.tasks,
         env=options.dump(),
     )
 
