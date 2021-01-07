@@ -201,6 +201,7 @@ class options:
     dgaf: str = os.environ.get("QPUB_ID", "dgaf")
     interactive: bool = os.environ.get("QPUB_INTERACTIVE", False)
     monkeytype: bool = os.environ.get("QPUB_INTERACTIVE", False)
+    mamba: bool = os.environ.get("QPUB_MAMBA", True)
 
     @classmethod
     def dump(cls):

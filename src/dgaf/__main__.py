@@ -38,21 +38,21 @@ _DGAF = typer.Option("dgaf", help="the version of dgaf to install", hidden=True)
 _DRYRUN = typer.Option(True, help="don't write any files.")
 
 
-@app.command()
+@app.command(context_settings=dict(allow_extra_args=True, ignore_unknown_options=True))
 def add(
     ctx: typer.Context,
-    tasks: typing.List[str],
     dir: pathlib.Path = _PATH,
     python: str = _PYTHON,
     docs: str = _DOCS,
     venv: bool = _VENV,
-    dry_run: bool = _DRYRUN,
+    watch: bool = typer.Option(False),
     force: bool = typer.Option(False, help="force the task execution"),
     interactive: bool = typer.Option(False, help="don't write any files."),
     clean: bool = typer.Option(False, help="use a clean venv"),
     dgaf: str = _DGAF,
 ):
     """add or update the project configuration."""
+    tasks = ctx.args
     if not tasks:
         # defualt tasks
         tasks = list(
@@ -62,22 +62,43 @@ def add(
     if force:
         tasks = ("-s",) + tasks
 
+    if watch:
+        tasks = ("auto",) + tasks
+
     options.python = python
     options.docs = docs
-    options.interactive = interactive
-    options.dgaf = dgaf
 
-    nox.session(reuse_venv=not clean, python=None if venv else False)(noxfile.add)
+    nox.session(reuse_venv=not clean, python=None if venv else False)(noxfile.tasks)
 
-    nox.options.sessions += ["add"]
+    nox.options.sessions += ["tasks"]
     options.tasks += list(map(str, tasks))
+
+
+@app.command(context_settings=dict(allow_extra_args=True, ignore_unknown_options=True))
+def tasks(
+    ctx: typer.Context,
+    venv: bool = _VENV,
+    clean: bool = typer.Option(False, help="use a clean venv"),
+):
+    """add or update the project configuration."""
+    nox.session(reuse_venv=not clean, python=None if venv else False)(noxfile.tasks)
+
+    nox.options.sessions += ["tasks"]
+    options.tasks += ctx.args
+
+
+@app.command(context_settings=dict(allow_extra_args=True, ignore_unknown_options=True))
+def sessions(
+    ctx: typer.Context,
+):
+    """add or update the project configuration."""
+    options.posargs += ctx.args
 
 
 @app.command()
 def develop(
     ctx: typer.Context,
     dir: pathlib.Path = typer.Option("", help="the path to configure"),
-    backend: str = typer.Option("infer", help="python package backend."),
     conda: bool = typer.Option(False),
     dgaf: str = _DGAF,
 ):
@@ -194,10 +215,8 @@ def main():
         app()
     except SystemExit as exception:
         # run the nox sessions that were configured.
-        if nox.options.sessions:
+        if nox.options.sessions or options.tasks:
             from . import noxfile
-
-            # piptions.sessions += ["add"]
 
             nox.options.sessions = sorted(nox.options.sessions)
             raise SystemExit(nox_runner(vars(noxfile)))
@@ -214,7 +233,7 @@ def nox_runner(module, _raise=True):
     import sys, nox
 
     argv = sys.argv
-    sys.argv = [__file__]
+    sys.argv = [__file__] + options.posargs
     ns = nox._options.options.parse_args()
     sys.argv = argv
     # run the tasks ourselves to avoid switching directories

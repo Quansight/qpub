@@ -8,19 +8,22 @@ each utility operates within.
 import nox
 import sys
 import importlib
+import functools
+import shutil
 import pathlib
+import contextlib
 
 Path = type(pathlib.Path())
 
 
 def run_in_nox():
-    print(sys.argv)
-    return sys.argv[0].endswith("bin/nox")
+    return sys.argv[0].endswith(("bin/nox", "nox/__main__.py"))
 
 
 try:
     from .dodo import options, File, PYPROJECT_TOML, Project, ENVIRONMENT_YAML
 except ImportError as e:
+    # when we invoke this file from nox it cannot naturally import files. this block loads the task file from teh specification.
     if run_in_nox():
         dodo = importlib.util.module_from_spec(
             importlib.util.spec_from_file_location(
@@ -37,14 +40,81 @@ except ImportError as e:
     else:
         raise e
 
+nox.options.default_venv_backend = shutil.which("conda") and "conda"
 
 _add_requirements = """depfinder aiofiles appdirs
 json-e flit poetry requests-cache tomlkit""".split()
 _core_requirements = """doit GitPython pathspec""".split()
 _interactive_requirements = """""".split()
 
+# patches to use mamba with nox
+if "_run" not in locals():
+    _run = nox.sessions.Session._run
 
-@nox.session
+
+def init_conda_session(dir, session):
+
+    if not options.conda:
+        return []
+    no_deps = ["--no-deps"]
+
+    if not (File(dir) / ENVIRONMENT_YAML).exists():
+        session.run(*f"python -m dgaf.tasks {dir / ENVIRONMENT_YAML}".split())
+    env = (File(dir) / ENVIRONMENT_YAML).load()
+    c, p = [], []
+    for dep in env.get("dependencies", []):
+        if isinstance(dep, str):
+            c += [dep]
+        elif isinstance(dep, dict):
+            p = dep.pop("pip")
+    if c:
+        session.conda_install(*"-c conda-forge".split(), *c)
+
+    p and session.install(*p, *no_deps)
+    return no_deps
+
+
+def run_mamba(self, *args, **kwargs):
+    if args[0] == "conda":
+        args = ("mamba",) + args[1:]
+    return _run(self, *args, **kwargs)
+
+
+@contextlib.contextmanager
+def mamba_context(session):
+    global _run
+    session.conda_install("mamba")
+    nox.sessions.Session._run = run_mamba
+    yield session
+    nox.sessions.Session._run = _run
+
+
+def session(callable):
+    nox.session(callable)
+    if options.conda and options.mamba:
+
+        @functools.wraps(callable)
+        def main(session):
+            with mamba_context(session) as session:
+                return callable(session)
+
+        return main
+    return callable
+
+
+@session
+def tasks(session):
+    """tasks for configuring different forms of projects."""
+    session.install(*_core_requirements, *_add_requirements)
+    session.run(
+        *f"""doit -f {Path(__file__).parent / "dodo.py"}""".split(),
+        *options.tasks,
+        *session.posargs,
+        env=options.dump(),
+    )
+
+
+@session
 def add(session):
     session.install(*_core_requirements, *_add_requirements)
     # nox is never imported when the tasks are run
@@ -56,7 +126,7 @@ def add(session):
     )
 
 
-@nox.session
+@session
 def develop(session):
     no_deps = init_conda_session(dir, session)
 
@@ -72,18 +142,18 @@ def develop(session):
     session.run(*"pip install -e.".split(), *no_deps)
 
 
-@nox.session
+@session
 def install(session):
     no_deps = init_conda_session(dir, session)
-
     session.run(*"pip install .".split(), *no_deps, env=options.dump())
 
 
-@nox.session
+@session
 def test(session):
     no_deps = init_conda_session(dir, session)
 
-    session.install(".[test]")
+    session.install("flit")
+    session.run(*"flit install --deps develop".split())
     if options.monkeytype:
         session.install("monkeytype")
         session.run(
@@ -93,19 +163,19 @@ def test(session):
         session.run("pytest", *options.posargs, *session.posargs)
 
 
-@nox.session
+@session
 def lint(session):
     session.install("pre-commit")
     session.run(*"pre-commit run --all-files".split(), success_codes=[0, 1])
 
 
-@nox.session
+@session
 def uninstall(session):
     extra = ("-y",) if options.confirm else tuple()
     session.run(*"pip uninstall".split(), *extra, Project().get_name())
 
 
-@nox.session
+@session
 def docs(session):
     no_deps = init_conda_session(dir, session)
 
