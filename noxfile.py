@@ -11,6 +11,12 @@ nox.options.sessions = ["develop"]
 
 
 @nox.session(python=False)
+def ci(session):
+    install(session)
+    test(session)
+
+
+@nox.session(python=False)
 def develop(session):
     """setup to project for development.
 
@@ -28,7 +34,7 @@ def test(session):
     the pytest configuration is set in pyproject.toml file.
     """
     # session.run(*"python -m dgaf add lint --dgaf . lint".split())
-    session.run(*"python -m dgaf test --clean".split(), *session.posargs)
+    session.run(*"python -m dgaf test --no-venv".split(), *session.posargs)
 
 
 @nox.session(python=False)
