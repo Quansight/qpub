@@ -13,7 +13,7 @@ nox.options.sessions = ["develop"]
 @nox.session(python=False)
 def ci(session):
     session.install(".[test]")
-    test(session)
+    session.run(*"python -m dgaf test --no-venv".split(), *session.posargs)
 
 
 @nox.session(python=False)
