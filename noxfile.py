@@ -12,7 +12,7 @@ nox.options.sessions = ["develop"]
 
 @nox.session(python=False)
 def ci(session):
-    install(session)
+    session.install(".[test]")
     test(session)
 
 
@@ -33,8 +33,9 @@ def test(session):
     extra arguments after `--` are passed to pytest.
     the pytest configuration is set in pyproject.toml file.
     """
-    # session.run(*"python -m dgaf add lint --dgaf . lint".split())
-    session.run(*"python -m dgaf test --no-venv".split(), *session.posargs)
+    # session.run(*"python -m dgaf a  dd lint --dgaf . lint".split())
+    # session.run(*"python -m dgaf lint".split())
+    session.run(*"python -m dgaf test".split(), *session.posargs)
 
 
 @nox.session(python=False)
