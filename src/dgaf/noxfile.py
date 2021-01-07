@@ -14,11 +14,12 @@ Path = type(pathlib.Path())
 
 
 def run_in_nox():
+    print(sys.argv)
     return sys.argv[0].endswith("bin/nox")
 
 
 try:
-    from dodo import options, File, PYPROJECT_TOML, Project, ENVIRONMENT_YAML
+    from .dodo import options, File, PYPROJECT_TOML, Project, ENVIRONMENT_YAML
 except ImportError as e:
     if run_in_nox():
         dodo = importlib.util.module_from_spec(
