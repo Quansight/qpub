@@ -18,7 +18,14 @@ from . import noxfile
 app = typer.Typer()
 nox.options.sessions = []
 
-from .dodo import PYPROJECT_TOML, options, PRECOMMITCONFIG_YML, TOC, REQUIREMENTS_TXT
+from .dodo import (
+    PYPROJECT_TOML,
+    options,
+    PRECOMMITCONFIG_YML,
+    TOC,
+    REQUIREMENTS_TXT,
+    ENVIRONMENT_YAML,
+)
 
 # from . import sessions
 
@@ -58,6 +65,8 @@ def add(
         tasks = list(
             map(str, [PRECOMMITCONFIG_YML, PYPROJECT_TOML, TOC, REQUIREMENTS_TXT])
         )
+        if nox.options.default_venv_backend == "conda":
+            tasks += [str(ENVIRONMENT_YAML)]
 
     if force:
         tasks = ("-s",) + tasks
@@ -100,13 +109,10 @@ def develop(
     ctx: typer.Context,
     dir: pathlib.Path = typer.Option("", help="the path to configure"),
     conda: bool = typer.Option(False),
-    dgaf: str = _DGAF,
 ):
     """install the project in development mode."""
 
     options.conda = conda
-    options.python = backend
-    options.dgaf = dgaf
 
     nox.session(python=False, venv_backend=[None, "conda"][conda])(noxfile.develop)
 
@@ -233,7 +239,7 @@ def nox_runner(module, _raise=True):
     import sys, nox
 
     argv = sys.argv
-    sys.argv = [__file__] + options.posargs
+    sys.argv = [__file__]
     ns = nox._options.options.parse_args()
     sys.argv = argv
     # run the tasks ourselves to avoid switching directories

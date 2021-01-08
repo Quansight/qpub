@@ -57,8 +57,13 @@ def task_lint():
 def task_python():
     """configure the python project"""
     targets = [project / PYPROJECT_TOML]
+    files = project.all_files()
     backend = project.python_backend()
-
+    task_dep = []
+    if not any(x for x in files if x.suffix == ".py"):
+        notebooks = [x for x in files if x.suffix == ".ipynb"]
+        if notebooks:
+            task_dep += ["jupytext"]
     if backend == "setuptools":
         targets += [project / SETUP_CFG]
         actions = [project.to(Setuptools).add]
@@ -67,7 +72,7 @@ def task_python():
     elif backend == "poetry":
         requires = " ".join(project.get_requires())
         actions = [project.to(Poetry).add, f"poetry add --lock {requires}"]
-    return dict(file_dep=project.all_files(), actions=actions, targets=targets)
+    return dict(file_dep=files, actions=actions, targets=targets, task_dep=task_dep)
 
 
 def task_build():
@@ -153,6 +158,7 @@ def task_jupyter_book():
             "jb build --path-output docs --toc docs/_toc.yml --config docs/_config.yml ."
         ],
         targets=[BUILD / "html"],
+        task_dep=["docs"],
         uptodate=[],
     )
 
@@ -181,6 +187,17 @@ def task_pdf():
     return dict(actions=[])
 
 
+def task_jupytext():
+    actions = []
+    if not installed("jupytext"):
+        actions += ["pip install jupytext"]
+    notebooks = [str(x) for x in project.all_files() if x.suffix == ".ipynb"]
+    return dict(
+        actions=actions
+        + [f"""jupytext --set-formats ipynb,py:percent {" ".join(notebooks)}"""]
+    )
+
+
 class options:
     """options for qpub
 
@@ -202,6 +219,7 @@ class options:
     interactive: bool = os.environ.get("QPUB_INTERACTIVE", False)
     monkeytype: bool = os.environ.get("QPUB_INTERACTIVE", False)
     mamba: bool = os.environ.get("QPUB_MAMBA", True)
+    cache: str = os.environ.get("QPUB_CACHE", Path(__file__).parent)
 
     @classmethod
     def dump(cls):
@@ -283,7 +301,7 @@ DODO = Convention("dodo.py")
 POETRY_LOCK = Convention("poetry.lock")
 MKDOCS = Convention("mkdocs.yml")  # https://www.mkdocs.org/
 DIST = Convention("dist")
-
+JUPYTEXT = Convention("jupytext.toml")
 MANIFEST = Convention("MANIFEST.in")
 ENVIRONMENT_YML = Convention("environment.yml")
 ENVIRONMENT_YAML = Convention("environment.yaml")
@@ -499,7 +517,19 @@ def cached(callable):
     return main
 
 
+@contextlib.contextmanager
+def cd(object):
+    next = os.getcwd()
+    os.chdir(object)
+    yield
+    os.chdir(next)
+
+
 class Project(Chapter):
+    def add(self, *tasks):
+        with cd(self.dir):
+            main(list(tasks))
+
     @cached
     def get_name(self):
         """get the project name"""
@@ -528,6 +558,10 @@ class Project(Chapter):
         if self.pages:
             if len(self.pages) == 1:
                 return self.pages[0].stem
+
+        if self.tests:
+            if len(self.tests) == 1:
+                return self.tests[0].stem
         raise BaseException
 
     @cached
@@ -560,6 +594,7 @@ class Project(Chapter):
         # there are a bunch of version convention we can look for bumpversion, semver, rever
         # if the name is a post name then infer the version from there
 
+        version = None
         if self.is_flit():
             flit = __import__("flit")
             with contextlib.redirect_stderr(io.StringIO()):
@@ -568,12 +603,12 @@ class Project(Chapter):
                         "version"
                     )
                 except:
-                    ...
-
-        if self.src:
-            version = self.src.get_version()
-        else:
-            version = __import__("datetime").date.today().strftime("%Y.%m.%d")
+                    pass
+        if version is None:
+            if self.src:
+                version = self.src.get_version()
+            else:
+                version = __import__("datetime").date.today().strftime("%Y.%m.%d")
         return normalize_version(version)
 
     @cached
@@ -800,7 +835,8 @@ class Project(Chapter):
             try:
                 self._flit_module = flit.common.Module(self.get_name(), self.dir)
                 return True
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 return False
         return True
 
@@ -1042,12 +1078,14 @@ class JupyterBook(Docs):
     def dump_toc(self, recurse=False):
         index = self.index
         if index is None:
-            for object in (self.pages, self.posts, self.tests, self.modules):
-                if object:
-                    index = object[0]
-                    break
+            for c in (self, *self._chapters):
+                for object in (c.pages, c.posts, c.tests, c.modules):
+                    if object:
+                        index = object[0]
+                        break
         if not index:
             raise NoIndex()
+
         data = dict(file=str(index.with_suffix("")), sections=[])
         for x in itertools.chain(
             self.pages,
@@ -1174,9 +1212,8 @@ def gather_imports(files):
     """"""
     if "depfinder" not in __import__("sys").modules:
         yaml = __import__("yaml")
-
-        dir = Path(__import__("appdirs").user_data_dir("qpub"))
-        __import__("requests_cache").install_cache(str(dir / "qpub"))
+        dir = Path(__file__).parent
+        __import__("requests_cache").install_cache(str(options.cache / "qpub"))
         dir.mkdir(parents=True, exist_ok=True)
         if not hasattr(yaml, "CSafeLoader"):
             yaml.CSafeLoader = yaml.SafeLoader
@@ -1521,6 +1558,16 @@ def packages_from_conda_not_found(out):
     return packages
 
 
+def installed(str):
+    import importlib_metadata
+
+    try:
+        importlib_metadata.distribution(str)
+        return True
+    finally:
+        return False
+
+
 class NoIndex(BaseException):
     ...
 
@@ -1535,10 +1582,13 @@ class NoIndex(BaseException):
 
 def main(argv=None, raises=False):
     global project
-    if project is None:
-        project = Project()
+    project = Project()
     if argv is None:
         argv = __import__("sys").argv[1:]
+
+    if isinstance(argv, str):
+        argv = argv.split()
+
     main = doit.doit_cmd.DoitMain(doit.cmd_base.ModuleTaskLoader(globals()))
 
     code = main.run(argv)
@@ -1550,7 +1600,6 @@ def run_in_doit():
     return sys.argv[0].endswith("bin/doit")
 
 
-project = None
 if __name__ == "__main__":
     main(None, True)
 elif run_in_doit():

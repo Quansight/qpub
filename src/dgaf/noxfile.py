@@ -41,10 +41,11 @@ except ImportError as e:
         raise e
 
 nox.options.default_venv_backend = shutil.which("conda") and "conda"
+nox.options.envdir = options.cache / ".nox"
 
 _add_requirements = """depfinder aiofiles appdirs
 json-e flit poetry requests-cache tomlkit""".split()
-_core_requirements = """doit GitPython pathspec""".split()
+_core_requirements = """doit GitPython pathspec importlib_metadata""".split()
 _interactive_requirements = """""".split()
 
 # patches to use mamba with nox
@@ -140,17 +141,13 @@ def install(session):
 
 @session
 def test(session):
-    no_deps = init_conda_session(dir, session)
-
     session.install("flit")
     session.run(*"flit install --deps develop".split())
     if options.monkeytype:
         session.install("monkeytype")
-        session.run(
-            *"monkeytype run -m pytest".split(), *options.posargs, *session.posargs
-        )
+        session.run(*"monkeytype run -m pytest".split(), *options.posargs)
     else:
-        session.run("pytest", *options.posargs, *session.posargs)
+        session.run("pytest", *options.posargs)
 
 
 @session
