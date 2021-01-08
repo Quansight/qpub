@@ -12,8 +12,8 @@ nox.options.sessions = ["develop"]
 
 @nox.session(python=False)
 def quick(session):
-    session.install(".[test]", "pytest", "importnb")
-    session.run("pytest")
+    session.install(".")
+    session.run("dgaf test")
 
 
 @nox.session(python=False)
