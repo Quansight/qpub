@@ -13,7 +13,7 @@ nox.options.sessions = ["develop"]
 @nox.session(python=False)
 def quick(session):
     session.install(".")
-    session.run("dgaf test")
+    session.run(*"dgaf test".split())
 
 
 @nox.session(python=False)
