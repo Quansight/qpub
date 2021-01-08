@@ -30,30 +30,36 @@ license = ""
 maintainer = "tonyfast"
 maintainer-email = "tony.fast@gmail.com"
 module = "dgaf"
-requires = ["nox", "typer"]
+requires = [
+  "nox",
+  "typer",
+  "GitPython",
+  "pathspec",
+  "importlib_metadata",
+]
 requires-python = ">=3.7"
 
 [tool.flit.metadata.requires-extra]
-core = [
-  "doit",
-  "GitPython",
-  "pathspec",
-]
-dev = []
 doc = ["jupyter-book"]
-extras = [
+test = [
+  "pytest",
+  "pytest-sugar",
+  "nbval",
+  "importnb",
+  "pytest",
+  "poetry",
+  "importlib_metadata",
+  "flit",
+  "nbformat",
   "depfinder",
   "aiofiles",
-  "appdirs",
   "typer",
   "json-e",
-  "flit",
   "poetry",
   "requests-cache",
   "tomlkit",
-  "nox",
+  "doit",
 ]
-test = ["pytest", "pytest-sugar", "nbval", "importnb", "pytest", "poetry", "importlib_metadata", "flit", "nbformat"]
 
 [tool.flit.metadata.urls]
 
