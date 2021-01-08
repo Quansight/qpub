@@ -31,13 +31,14 @@ def task_docs():
     doit = __import__("doit")
     backend = project.docs_backend()
     # basically we wanna combine a bunch of shit
+
     if backend == "mkdocs":
         return dict(
             file_dep=project.all_files(),
             actions=[(doit.tools.create_folder, [docs]), project.to(Mkdocs).add],
             targets=[project / MKDOCS],
         )
-    # nbdev, lektor can go here.
+
     return dict(
         file_dep=project.all_files(),
         actions=[(doit.tools.create_folder, [docs]), project.to(JupyterBook).add],
@@ -60,10 +61,13 @@ def task_python():
     files = project.all_files()
     backend = project.python_backend()
     task_dep = []
+    print(files, project)
     if not any(x for x in files if x.suffix == ".py"):
         notebooks = [x for x in files if x.suffix == ".ipynb"]
+
         if notebooks:
             task_dep += ["jupytext"]
+
     if backend == "setuptools":
         targets += [project / SETUP_CFG]
         actions = [project.to(Setuptools).add]
@@ -139,27 +143,27 @@ def task_gitignore():
 
 def task_ci():
     """configure a ci workflow for test and release a project"""
-    project = Actions()
-    return dict(actions=[project.add], targets=[project / BUILDTESTRELEASE])
+    return dict(actions=[project.to(Actions).add], targets=[project / BUILDTESTRELEASE])
 
 
 def task_readthedocs():
     """configure for the distribution for readthedocs"""
-    project = Readthedocs()
-    return dict(actions=[project.add], targets=[project / READTHEDOCS])
+    return dict(actions=[project.to(Readthedocs).add], targets=[project / READTHEDOCS])
 
 
 def task_jupyter_book():
     """build the documentation with jupyter book"""
     docs = project / "docs"
     return dict(
-        file_dep=[project / TOC, project / CONFIG] + project.all_files(),
+        file_dep=[project / TOC, project / CONFIG],
         actions=[
             "jb build --path-output docs --toc docs/_toc.yml --config docs/_config.yml ."
         ],
         targets=[BUILD / "html"],
         task_dep=["docs"],
-        uptodate=[],
+        uptodate=[
+            doit.tools.config_changed(" ".join(sorted(map(str, project.all_files()))))
+        ],
     )
 
 
@@ -219,7 +223,10 @@ class options:
     interactive: bool = os.environ.get("QPUB_INTERACTIVE", False)
     monkeytype: bool = os.environ.get("QPUB_INTERACTIVE", False)
     mamba: bool = os.environ.get("QPUB_MAMBA", True)
-    cache: str = os.environ.get("QPUB_CACHE", Path(__file__).parent)
+    cache: str = os.environ.get("QPUB_CACHE", Path(__file__).parent / "data")
+    dev: bool = os.environ.get("QPUB_DEV", True)
+    pip: bool = os.environ.get("QPUB_PIP", False)
+    install: bool = os.environ.get("QPUB_INSTALL", True)
 
     @classmethod
     def dump(cls):
@@ -530,7 +537,6 @@ class Project(Chapter):
         with cd(self.dir):
             main(list(tasks))
 
-    @cached
     def get_name(self):
         """get the project name"""
 
@@ -544,8 +550,12 @@ class Project(Chapter):
 
         # get the name of modules if there are any.
         if self.modules:
-            if len(self.modules) == 1:
-                return self.modules[0].stem
+            names = sorted(
+                set(str(x.relative_to(x.parent).with_suffix("")) for x in self.modules)
+            )
+            print(names)
+            if len(names) == 1:
+                return names[0]
             else:
                 raise BaseException
 
@@ -564,7 +574,6 @@ class Project(Chapter):
                 return self.tests[0].stem
         raise BaseException
 
-    @cached
     def get_description(self):
         """get from the docstring of the project. raise an error if it doesn't exist."""
 
@@ -584,7 +593,6 @@ class Project(Chapter):
 
         return ""
 
-    @cached
     def get_version(self):
         """determine a version for the project, if there is no version defer to calver.
 

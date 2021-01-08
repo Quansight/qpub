@@ -118,31 +118,28 @@ def tasks(session):
 
 
 @session
-def develop(session):
-    no_deps = init_conda_session(dir, session)
-
-    pyproject = (File() / PYPROJECT_TOML).load()
-    backend = pyproject.get("build-system", {}).get("build-backend", None)
-
-    if backend == "flit_core.buildapi":
-        # install flit, the flit way
-        session.install("flit")
-        session.run(*"flit install -s".split())
-        return
-
-    session.run(*"pip install -e.".split(), *no_deps)
-
-
-@session
 def install(session):
     no_deps = init_conda_session(dir, session)
-    session.run(*"pip install .".split(), *no_deps, env=options.dump())
+    pyproject = (File() / PYPROJECT_TOML).load()
+    # backend = pyproject.get("build-system", {}).get("build-backend", None)
+    if options.dev:
+        if options.pip:
+            session.run(*"pip install -e.".split(), *no_deps)
+        else:
+            session.install("flit")
+            session.run(*"flit install -s".split(), *no_deps)
+    else:
+        if options.pip:
+            session.run(*"pip install .".split(), *no_deps, env=options.dump())
+        else:
+            session.install("flit")
+            session.run(*"flit install -s".split())
 
 
 @session
 def test(session):
-    session.install("flit")
-    session.run(*"flit install --deps develop".split())
+    if options.install:
+        install(session)
     if options.monkeytype:
         session.install("monkeytype")
         session.run(*"monkeytype run -m pytest".split(), *options.posargs)

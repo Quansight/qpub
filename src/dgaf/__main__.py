@@ -105,30 +105,23 @@ def sessions(
 
 
 @app.command()
-def develop(
+def install(
     ctx: typer.Context,
     dir: pathlib.Path = typer.Option("", help="the path to configure"),
     conda: bool = typer.Option(False),
+    backend: str = _PYTHON,
+    dev: bool = typer.Option(True),
+    pip: bool = typer.Option(False),
 ):
-    """install the project in development mode."""
-
-    options.conda = conda
-
-    nox.session(python=False, venv_backend=[None, "conda"][conda])(noxfile.develop)
-
-    nox.options.sessions += ["develop"]
-    options.tasks += ["python"]
-
-
-@app.command()
-def install(ctx: typer.Context, conda: bool = _CONDA):
     """install the distribution."""
+    options.python_backend = backend
     options.conda = conda
+    options.pip = pip
+    options.dev = dev
 
     nox.session(python=False)(noxfile.install)
 
     nox.options.sessions += ["install"]
-    options.tasks += ["python"]
 
 
 @app.command(context_settings=dict(allow_extra_args=True, ignore_unknown_options=True))
@@ -139,15 +132,22 @@ def test(
     conda: bool = typer.Option(False),
     clean: bool = typer.Option(False, help="use a clean venv"),
     types: bool = typer.Option(False, help="generate type stubs"),
+    dev: bool = typer.Option(True),
+    pip: bool = typer.Option(False),
+    install: bool = typer.Option(True),
 ):
     """test the distribution."""
     options.monkeytype = types
     nox.session(
         python=None if venv else False,
-        venv_backend=[None, "conda"][conda],
         reuse_venv=not clean,
     )(noxfile.test)
     options.posargs += ctx.args
+    options.pip = pip
+    options.dev = dev
+    options.conda = conda
+    options.install = install
+
     nox.options.sessions += ["test"]
 
 
