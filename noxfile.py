@@ -5,7 +5,33 @@
 the top-level nox file bootstraps dgaf for development and ci.
 """
 
-import nox
+
+def task_python_gitignore():
+    """download the gitignore file for excluding python content."""
+    import pathlib
+
+    dgaf = pathlib.Path("dgaf")
+    targets = [
+        dgaf / "templates" / "Python.gitignore",
+        dgaf / "templates" / "Nikola.gitignore",
+        dgaf / "templates" / "JupyterNotebooks.gitignore",
+    ]
+
+    return dict(
+        actions=[
+            """wget https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore -O dgaf/templates/Python.gitignore""",
+            """wget https://raw.githubusercontent.com/github/gitignore/master/community/Python/Nikola.gitignore -O dgaf/templates/Nikola.gitignore""",
+            """wget https://raw.githubusercontent.com/github/gitignore/master/community/Python/ .gitignore -O dgaf/templates/JupyterNotebooks.gitignore""",
+        ],
+        targets=targets,
+        uptodate=list(map(pathlib.Path.exists, targets)),
+    )
+
+
+try:
+    import nox
+except ModuleNotFoundError:
+    raise SystemExit(0)
 
 nox.options.sessions = ["develop"]
 
@@ -60,4 +86,10 @@ def docs(session):
 def uml(session):
     """export a visual representation of the project."""
     session.install("pylint")
-    session.run(*"pyreverse -o png -k --ignore=exceptions.py dgaf".split())
+    session.run(*"pyreverse -o png src.dgaf".split())
+
+
+@nox.session(reuse_venv=True)
+def tasks(session):
+    session.install("doit")
+    session.run(*f"doit -v2 --file={__file__} python_gitignore ".split())
