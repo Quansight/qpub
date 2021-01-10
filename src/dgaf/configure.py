@@ -48,53 +48,6 @@ def task_conf():
     return Task(targets=[CONF])
 
 
-def ignore(cache={}):
-    """initialize the path specifications to decide what to omit."""
-    import importlib.resources
-
-    if cache:
-        return cache
-
-    def where_template(template):
-        try:
-            with importlib.resources.path("dgaf.templates", template) as template:
-                template = pathlib.Path(template)
-        except:
-            template = pathlib.Path(__file__).parent / "templates" / template
-        return template
-
-    for file in (
-        "Python.gitignore",
-        "Nikola.gitignore",
-        "JupyterNotebooks.gitignore",
-    ):
-        import pathspec
-
-        file = where_template(file)
-        for pattern in (
-            file.read_text().splitlines()
-            + ".local .vscode _build .gitignore .git .doit.db* .benchmarks".split()
-        ):
-            if bool(pattern):
-                match = pathspec.patterns.GitWildMatchPattern(pattern)
-                if match.include:
-                    cache[pattern] = match
-    return cache
-
-
-def ignored_by(object):
-    for k, v in ignore().items():
-        try:
-            next(v.match([str(object)]))
-            return k
-        except StopIteration:
-            continue
-
-
-def ignored(object):
-    return bool(ignored_by(object))
-
-
 def rough_source(nb):
     """extract a rough version of the source in notebook to infer files from"""
 

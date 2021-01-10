@@ -159,6 +159,70 @@ def get_repo():
         return git.Repo()
 
 
+def get_name():
+    if SRC.exists():
+        for x in SRC.iterdir():
+            if is_private(x):
+                continue
+            if x.is_dir():
+                return x.stem
+
+        raise Exception
+
+    for directory in [True, False]:
+        for x in Path().iterdir():
+
+            if is_private(x):
+                continue
+
+            if x not in CONVENTIONS:
+                continue
+
+            if directory:
+                if x.is_dir():
+                    return x.stem
+            else:
+                return x.stem
+    raise Exception
+
+
+def is_private(object):
+    return Path(object).stem.startswith(tuple(".-"))
+
+
+def get_module(name):
+    import flit
+
+    try:
+        return flit.common.Module(get_name())
+    except:
+        pass
+
+
+def get_version():
+    import flit
+    import datetime
+
+    try:
+        return flit.common.get_info_from_module(get_module(get_name())).pop("version")
+    except:
+        return datetime.date.today().strftime("%Y.%m.%d")
+
+
+def normalize_version(object):
+    import packaging.requirements
+    import contextlib
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return str(packaging.version.Version(object))
+
+
+def get_description():
+    import flit
+
+    return flit.common.get_info_from_module(get_module(get_name())).pop("summary")
+
+
 @dataclasses.dataclass
 class Chapter:
     dir: str = dataclasses.field(default_factory=Path)
@@ -217,6 +281,7 @@ class Chapter:
 
 
 def main(object=None, argv=None, raises=False):
+    """run the main program"""
     global DOIT_CONFIG
     import doit
     import sys
@@ -471,3 +536,50 @@ def merge(*args):
     if isinstance(a, set):
         return list(sorted(set(a).union(b)))
     return a or b
+
+
+def ignore(cache={}):
+    """initialize the path specifications to decide what to omit."""
+    import importlib.resources
+
+    if cache:
+        return cache
+
+    def where_template(template):
+        try:
+            with importlib.resources.path("dgaf.templates", template) as template:
+                template = Path(template)
+        except:
+            template = Path(__file__).parent / "templates" / template
+        return template
+
+    for file in (
+        "Python.gitignore",
+        "Nikola.gitignore",
+        "JupyterNotebooks.gitignore",
+    ):
+        import pathspec
+
+        file = where_template(file)
+        for pattern in (
+            file.read_text().splitlines()
+            + ".local .vscode _build .gitignore .git .doit.db* .benchmarks".split()
+        ):
+            if bool(pattern):
+                match = pathspec.patterns.GitWildMatchPattern(pattern)
+                if match.include:
+                    cache[pattern] = match
+    return cache
+
+
+def ignored_by(object):
+    for k, v in ignore().items():
+        try:
+            next(v.match([str(object)]))
+            return k
+        except StopIteration:
+            continue
+
+
+def ignored(object):
+    return bool(ignored_by(object))
