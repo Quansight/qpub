@@ -6,10 +6,12 @@ each utility operates within.
 """
 
 import nox
+import os
 import sys
 import importlib
 import functools
 import shutil
+import itertools
 import pathlib
 import contextlib
 
@@ -52,55 +54,80 @@ _interactive_requirements = """""".split()
 if "_run" not in locals():
     _run = nox.sessions.Session._run
 
-
-def conda_install(dir, session):
-    if not nox.options.default_venv_backend == "conda":
-        return []
-
-    no_deps = ["--no-deps"]
-
-    if not (File(dir) / ENVIRONMENT_YAML).exists():
-        session.run(*f"python -m dgaf.tasks {ENVIRONMENT_YAML}".split())
-    env = (File(dir) / ENVIRONMENT_YAML).load()
-    c, p = [], []
-    for dep in env.get("dependencies", []):
-        if isinstance(dep, str):
-            c += [dep]
-        elif isinstance(dep, dict):
-            p = dep.pop("pip")
-    if c:
-        session.conda_install(*"-c conda-forge".split(), *c)
-
-    p and session.install(*p, *no_deps)
-    return no_deps
+if "_install" not in locals():
+    _install = nox.sessions.Session.install
 
 
-def run_mamba(self, *args, **kwargs):
-    if args[0] == "conda":
-        args = ("mamba",) + args[1:]
-    return _run(self, *args, **kwargs)
+def run(session, *args, **kwargs):
+    if "mamba" == options.install_backend:
+        if args[0] == "conda":
+            args = "mamba", *args[1:]
+    session._runner.global_config.last_result = _run(session, *args, **kwargs)
+    return session._runner.global_config.last_result
 
 
-@contextlib.contextmanager
-def mamba_context(session):
-    global _run
-    session.conda_install("mamba")
-    nox.sessions.Session._run = run_mamba
-    yield session
-    nox.sessions.Session._run = _run
+nox.sessions.Session._run = run
 
 
-def session(callable):
-    nox.session(callable)
-    if options.conda and options.mamba:
+def session_install(session, *args, **kwargs):
+    """a general installer for conda and pip. it prefers conda,
+    and defers to pip"""
+    mamba, conda = (
+        options.install_backend == "mamba",
+        options.install_backend == "conda",
+    )
+    pip = []
+    if len(args) == 1:
+        args = tuple(itertools.chain(*map(str.split, args)))
 
-        @functools.wraps(callable)
-        def main(session):
-            with mamba_context(session) as session:
-                return callable(session)
+    pip = [x for x in args if x.startswith(".")]
+    args = [x for x in args if x not in pip]
 
-        return main
-    return callable
+    if conda:
+        _run = type(session).run
+
+        type(session).run = run
+
+        try:
+            session.conda_install(*args, **kwargs, silent=True, success_codes=[0, 1])
+            pip = get_unfound_packages(session._runner.global_config.last_result)
+            if pip:
+                args = [x for x in args if x not in pip]
+                session.conda_install(*args, **kwargs)
+
+        finally:
+            type(session).run = _run
+    else:
+        pip = args
+    no_deps = ["--no-deps"] if options.install_backend in {"conda", "mamba"} else []
+    if pip:
+        session_install_pip(session, *pip, *no_deps)
+
+
+def session_install_pip(session, *args, **kwargs):
+    _install(session, *args, **kwargs)
+
+
+nox.sessions.Session.install = session_install
+
+session = nox.session
+
+
+def get_unfound_packages(str):
+    collect = False
+    packages = []
+    for line in str.splitlines():
+        if line.startswith("PackagesNotFoundError: "):
+            collect = True
+            continue
+        if not collect:
+            continue
+        if collect:
+            if line.strip():
+                packages.append(line.strip().lstrip("-").strip())
+        if packages and not line.strip():
+            return packages
+    return packages
 
 
 @session
@@ -108,31 +135,32 @@ def tasks(session):
     """tasks for configuring different forms of projects.
 
     the tasks write to common configuration convetions like pyproject.toml"""
+    options.install_backend = "pip"
     session.install(*_core_requirements, *_add_requirements)
     session.run(
-        *f"""doit -f {Path(__file__).parent / "dodo.py"}""".split(),
+        "doit",
+        f"""--file={Path(__file__).parent / "dodo.py"}""",
+        f"""--dir={os.getcwd()}""",
         *options.tasks,
-        *session.posargs,
         env=options.dump(),
+        silent=False,
     )
 
 
 @session
 def install(session):
-    no_deps = init_conda_session(dir, session)
-    pyproject = (File() / PYPROJECT_TOML).load()
-    # backend = pyproject.get("build-system", {}).get("build-backend", None)
+    no_deps = [] if options.install_backend in {"conda", "mamba"} else []
     if options.dev:
-        if options.pip:
+        if options.pip_only:
             session.run(*"pip install -e.".split(), *no_deps)
         else:
-            session.install("flit")
+            session_install_pip(session, "flit")
             session.run(*"flit install -s".split(), *no_deps)
     else:
-        if options.pip:
+        if options.pip_only:
             session.run(*"pip install .".split(), *no_deps, env=options.dump())
         else:
-            session.install("flit")
+            session_install_pip(session, "flit")
             session.run(*"flit install -s".split())
 
 
@@ -141,7 +169,7 @@ def test(session):
     if options.install:
         install(session)
     if options.monkeytype:
-        session.install("monkeytype")
+        session_install_pip("monkeytype")
         session.run(*"monkeytype run -m pytest".split(), *options.posargs)
     else:
         session.run("pytest", *options.posargs)
@@ -161,20 +189,30 @@ def uninstall(session):
 
 @session
 def docs(session):
-    no_deps = init_conda_session(dir, session)
-
-    session.install(".[doc]", "--no-deps")
-    session.install(options.dgaf + "[core]", *no_deps)
+    options.install_backend = "pip"
+    session.install(*_core_requirements, "flit", "packaging")
+    if options.dgaf == Path:
+        session_install(session, options.dgaf + "[doc]")
     if options.watch:
         session.run(
-            *f"python -m dgaf.tasks auto --dir . -s html".split(),
+            "doit",
+            f"""--file={Path(__file__).parent / "dodo.py"}""",
+            f"""--dir={os.getcwd()}""",
+            "auto",
+            "jupyter_book",
             env=options.dump(),
-            external=True,
+            silent=False,
         )
     else:
         session.run(
-            *f"python -m dgaf.tasks -s jupyter_book".split(), env=options.dump()
+            "doit",
+            f"""--file={Path(__file__).parent / "dodo.py"}""",
+            f"""--dir={os.getcwd()}""",
+            "jupyter_book",
+            env=options.dump(),
+            silent=False,
         )
+
     options.pdf
     if options.serve:
         session.run(*f"python -m http.server -d docs/_build/html".split())

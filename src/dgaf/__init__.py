@@ -152,6 +152,70 @@ class Param(Dict):
 DOIT_CONFIG = dict(verbosity=2, default_tasks=[])
 
 
+def get_repo():
+    if GIT.exists():
+        import git
+
+        return git.Repo()
+
+
+@dataclasses.dataclass
+class Chapter:
+    dir: str = dataclasses.field(default_factory=Path)
+    repo: object = dataclasses.field(default_factory=get_repo)
+    include: list = dataclasses.field(default_factory=list)
+    exclude: list = dataclasses.field(default_factory=list, repr=False)
+    exclude_patterns: list = dataclasses.field(default_factory=list)
+    suffixes: list = dataclasses.field(default_factory=list)
+    directories: list = dataclasses.field(default_factory=list, repr=False)
+    exclude_directories: list = dataclasses.field(default_factory=list, repr=False)
+
+    def __post_init__(self):
+        self.get_include_exclude()
+        self.include = sorted(self.include)
+        self.exclude_patterns = sorted(set(self.exclude_patterns))
+        self.directories = sorted(set(x.parent for x in self.include))
+        self.suffixes = sorted(set(x.suffix for x in self.include if x.suffix))
+        self.exclude_directories = sorted(set(x.parent for x in self.exclude))
+
+    def get_include_exclude(self, dir=None, files=None):
+        dir = dir or self.dir
+        root = files is None
+        files = [] if root else files
+        for x in dir.iterdir():
+            by = ignored_by(str(x))
+            if x.is_dir():
+                by = ignored_by(str(x))
+                if not by:
+                    by = ignored_by(x.relative_to(dir) / ".tmp")
+                if by:
+                    self.exclude_patterns.append(by)
+                    self.exclude.append(x)
+                else:
+                    self.get_include_exclude(x, files)
+
+                continue
+
+            if not by:
+                by = ignored_by(str(x.relative_to(dir)))
+
+            if by:
+                self.exclude.append(x)
+            else:
+                self.include.append(x)
+
+    def dump(self):
+        return {
+            x: [str(x) for x in getattr(self, x)]
+            if isinstance(getattr(self, x), list)
+            else str(getattr(self, x))
+            for x in self.__annotations__
+        }
+
+    def _repr_json_(self):
+        return self.dump()
+
+
 def main(object=None, argv=None, raises=False):
     global DOIT_CONFIG
     import doit

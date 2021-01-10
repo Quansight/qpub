@@ -1,34 +1,59 @@
 # dodo.py
+import aiofiles
+import ast
+import asyncio
 import contextlib
 import dataclasses
+import datetime
+import flit
 import functools
+import git
 import io
 import itertools
+import json
 import os
+import packaging.requirements
 import pathlib
-import typing
+import pathspec
+import re
+import shutil
 import sys
+import textwrap
+import typing
 
 try:
-    doit = __import__("doit")
-
-    class Reporter(doit.reporter.ConsoleReporter):
-        def execute_task(self, task):
-            self.outstream.write("MyReporter --> %s\n" % task.title())
-
-    DOIT_CONFIG = dict(verbosity=2, reporter=Reporter)
-
+    import importlib.resources
 except ModuleNotFoundError:
-    doit = None
+    import importlib, importlib_resources
 
-Path = type(__import__("pathlib").Path())
-post_pattern = __import__("re").compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
+    importlib.resource = importlib_resources
+
+try:
+    import importlib.metadata
+except ModuleNotFoundError:
+    import importlib, importlib_metadata
+
+    importlib.metadata = importlib_metadata
+
+print(os.getcwd())
+import doit
+
+
+class Reporter(doit.reporter.ConsoleReporter):
+    def execute_task(self, task):
+        self.outstream.write("MyReporter --> %s\n" % task.title())
+
+
+DOIT_CONFIG = dict(verbosity=2, reporter=Reporter)
+
+
+Path = type(pathlib.Path())
+post_pattern = re.compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(.*)")
 
 
 def task_docs():
     """configure the documentation"""
     docs = project / DOCS
-    doit = __import__("doit")
     backend = project.docs_backend()
     # basically we wanna combine a bunch of shit
 
@@ -61,7 +86,6 @@ def task_python():
     files = project.all_files()
     backend = project.python_backend()
     task_dep = []
-    print(files, project)
     if not any(x for x in files if x.suffix == ".py"):
         notebooks = [x for x in files if x.suffix == ".ipynb"]
 
@@ -80,7 +104,6 @@ def task_python():
 
 
 def task_build():
-    backend = project.python_backend()
     return dict(
         file_dep=[project / PYPROJECT_TOML],
         actions=["python -m pep517.build ."],
@@ -107,7 +130,8 @@ def task_conda():
     """configure a conda environment for the distribution"""
 
     def shuffle_conda():
-        doit = __import__("doit")
+        import doit
+
         file = project / ENVIRONMENT_YAML
         env = file.load()
         c, p = [], []
@@ -223,10 +247,20 @@ class options:
     interactive: bool = os.environ.get("QPUB_INTERACTIVE", False)
     monkeytype: bool = os.environ.get("QPUB_INTERACTIVE", False)
     mamba: bool = os.environ.get("QPUB_MAMBA", True)
-    cache: str = os.environ.get("QPUB_CACHE", Path(__file__).parent / "data")
+    cache: str = Path(os.environ.get("QPUB_CACHE", Path(__file__).parent / "_data"))
     dev: bool = os.environ.get("QPUB_DEV", True)
-    pip: bool = os.environ.get("QPUB_PIP", False)
+    pip_only: bool = os.environ.get("QPUB_PIP", False)
     install: bool = os.environ.get("QPUB_INSTALL", True)
+    install_backend: bool = os.environ.get(
+        "QPUB_INSTALL_BACKEND",
+        (
+            "mamba"
+            if shutil.which("mamba")
+            else "conda"
+            if shutil.which("conda")
+            else "pip"
+        ),
+    )
 
     @classmethod
     def dump(cls):
@@ -355,18 +389,16 @@ class Chapter:
         if not isinstance(self.dir, pathlib.Path):
             self.dir = File(self.dir)
         if self.repo is None:
-            self.repo = (
-                (self.dir / GIT).exists()
-                and __import__("git").Repo(self.dir / GIT)
-                or None
-            )
+            if (self.dir / GIT).exists():
+                self.repo = git.Repo(self.dir / GIT)
         if not self.exclude:
-            pathspec = __import__("pathspec")
+            import pathspec
+
             self.exclude = pathspec.PathSpec.from_lines(
                 pathspec.patterns.GitWildMatchPattern,
                 self.get_exclude_patterns() + [".git"],
             )
-        if not (
+        if (
             self.docs
             or self.chapters
             or self.conventions
@@ -375,64 +407,64 @@ class Chapter:
             or self.pages
             or self.other
         ):
-            contents = (
-                self.repo
-                and list(
-                    map(File, __import__("git").Git(self.dir).ls_files().splitlines())
-                )
-                or None
-            )
+            return
+        contents = (
+            self.repo
+            and list(map(File, git.Git(self.dir).ls_files().splitlines()))
+            or None
+        )
 
-            for parent in contents or []:
-                if parent.parent not in contents:
-                    contents += [parent.parent]
+        for parent in contents or []:
+            if parent.parent not in contents:
+                contents += [parent.parent]
 
-            for file in self.dir.iterdir():
-                local = file.relative_to(self.dir)
-                if contents is not None:
-                    if local not in contents:
-                        continue
+        for file in self.dir.iterdir():
 
-                if local in {DOCS}:
-                    self.docs = Docs(dir=file, parent=self)
-                elif local in {SRC}:
-                    self.src = Project(dir=file, parent=self)
-                    self.chapters += [x for x in file.iterdir() if x.is_dir()]
-                elif local in CONVENTIONS:
-                    self.conventions += [file]
-                elif local.stem.startswith((".",)):
-                    self.hidden += [file]
-                elif file.is_dir():
-                    if self.exclude.match_file(local / ".tmp"):
-                        ...
-                    else:
-                        self.chapters += [file]
+            local = file.relative_to(self.dir)
+
+            if contents is not None:
+                if local not in contents:
                     continue
-                elif local.stem.startswith(("_",)):
-                    if local.stem.endswith("_"):
-                        self.modules += [file]
-                    else:
-                        self.hidden += [file]
-                elif self.exclude.match_file(local):
-                    continue
-                elif file.suffix not in {".ipynb", ".md", ".rst", ".py"}:
-                    self.other += [file]
-                elif file.stem.lower() in {"readme", "index"}:
-                    self.index = file
-                elif post_pattern.match(file.stem):
-                    self.posts += [file]
-                elif is_pythonic(file.stem):
-                    if file.stem.startswith("test_"):
-                        self.tests += [file]
-                    else:
-                        self.modules += [file]
+
+            if local in {DOCS}:
+                self.docs = Docs(dir=file, parent=self)
+            elif local in {SRC}:
+                self.src = Project(dir=file, parent=self)
+            elif local in CONVENTIONS:
+                self.conventions += [file]
+            elif local.stem.startswith((".",)):
+                self.hidden += [file]
+            elif file.is_dir():
+                if self.exclude.match_file(str(local / ".tmp")):
+                    ...
                 else:
-                    self.pages += [file]
+                    self.chapters += [file]
+                continue
+            elif local.stem.startswith(("_",)):
+                if local.stem.endswith("_"):
+                    self.modules += [file]
+                else:
+                    self.hidden += [file]
+            elif self.exclude.match_file(str(local)):
+                continue
+            elif file.suffix not in {".ipynb", ".md", ".rst", ".py"}:
+                self.other += [file]
+            elif file.stem.lower() in {"readme", "index"}:
+                self.index = file
+            elif post_pattern.match(file.stem):
+                self.posts += [file]
+            elif is_pythonic(file.stem):
+                if file.stem.startswith("test_"):
+                    self.tests += [file]
+                else:
+                    self.modules += [file]
+            else:
+                self.pages += [file]
 
-            for k in "chapters posts tests modules pages conventions".split():
-                setattr(self, k, sorted(getattr(self, k), reverse=k in {"posts"}))
+        for k in "chapters posts tests modules pages conventions".split():
+            setattr(self, k, sorted(getattr(self, k), reverse=k in {"posts"}))
 
-            self._chapters = list(Chapter(dir=x, parent=self) for x in self.chapters)
+        self._chapters = list(Chapter(dir=x, parent=self) for x in self.chapters)
 
     def root(self):
         return self.parent.root() if self.parent else self
@@ -533,13 +565,15 @@ def cd(object):
 
 
 class Project(Chapter):
+    def reset(self):
+        self._flit_module = None
+
     def add(self, *tasks):
         with cd(self.dir):
             main(list(tasks))
 
     def get_name(self):
         """get the project name"""
-
         # get the name of subdirectories if there are any.
         if self.src:
             return self.src.get_name()
@@ -553,7 +587,6 @@ class Project(Chapter):
             names = sorted(
                 set(str(x.relative_to(x.parent).with_suffix("")) for x in self.modules)
             )
-            print(names)
             if len(names) == 1:
                 return names[0]
             else:
@@ -579,7 +612,8 @@ class Project(Chapter):
 
         # look in modules/chapters to see if we can flit this project.
         if self.is_flit():
-            flit = __import__("flit")
+            import flit
+
             with contextlib.redirect_stderr(io.StringIO()):
                 try:
                     return flit.common.get_info_from_module(self._flit_module).pop(
@@ -604,7 +638,6 @@ class Project(Chapter):
 
         version = None
         if self.is_flit():
-            flit = __import__("flit")
             with contextlib.redirect_stderr(io.StringIO()):
                 try:
                     version = flit.common.get_info_from_module(self._flit_module).pop(
@@ -616,7 +649,7 @@ class Project(Chapter):
             if self.src:
                 version = self.src.get_version()
             else:
-                version = __import__("datetime").date.today().strftime("%Y.%m.%d")
+                version = datetime.date.today().strftime("%Y.%m.%d")
         return normalize_version(version)
 
     @cached
@@ -668,7 +701,7 @@ class Project(Chapter):
                 + ".local .vscode _build .gitignore".split()
             ):
                 if bool(pattern):
-                    match = __import__("pathspec").patterns.GitWildMatchPattern(pattern)
+                    match = pathspec.patterns.GitWildMatchPattern(pattern)
                     if match.include:
                         self.gitignore_patterns[pattern] = match
 
@@ -774,10 +807,7 @@ class Project(Chapter):
                 for x in REQUIREMENTS_TXT.read_text().splitlines()
                 if not x.lstrip().startswith("#") and x.strip()
             ]
-            return list(
-                __import__("packaging.requirements").requirements.Requirement(x).name
-                for x in known
-            )
+            return list(packaging.requirements.Requirement(x).name for x in known)
 
         return []
 
@@ -838,13 +868,13 @@ class Project(Chapter):
 
         """
 
-        flit = __import__("flit")
+        import flit
+
         if self._flit_module is None:
             try:
                 self._flit_module = flit.common.Module(self.get_name(), self.dir)
                 return True
             except ValueError as e:
-                print(e)
                 return False
         return True
 
@@ -1182,59 +1212,66 @@ def rough_source(nb):
     """extract a rough version of the source in notebook to infer files from"""
 
     if isinstance(nb, str):
-        nb = __import__("json").loads(nb)
+        nb = json.loads(nb)
 
     return "\n".join(
-        __import__("textwrap").dedent("".join(x["source"]))
+        textwrap.dedent("".join(x["source"]))
         for x in nb.get("cells", [])
         if x["cell_type"] == "code"
     )
 
 
+def _import_depfinder():
+    if "depfinder" not in sys.modules:
+        import yaml, requests_cache
+
+        dir = Path(__file__).parent
+        requests_cache.install_cache(str(options.cache / "requests_cache"))
+        dir.mkdir(parents=True, exist_ok=True)
+        if not hasattr(yaml, "CSafeLoader"):
+            yaml.CSafeLoader = yaml.SafeLoader
+        import depfinder
+
+        requests_cache.uninstall_cache()
+    return __import__("depfinder")
+
+
 async def infer(file):
     """infer imports from different kinds of files."""
-    async with __import__("aiofiles").open(file, "r") as f:
+    depfinder = _import_depfinder()
+
+    async with aiofiles.open(file, "r") as f:
         if file.suffix not in {".py", ".ipynb", ".md", ".rst"}:
             return file, {}
         source = await f.read()
         if file.suffix == ".ipynb":
             source = rough_source(source)
         try:
-            return (
-                file,
-                __import__("depfinder").main.get_imported_libs(source).describe(),
-            )
+            return (file, depfinder.main.get_imported_libs(source).describe())
         except SyntaxError:
             return file, {}
 
 
 async def infer_files(files):
-    return dict(
-        await __import__("asyncio").gather(
-            *(infer(file) for file in map(Path, set(files)))
-        )
-    )
+    return dict(await asyncio.gather(*(infer(file) for file in map(Path, set(files)))))
 
 
 def gather_imports(files):
     """"""
-    if "depfinder" not in __import__("sys").modules:
-        yaml = __import__("yaml")
-        dir = Path(__file__).parent
-        __import__("requests_cache").install_cache(str(options.cache / "qpub"))
-        dir.mkdir(parents=True, exist_ok=True)
-        if not hasattr(yaml, "CSafeLoader"):
-            yaml.CSafeLoader = yaml.SafeLoader
-        __import__("depfinder")
-
-        __import__("requests_cache").uninstall_cache()
 
     object = infer_files(files)
     try:
-        return dict(__import__("asyncio").run(object))
+        return dict(asyncio.run(object))
     except RuntimeError:
         __import__("nest_asyncio").apply()
-        return dict(__import__("asyncio").run(object))
+        return dict(asyncio.run(object))
+
+
+def merged_imports(files):
+    results = merge(*gather_imports(files).values())
+    return sorted(
+        set(list(results.get("required", [])) + list(results.get("questionable", [])))
+    )
 
 
 def merge(*args):
@@ -1244,7 +1281,7 @@ def merge(*args):
         return args[0]
     a, b, *args = args
     if args:
-        b = __import__("functools").reduce(merge, (b, *args))
+        b = functools.reduce(merge, (b, *args))
     if hasattr(a, "items"):
         for k, v in a.items():
             if k in b:
@@ -1269,29 +1306,23 @@ def merge(*args):
     return a or b
 
 
-def merged_imports(files):
-    results = merge(*gather_imports(files).values())
-    return sorted(
-        set(list(results.get("required", [])) + list(results.get("questionable", [])))
-    )
-
-
 def import_to_pypi(list):
     global IMPORT_TO_PIP
     if not IMPORT_TO_PIP:
+        depfinder = _import_depfinder()
         IMPORT_TO_PIP = {
-            x["import_name"]: x["pypi_name"]
-            for x in __import__("depfinder").utils.mapping_list
+            x["import_name"]: x["pypi_name"] for x in depfinder.utils.mapping_list
         }
     return [IMPORT_TO_PIP.get(x, x) for x in list if x not in ["src"]]
 
 
 def pypi_to_conda(list):
     global PIP_TO_CONDA
+
     if not PIP_TO_CONDA:
+        depfinder = _import_depfinder()
         PIP_TO_CONDA = {
-            x["import_name"]: x["conda_name"]
-            for x in __import__("depfinder").utils.mapping_list
+            x["import_name"]: x["conda_name"] for x in depfinder.utils.mapping_list
         }
     return [PIP_TO_CONDA.get(x, x) for x in list]
 
@@ -1321,21 +1352,15 @@ def dump_txt(object):
     return object
 
 
-def load_configparser(str):
-    object = __import__("configparser").ConfigParser(default_section=None)
-    object.read_string(str)
-    return expand_cfg(object)
-
-
-def load_configupdater(str):
-    object = __import__("configupdater").ConfigUpdater()
+def load_config(str):
+    object = configupdater.ConfigUpdater()
     object.read_string(str)
     return expand_cfg(object)
 
 
 @ensure_trailing_eol
 def dump_config__er(object):
-    next = __import__("io").StringIO()
+    next = io.StringIO()
     object = compact_cfg(object)
     if isinstance(object, dict):
         import configparser
@@ -1352,7 +1377,7 @@ def expand_cfg(object):
     for main, section in object.items():
         for key, value in section.items():
             if isinstance(value, str) and value.startswith("\n"):
-                value = __import__("textwrap").dedent(value).splitlines()[1:]
+                value = textwrap.dedent(value).splitlines()[1:]
             object[main][key] = value
     return object
 
@@ -1380,43 +1405,34 @@ def dump_text(object):
 
 
 def load_toml(str):
-    return __import__("toml").loads(str)
+    import tomlkit
 
-
-def load_tomlkit(str):
-    return __import__("tomlkit").parse(str)
+    return tomlkit.parse(str)
 
 
 @ensure_trailing_eol
 def dump_toml(object):
-    try:
-        tomlkit = __import__("tomlkit")
-        return tomlkit.dumps(object)
-    except ModuleNotFoundError:
-        pass
-    return __import__("toml").dumps(object)
+    import tomlkit
+
+    return tomlkit.dumps(object)
 
 
 def load_yaml(str):
-    return __import__("yaml").safe_load(str)
+    import ruamel.yaml
 
-
-def load_ruamel(str):
-    object = __import__("ruamel.yaml").yaml.YAML()
+    object = ruamel.yaml.YAML()
     return object.load(str)
 
 
 @ensure_trailing_eol
 def dump_yaml(object):
-    try:
-        ruamel = __import__("ruamel.yaml").yaml
-        if isinstance(object, ruamel.YAML):
-            next = __import__("io").StringIO()
-            object.dump(next)
-            return next.getvalue()
-    except ModuleNotFoundError:
-        pass
-    return __import__("yaml").safe_dump(object)
+    import ruamel.yaml
+
+    if isinstance(object, ruamel.YAML):
+        next = io.StringIO()
+        object.dump(next)
+        return next.getvalue()
+    return ruamel.yaml.safe_dump(object)
 
 
 def to_dict(object):
@@ -1437,15 +1453,10 @@ class INI(File):
     _suffixes = ".ini", ".cfg"
 
     def load(self):
-        # try:
-        #     __import__("configupdater")
-        #     callable = load_configupdater
-        # except ModuleNotFoundError:
-        #     callable = load_configparser
         try:
-            return callable(self.read_text())
+            return load_config(self.read_text())
         except FileNotFoundError:
-            return callable("")
+            return load_config("")
 
     def dump(self, object):
         return dump_config__er(object)
@@ -1473,14 +1484,9 @@ class TOML(File):
 
     def load(self):
         try:
-            __import__("tomlkit")
-            callable = load_tomlkit
-        except ModuleNotFoundError:
-            callable = load_toml
-        try:
-            return callable(self.read_text())
+            return load_toml(self.read_text())
         except FileNotFoundError:
-            return callable("")
+            return load_toml("")
 
     def dump(self, object):
         return dump_toml(object)
@@ -1490,10 +1496,10 @@ class JSON(File):
     _suffixes = (".json",)
 
     def load(self):
-        return __import__("json").loads(self.read_text())
+        return json.loads(self.read_text())
 
     def dump(self, boject):
-        return __import__("json").dumps(object)
+        return json.dumps(object)
 
 
 class YML(File):
@@ -1503,14 +1509,9 @@ class YML(File):
 
     def load(self):
         try:
-            __import__("ruamel.yaml")
-            callable = load_ruamel
-        except ModuleNotFoundError:
-            callable = load_yaml
-        try:
-            return callable(self.read_text())
+            return load_yaml(self.read_text())
         except FileNotFoundError:
-            return callable("{}")
+            return load_yaml("{}")
 
     def dump(self, object):
         return dump_yaml(object)
@@ -1521,7 +1522,6 @@ PIP_TO_CONDA = None
 
 
 def is_pythonic(object):
-    import ast, pathlib
 
     object = pathlib.Path(object)
     try:
@@ -1532,15 +1532,13 @@ def is_pythonic(object):
 
 
 def normalize_version(object):
-    import contextlib, io
+    import packaging.requirements
 
     with contextlib.redirect_stdout(io.StringIO()):
-        return str(__import__("packaging.version").version.Version(object))
+        return str(packaging.version.Version(object))
 
 
 def where_template(template):
-    import importlib
-
     try:
         with importlib.resources.path("dgaf.templates", template) as template:
             template = File(template)
@@ -1550,7 +1548,9 @@ def where_template(template):
 
 
 def templated_file(template, data):
-    return __import__("jsone").render(where_template(template).load(), data)
+    import jsone
+
+    return jsone.render(where_template(template).load(), data)
 
 
 def packages_from_conda_not_found(out):
@@ -1567,10 +1567,8 @@ def packages_from_conda_not_found(out):
 
 
 def installed(str):
-    import importlib_metadata
-
     try:
-        importlib_metadata.distribution(str)
+        importlib.metadata.distribution(str)
         return True
     finally:
         return False
@@ -1592,7 +1590,7 @@ def main(argv=None, raises=False):
     global project
     project = Project()
     if argv is None:
-        argv = __import__("sys").argv[1:]
+        argv = sys.argv[1:]
 
     if isinstance(argv, str):
         argv = argv.split()

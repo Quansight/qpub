@@ -2,9 +2,11 @@
 
 in the python world, there are conventional forms and tools for distributing packages, tests, and documentation. `qpub` organizes these opinions and system specific conditions into a consistent command line interface. the unique affordance of `qpub` is that it can infer complete configurations from the contents of project; it can produce packaging, environment, documentation, and testing configuration to name a few.
 
-with `dgaf` you have the freedom to restructure your project as different forms. `dgaf` will infer and configure your project.
+with `dgaf` you have the freedom to restructure your project as different forms. `dgaf` will infer and configure your project. it is a developer tool that prioritizes developer needs.
 
 ## quickstart
+
+from some content, `qpub` infers configurations for well rounded development environments.
 
 the quickest way to begin is to:
 
