@@ -12,3 +12,4 @@ settings.json
 poetry.lock
 .pytest_cache
 .nox
+*.sqlite
