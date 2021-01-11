@@ -1,13 +1,41 @@
 """configure packages, documentation, and tests."""
 
-from .__init__ import *
-import shutil
-import doit
-import pathlib
 import asyncio
-import sys
 import json
+import pathlib
+import shutil
+import sys
 import textwrap
+
+import doit
+
+from . import (
+    BUILD,
+    CONF,
+    CONFIG,
+    CONVENTIONS,
+    DOCS,
+    DOIT_CONFIG,
+    ENVIRONMENT_YAML,
+    PYPROJECT_TOML,
+    REQUIREMENTS_TXT,
+    SETUP_CFG,
+    SETUP_PY,
+    TOC,
+    Chapter,
+    Path,
+    Repo,
+    Task,
+    get_license,
+    get_name,
+    get_python_version,
+    get_repo,
+    is_private,
+    main,
+    merge,
+    options,
+    templated_file,
+)
 
 
 def task_requirements_txt():
@@ -69,9 +97,7 @@ def task_pyproject():
             pass
 
     return Task(
-        file_dep=[
-            REQUIREMENTS_TXT,
-        ],
+        file_dep=[REQUIREMENTS_TXT],
         actions=[python],
         targets=[PYPROJECT_TOML],
         params=[
@@ -110,7 +136,8 @@ def task_config():
                 name=get_name(),
                 requires=REQUIREMENTS_TXT.load(),
                 author=repo.get_author(),
-                exclude=[str(x / "*") for x in chapter.exclude_directories],
+                exclude=[str(x / "*") for x in chapter.exclude_directories]
+                + [str(BUILD)],
             ),
         )
         CONFIG.update(data)
@@ -194,7 +221,8 @@ def rough_source(nb):
 
 def _import_depfinder():
     if "depfinder" not in sys.modules:
-        import yaml, requests_cache
+        import requests_cache
+        import yaml
 
         dir = Path(__file__).parent
         requests_cache.install_cache(str(options.cache / "requests_cache"))

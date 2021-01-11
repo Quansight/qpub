@@ -5,15 +5,16 @@ document, test, and lint software. nox allows us to control the environments
 each utility operates within.
 """
 
-import nox
-import os
-import sys
-import importlib
-import functools
-import shutil
-import itertools
-import pathlib
 import contextlib
+import functools
+import importlib
+import itertools
+import os
+import pathlib
+import shutil
+import sys
+
+import nox
 
 Path = type(pathlib.Path())
 
@@ -23,7 +24,7 @@ def run_in_nox():
 
 
 try:
-    from .dodo import options, File, PYPROJECT_TOML, Project, ENVIRONMENT_YAML
+    from .dodo import ENVIRONMENT_YAML, PYPROJECT_TOML, File, Project, options
 except ImportError as e:
     # when we invoke this file from nox it cannot naturally import files. this block loads the task file from teh specification.
     if run_in_nox():

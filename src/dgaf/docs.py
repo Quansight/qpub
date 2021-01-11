@@ -1,5 +1,8 @@
-from .__init__ import *
+import sys
+
 import doit
+
+from . import CONF, CONFIG, DOIT_CONFIG, MKDOCS, TOC, Param, Task, main
 
 _SERVE = Param("serve", False, help="serve the documentation afterwards.")
 
@@ -20,10 +23,12 @@ def task_mkdocs():
 
 
 def task_jupyter_book():
+    """build the documentation with jupyter-book"""
+
     def jb():
         assert not doit.tools.LongRunning(
             "jb build --toc docs/_toc.yml --config docs/_config.yml --builder html ."
-        ).execute()
+        ).execute(sys.stdout, sys.stderr)
 
     return Task(actions=[jb], file_dep=[TOC, CONFIG], uptodate=[not TOC.exists()])
 

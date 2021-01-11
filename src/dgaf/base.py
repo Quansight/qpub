@@ -1,8 +1,10 @@
+import collections
 import dataclasses
 import importlib
-import collections
 import io
-from .files import GIT, SRC, CONVENTIONS, Path, File
+
+from . import DOIT_CONFIG
+from .files import CONVENTIONS, GIT, SRC, File, Path
 
 BUILDSYSTEM = "build-system"
 
@@ -125,8 +127,9 @@ def get_module(name):
 
 
 def get_version():
-    import flit
     import datetime
+
+    import flit
 
     try:
         x = flit.common.get_info_from_module(get_module(get_name())).pop("version")
@@ -136,8 +139,9 @@ def get_version():
 
 
 def normalize_version(object):
-    import packaging.requirements
     import contextlib
+
+    import packaging.requirements
 
     with contextlib.redirect_stdout(io.StringIO()):
         return str(packaging.version.Version(object))
@@ -168,7 +172,7 @@ class Chapter:
         self.exclude_patterns = sorted(set(self.exclude_patterns))
 
         self.suffixes = sorted(set(x.suffix for x in self.include if x.suffix))
-        self.exclude_directories = sorted(set(x.parent for x in self.exclude))
+        self.exclude_directories = sorted(set(x.parent for x in []))
 
     def source_files(self):
         return self.include
@@ -220,8 +224,9 @@ class Chapter:
 def main(object=None, argv=None, raises=False):
     """run the main program"""
     global DOIT_CONFIG
-    import doit
     import sys
+
+    import doit
 
     if argv is None:
         argv = sys.argv[1:]
@@ -253,7 +258,7 @@ def needs(*object):
     if needs:
         assert not doit.tools.CmdAction(
             f"""pip install {" ".join(needs)} --no-deps"""
-        ).execute()
+        ).execute(sys.stdout, sys.stderr)
 
 
 def where_template(template):
@@ -278,11 +283,7 @@ def ignore(cache={}):
     if cache:
         return cache
 
-    for file in (
-        "Python.gitignore",
-        "Nikola.gitignore",
-        "JupyterNotebooks.gitignore",
-    ):
+    for file in ("Python.gitignore", "Nikola.gitignore", "JupyterNotebooks.gitignore"):
         import pathspec
 
         file = where_template(file)

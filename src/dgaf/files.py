@@ -1,20 +1,24 @@
+import collections
 import io
 import textwrap
-import collections
 
 Path = type(__import__("pathlib").Path())
 
 try:
     import importlib.resources
 except ModuleNotFoundError:
-    import importlib, importlib_resources
+    import importlib
+
+    import importlib_resources
 
     importlib.resource = importlib_resources
 
 try:
     import importlib.metadata
 except ModuleNotFoundError:
-    import importlib, importlib_metadata
+    import importlib
+
+    import importlib_metadata
 
     importlib.metadata = importlib_metadata
 
@@ -285,6 +289,21 @@ class JSON(File):
         import json
 
         return json.dumps(object)
+
+
+class YML(File):
+    """dump and load yml files in place."""
+
+    _suffixes = ".yaml", ".yml"
+
+    def load(self):
+        try:
+            return load_yaml(self.read_text())
+        except FileNotFoundError:
+            return load_yaml("{}")
+
+    def dump(self, object):
+        return dump_yaml(object)
 
 
 def merge(*args):

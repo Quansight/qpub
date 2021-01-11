@@ -1,37 +1,42 @@
 # dodo.py
-import aiofiles
 import ast
 import asyncio
 import contextlib
 import dataclasses
 import datetime
-import flit
 import functools
-import git
 import io
 import itertools
 import json
 import os
-import packaging.requirements
 import pathlib
-import pathspec
 import re
 import shutil
 import sys
 import textwrap
 import typing
 
+import aiofiles
+import flit
+import git
+import packaging.requirements
+import pathspec
+
 try:
     import importlib.resources
 except ModuleNotFoundError:
-    import importlib, importlib_resources
+    import importlib
+
+    import importlib_resources
 
     importlib.resource = importlib_resources
 
 try:
     import importlib.metadata
 except ModuleNotFoundError:
-    import importlib, importlib_metadata
+    import importlib
+
+    import importlib_metadata
 
     importlib.metadata = importlib_metadata
 
@@ -1223,7 +1228,8 @@ def rough_source(nb):
 
 def _import_depfinder():
     if "depfinder" not in sys.modules:
-        import yaml, requests_cache
+        import requests_cache
+        import yaml
 
         dir = Path(__file__).parent
         requests_cache.install_cache(str(options.cache / "requests_cache"))

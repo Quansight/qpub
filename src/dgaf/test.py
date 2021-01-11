@@ -1,4 +1,6 @@
-from .__init__ import *
+import sys
+
+from .__init__ import DOIT_CONFIG, NOXFILE, Param, Task, main, needs
 
 
 def test_nox():
@@ -10,6 +12,8 @@ def test_tox():
 
 
 def task_test():
+    """test the project with pytest"""
+
     def test(monkeytype, extra):
         import doit
 
@@ -19,24 +23,29 @@ def task_test():
             needs("pytest", "monkeytype")
             assert not doit.tools.LongRunning(
                 f"""monkeytype pytest {" ".join(extra)}"""
-            ).execute()
+            ).execute(sys.stdout, sys.stderr)
         else:
             needs("pytest")
-            assert not doit.tools.LongRunning(f"""pytest {" ".join(extra)}""").execute()
+            assert not doit.tools.LongRunning(f"""pytest {" ".join(extra)}""").execute(
+                sys.stdout, sys.stderr
+            )
 
-    return Task(actions=[test], params=[Param("monkeytype", False)], pos_arg="extra")
+    return Task(
+        actions=[test],
+        params=[Param("monkeytype", False, help="infer type annotations from tests")],
+        pos_arg="extra",
+    )
 
+
+def tox_conf():
+    return False
+
+
+def nox_conf():
+    return NOXFILE.exists()
+
+
+DOIT_CONFIG["default_tasks"] += ["test"]
 
 if __name__ == "__main__":
-
-    def tox_conf():
-        return False
-
-    def nox_conf():
-        return NOXFILE.exists()
-
-    DOIT_CONFIG["default_tasks"] += [
-        "nox" if nox_conf() else "tox" if tox_conf() else "test"
-    ]
-
     main(globals())

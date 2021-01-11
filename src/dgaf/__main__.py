@@ -1,4 +1,5 @@
 import argparse
+
 from . import DOIT_CONFIG
 
 parser = argparse.ArgumentParser(prog="dgaf")

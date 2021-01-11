@@ -10,15 +10,15 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 #    \\//  ||>>_   (__) )(   _|| \\_
 #   (_(__)(__)__)      (__) (__) (__)
 
-import dataclasses
-import io
 import collections
+import dataclasses
 import functools
+import io
 import itertools
-from .files import *
-from .base import *
 
 DOIT_CONFIG = dict(verbosity=2, default_tasks=[])
+from .base import *
+from .files import *
 
 
 def load_ipython_extension(shell):

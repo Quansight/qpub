@@ -1,20 +1,31 @@
 """install packages into conda and python environments."""
 
-from .__init__ import *
 import shutil
+import sys
+
 import doit
 
+from .__init__ import (
+    BUILDSYSTEM,
+    DIST,
+    DOIT_CONFIG,
+    ENVIRONMENT_YAML,
+    PYPROJECT_TOML,
+    REQUIREMENTS_TXT,
+    Param,
+    Path,
+    Task,
+    get_name,
+    get_version,
+    main,
+    needs,
+)
+
 _DEVELOP = Param(
-    "develop",
-    True,
-    type=bool,
-    help="use development tools to build the project.",
+    "develop", True, type=bool, help="use development tools to build the project."
 )
 _PIP = Param(
-    "pip",
-    False,
-    type=bool,
-    help="build with generic standard python packaging tools.",
+    "pip", False, type=bool, help="build with generic standard python packaging tools."
 )
 
 
@@ -31,12 +42,9 @@ def task_conda():
 
     def conda(mamba):
         backend = mamba and "mamba" or "conda"
-        # assert not doit.tools.LongRunning(f"{backend} install").execute()
+        # assert not doit.tools.LongRunning(f"{backend} install").execute(sys.stdout, sys.stderr)
 
-    return Task(
-        file_dep=[ENVIRONMENT_YAML],
-        params=[Param("mamba", mamba)],
-    )
+    return Task(file_dep=[ENVIRONMENT_YAML], params=[Param("mamba", mamba)])
 
 
 def build_backend():
@@ -64,19 +72,27 @@ def task_build():
     def build(develop, pip):
         if pip:
             needs("pep517")
-            assert not doit.tools.CmdAction("python -m pep517.build .").execute()
+            assert not doit.tools.CmdAction("python -m pep517.build .").execute(
+                sys.stdout, sys.stderr
+            )
         elif PYPROJECT_TOML.exists():
             backend = build_backend()
             print(backend)
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.CmdAction("flit build").execute()
+                assert not doit.tools.CmdAction("flit build").execute(
+                    sys.stdout, sys.stderr
+                )
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.CmdAction("poetry build").execute()
+                assert not doit.tools.CmdAction("poetry build").execute(
+                    sys.stdout, sys.stderr
+                )
             else:
                 needs("pep517")
-                assert not doit.tools.CmdAction("python -m pep517.build .").execute()
+                assert not doit.tools.CmdAction("python -m pep517.build .").execute(
+                    sys.stdout, sys.stderr
+                )
 
     name, version = get_name(), get_version()
     return Task(
@@ -96,17 +112,23 @@ def task_install():
 
             assert not doit.tools.CmdAction(
                 f"python -m pip install --find-links=dist --no-index --ignore-installed --no-deps {name}"
-            ).execute()
+            ).execute(sys.stdout, sys.stderr)
         elif PYPROJECT_TOML.exists():
             backend = build_backend()
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.LongRunning("flit install").execute()
+                assert not doit.tools.LongRunning("flit install").execute(
+                    sys.stdout, sys.stderr
+                )
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.LongRunning("poetry install").execute()
+                assert not doit.tools.LongRunning("poetry install").execute(
+                    sys.stdout, sys.stderr
+                )
             else:
-                assert not doit.tools.LongRunning("pip install . --no-deps").execute()
+                assert not doit.tools.LongRunning("pip install . --no-deps").execute(
+                    sys.stdout, sys.stderr
+                )
 
     name, version = get_name(), get_version()
     return Task(
@@ -131,18 +153,20 @@ def task_develop():
             backend = build_backend()
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.LongRunning("flit install -s").execute()
+                assert not doit.tools.LongRunning("flit install -s").execute(
+                    sys.stdout, sys.stderr
+                )
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.LongRunning("poetry install").execute()
+                assert not doit.tools.LongRunning("poetry install").execute(
+                    sys.stdout, sys.stderr
+                )
             else:
-                assert not doit.tools.LongRunning("pip install -e. --no-deps").execute()
+                assert not doit.tools.LongRunning("pip install -e. --no-deps").execute(
+                    sys.stdout, sys.stderr
+                )
 
-    return Task(
-        file_dep=[PYPROJECT_TOML],
-        actions=[develop],
-        params=[_DEVELOP, _PIP],
-    )
+    return Task(file_dep=[PYPROJECT_TOML], actions=[develop], params=[_DEVELOP, _PIP])
 
 
 conda, mamba = bool(shutil.which("conda")), bool(shutil.which("mamba"))
