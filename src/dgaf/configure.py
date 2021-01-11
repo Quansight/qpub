@@ -40,8 +40,52 @@ def task_setup():
     return Task(file_dep=[REQUIREMENTS_TXT], targets=[SETUP_CFG, SETUP_PY])
 
 
+def get_section(chapter, parent=Path(), *done, **section):
+    files = [
+        x
+        for x in chapter.include
+        if 1 == (len(x.parts) - len(parent.parts))
+        and x.is_relative_to(parent)
+        and x not in CONVENTIONS
+        and not is_private(x)
+    ]
+    for name in "index readme".split():
+        for file in files:
+            if file.stem.lower() == name:
+                if "file" not in section:
+                    section.update(file=file.stem, sections=[])
+                else:
+                    sections["sections"].append(file.stem)
+
+    if "file" not in section:
+        section = dict(file=None, sections=[])
+
+    for file in files:
+        if file.suffix in {".py", ".ipynb", ".md", ".rst"}:
+            if section["file"] is None:
+                section["file"] = file.stem
+            else:
+                section["sections"].append(dict(file=str(file.with_suffix(""))))
+
+    for dir in [DOCS] + [
+        x
+        for x in chapter.directories
+        if x.is_relative_to(parent) and x not in CONVENTIONS and not is_private(x)
+    ]:
+        if dir == parent:
+            continue
+        if dir not in done:
+            section["sections"].append(get_section(chapter, dir, *done))
+            done += (dir,)
+
+    return section
+
+
 def task_jb():
-    return Task(targets=[TOC, CONFIG])
+    def main():
+        TOC.write(get_section(Chapter()))
+
+    return Task(actions=[main], targets=[TOC, CONFIG])
 
 
 def task_conf():

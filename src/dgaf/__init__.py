@@ -33,6 +33,19 @@ __version__ = __import__("datetime").date.today().strftime("%Y.%m.%d")
 
 Path = type(__import__("pathlib").Path())
 
+if not hasattr(Path, "is_relative_to"):
+
+    def _is_relative_to(self, *objects):
+        for object in objects:
+            try:
+                self.relative_to(object)
+                return True
+            except:
+                pass
+        return False
+
+    Path.is_relative_to = _is_relative_to
+
 
 class options:
     cache = Path(__file__).parent / "_data"
@@ -236,9 +249,10 @@ class Chapter:
 
     def __post_init__(self):
         self.get_include_exclude()
-        self.include = sorted(self.include)
-        self.exclude_patterns = sorted(set(self.exclude_patterns))
         self.directories = sorted(set(x.parent for x in self.include))
+        self.include = sorted(set(x for x in self.include if x not in self.directories))
+        self.exclude_patterns = sorted(set(self.exclude_patterns))
+
         self.suffixes = sorted(set(x.suffix for x in self.include if x.suffix))
         self.exclude_directories = sorted(set(x.parent for x in self.exclude))
 
