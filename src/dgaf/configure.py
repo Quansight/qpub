@@ -10,15 +10,19 @@ import json
 import textwrap
 
 
-def task_requirements():
+def task_requirements_txt():
+    """infer the project dependencies and write them to a requirements.txt"""
+
     def requirements():
         chapter = Chapter()
-        REQUIREMENTS_TXT.update(pip_requirements(chapter.include))
+        REQUIREMENTS_TXT.update(pip_requirements(chapter.source_files()))
 
-    return Task(actions=[requirements], targets=[REQUIREMENTS_TXT])
+    return Task(actions=[requirements], targets=[REQUIREMENTS_TXT], clean=True)
 
 
-def task_environment():
+def task_environment_yaml():
+    """infer the project dependencies and write them to an environment.yaml"""
+
     def conda():
         conda = pypi_to_conda(REQUIREMENTS_TXT.load())
         pip = []
@@ -32,15 +36,102 @@ def task_environment():
     )
 
 
-def task_python():
-    return Task(file_dep=[REQUIREMENTS_TXT], targets=[PYPROJECT_TOML])
+def task_pyproject():
+    """infer the pyproject.toml configuration for the project"""
+
+    def python(backend):
+        repo = Repo(get_repo())
+
+        if backend == "flit":
+            data = templated_file(
+                "flit.json",
+                dict(
+                    name=get_name(),
+                    requires=REQUIREMENTS_TXT.load(),
+                    author=repo.get_author(),
+                    email=repo.get_email(),
+                    license=get_license(),
+                    classifiers=[],
+                    keywords=[],
+                    python_version=">=" + get_python_version(),
+                    test_requires=[],
+                    docs_requires=[],
+                    url=repo.get_url(),
+                ),
+            )
+
+            PYPROJECT_TOML.update(data)
+
+        if backend == "poetry":
+            pass
+
+        if backend == "setuptools":
+            pass
+
+    return Task(
+        file_dep=[
+            REQUIREMENTS_TXT,
+        ],
+        actions=[python],
+        targets=[PYPROJECT_TOML],
+        params=[
+            Param(
+                "backend",
+                "flit",
+                choices=tuple((x, x) for x in ("flit", "poetry", "setuptools")),
+            )
+        ],
+    )
 
 
-def task_setup():
+def task_setup_cfg():
+    """infer the declarative setup.cfg configuration for the project"""
     return Task(file_dep=[REQUIREMENTS_TXT], targets=[SETUP_CFG, SETUP_PY])
 
 
+def task_toc():
+    """infer the table of contents for the jupyter_book documentation."""
+
+    def main():
+        TOC.write(get_section(Chapter()))
+
+    return Task(actions=[main], targets=[TOC])
+
+
+def task_config():
+    """infer the jupyter_book documentation configuration."""
+
+    def main():
+        repo = Repo(get_repo())
+        chapter = Chapter()
+        data = templated_file(
+            "_config.json",
+            dict(
+                name=get_name(),
+                requires=REQUIREMENTS_TXT.load(),
+                author=repo.get_author(),
+                exclude=[str(x / "*") for x in chapter.exclude_directories],
+            ),
+        )
+        CONFIG.update(data)
+
+    return Task(actions=[main], targets=[CONFIG])
+
+
+def task_mkdocs_yml():
+    """infer the mkdocs documentation configuration."""
+
+    return Task()
+
+
+def task_blog():
+    """infer the nikola blog documentation configuration."""
+
+    return Task(targets=[CONF])
+
+
 def get_section(chapter, parent=Path(), *done, **section):
+    """generate the nested jupyter book table of contents format for the chapter."""
     files = [
         x
         for x in chapter.include
@@ -49,21 +140,26 @@ def get_section(chapter, parent=Path(), *done, **section):
         and x not in CONVENTIONS
         and not is_private(x)
     ]
+    index = None
     for name in "index readme".split():
         for file in files:
             if file.stem.lower() == name:
+                index = file
                 if "file" not in section:
-                    section.update(file=file.stem, sections=[])
+                    section.update(file=str(file.with_suffix("")), sections=[])
                 else:
-                    sections["sections"].append(file.stem)
+                    section["sections"].append(str(file.with_suffix("")))
 
-    if "file" not in section:
+    if index is None:
         section = dict(file=None, sections=[])
 
     for file in files:
+        if file == index:
+            continue
         if file.suffix in {".py", ".ipynb", ".md", ".rst"}:
+            index = file
             if section["file"] is None:
-                section["file"] = file.stem
+                section["file"] = str(file.with_suffix(""))
             else:
                 section["sections"].append(dict(file=str(file.with_suffix(""))))
 
@@ -76,20 +172,11 @@ def get_section(chapter, parent=Path(), *done, **section):
             continue
         if dir not in done:
             section["sections"].append(get_section(chapter, dir, *done))
+            if section["sections"][-1]["file"] == None:
+                section["sections"].pop(-1)
             done += (dir,)
 
     return section
-
-
-def task_jb():
-    def main():
-        TOC.write(get_section(Chapter()))
-
-    return Task(actions=[main], targets=[TOC, CONFIG])
-
-
-def task_conf():
-    return Task(targets=[CONF])
 
 
 def rough_source(nb):
@@ -188,7 +275,15 @@ def pip_requirements(files):
 IMPORT_TO_PIP = None
 PIP_TO_CONDA = None
 
+if not REQUIREMENTS_TXT.exists():
+    DOIT_CONFIG["default_tasks"] += ["requirements"]
+
+if shutil.which("mamba") or shutil.which("conda") and not ENVIRONMENT_YAML.exists():
+    DOIT_CONFIG["default_tasks"] += ["environment"]
+
+
+DOIT_CONFIG["default_tasks"] += ["toc"]
+DOIT_CONFIG["default_tasks"] += ["config"]
 
 if __name__ == "__main__":
-
     main(globals())

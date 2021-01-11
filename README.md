@@ -1,33 +1,12 @@
-# `qpub` - literate packaging commands
+# `qpub` - quick publishing tasks
 
-in the python world, there are conventional forms and tools for distributing packages, tests, and documentation. `qpub` organizes these opinions and system specific conditions into a consistent command line interface. the unique affordance of `qpub` is that it can infer complete configurations from the contents of project; it can produce packaging, environment, documentation, and testing configuration to name a few.
+`qpub` is a collection of [`doit`][doit] tasks to configure, install, and deploy software. it provides an open source sink for best practices to use different technologies in the open source ecosystem.
 
-with `dgaf` you have the freedom to restructure your project as different forms. `dgaf` will infer and configure your project. it is a developer tool that prioritizes developer needs.
+`qpub` organizes high-level tools that package python project as software and documentation.
 
-## quickstart
+## `qpub` tasks
 
-from some content, `qpub` infers configurations for well rounded development environments.
-
-the quickest way to begin is to:
-
-```bash
-# have some content in a directory
-pushd some_place_with_content
-# install dgaf
-pip install dgaf
-# run the add command to configure the project
-dgaf add
-```
-
-## `dgaf sessions`
-
-`dgaf sessions` reveals the `nox` cli for designing virtual and developer environments.
-
-    dgaf sessions -h # reveals the nox cli.
-
-## `dgaf tasks`
-
-`dgaf tasks` reveals the `doit` for managing the changes to files. by choosing doit tasks we can choose to trigger watcher events based on file system changes.
+tasks are actions that have file dependencies and targets.
 
 ## `dgaf add`
 

@@ -1,16 +1,21 @@
 from .__init__ import *
 import doit
 
+_SERVE = Param("serve", False, help="serve the documentation afterwards.")
+
 
 def task_nikola():
+    """build the documentation with nikola"""
     return Task(file_dep=[CONF], uptodate=[not CONF.exists()])
 
 
 def task_sphinx():
+    """build the documentation with sphinx"""
     return Task(file_dep=[CONF], uptodate=[not CONF.exists()])
 
 
 def task_mkdocs():
+    """build the documentation with mkdocs"""
     return Task(file_dep=[MKDOCS], uptodate=[not MKDOCS.exists()])
 
 

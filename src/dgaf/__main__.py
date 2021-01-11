@@ -1,4 +1,5 @@
 import argparse
+from . import DOIT_CONFIG
 
 parser = argparse.ArgumentParser(prog="dgaf")
 parser.add_argument(
@@ -12,14 +13,7 @@ parser.add_argument(
 )
 
 
-def main():
-    from .__init__ import main
-
-    ns, args = parser.parse_known_args()
-    a = ns.actions
-    if not args:
-        args = ["list"]
-
+def load_tasks(a):
     all = a == "all"
     object = {}
 
@@ -40,7 +34,29 @@ def main():
 
         object.update(vars(install))
 
-    main(object, argv=args, raises=True)
+    import doit
+
+    class Reporter(doit.reporter.ConsoleReporter):
+        def execute_task(self, task):
+            self.outstream.write("MyReporter --> %s\n" % task.title())
+
+    DOIT_CONFIG["reporter"] = Reporter
+
+    return {
+        **{k: v for k, v in object.items() if k.startswith("task_")},
+        "DOIT_CONFIG": DOIT_CONFIG,
+    }
+
+
+def main():
+    from .__init__ import main
+
+    ns, args = parser.parse_known_args()
+
+    if not args:
+        args = ["list"]
+
+    main(load_tasks(ns.actions), argv=args, raises=True)
 
 
 if __name__ == "__main__":

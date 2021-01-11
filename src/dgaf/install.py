@@ -4,8 +4,22 @@ from .__init__ import *
 import shutil
 import doit
 
+_DEVELOP = Param(
+    "develop",
+    True,
+    type=bool,
+    help="use development tools to build the project.",
+)
+_PIP = Param(
+    "pip",
+    False,
+    type=bool,
+    help="build with generic standard python packaging tools.",
+)
+
 
 def task_pip():
+    """install pip requirements"""
     return Task(
         file_dep=[REQUIREMENTS_TXT],
         actions=[f"pip install -r{REQUIREMENTS_TXT} --no-deps"],
@@ -13,6 +27,8 @@ def task_pip():
 
 
 def task_conda():
+    """install conda requirements"""
+
     def conda(mamba):
         backend = mamba and "mamba" or "conda"
         # assert not doit.tools.LongRunning(f"{backend} install").execute()
@@ -33,28 +49,31 @@ def build_backend():
 
 
 def to_whl(dir, name, version):
+    """generate the name of the target wheel."""
     return dir / DIST / f"{name}-{version}-py3-none-any.whl"
 
 
 def to_sdist(dir, name, version):
+    """generate the name of the target sdist."""
     return dir / DIST / f"{name}-{version}.tar.gz"
 
 
 def task_build():
+    """build the python project."""
+
     def build(develop, pip):
-        if develop:
-            return
         if pip:
             needs("pep517")
             assert not doit.tools.CmdAction("python -m pep517.build .").execute()
         elif PYPROJECT_TOML.exists():
             backend = build_backend()
+            print(backend)
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.LongRunning("flit build").execute()
+                assert not doit.tools.CmdAction("flit build").execute()
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.LongRunning("poetry build").execute()
+                assert not doit.tools.CmdAction("poetry build").execute()
             else:
                 needs("pep517")
                 assert not doit.tools.CmdAction("python -m pep517.build .").execute()
@@ -64,11 +83,13 @@ def task_build():
         file_dep=[PYPROJECT_TOML],
         actions=[build],
         targets=[to_whl(Path(), name, version), to_sdist(Path(), name, version)],
-        params=[Param("develop", True, type=bool), Param("pip", False, type=bool)],
+        params=[_DEVELOP, _PIP],
     )
 
 
 def task_install():
+    """install the packages into the sys.packages"""
+
     def install(pip):
         if pip:
             name = get_name()
@@ -96,11 +117,13 @@ def task_install():
         ],
         actions=[install],
         task_dep=["build"],
-        params=[Param("develop", True, type=bool), Param("pip", False, type=bool)],
+        params=[_DEVELOP, _PIP],
     )
 
 
 def task_develop():
+    """install the project in development mode."""
+
     def develop(pip):
         if pip:
             assert not doit.tools.CmdAction("pip install -e.")
@@ -118,18 +141,11 @@ def task_develop():
     return Task(
         file_dep=[PYPROJECT_TOML],
         actions=[develop],
-        params=[Param("pip", False, type=bool)],
+        params=[_DEVELOP, _PIP],
     )
 
 
 conda, mamba = bool(shutil.which("conda")), bool(shutil.which("mamba"))
-
-
-if ENVIRONMENT_YAML.exists():
-    DOIT_CONFIG["default_tasks"] += ["conda"]
-
-if REQUIREMENTS_TXT.exists():
-    DOIT_CONFIG["default_tasks"] += ["pip"]
 
 DOIT_CONFIG["default_tasks"] += ["develop"]
 

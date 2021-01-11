@@ -36,10 +36,26 @@ requires = [
   "GitPython",
   "pathspec",
   "importlib_metadata",
+  "aiofiles",
+  "depfinder",
+  "dgaf",
+  "doit",
+  "flit",
+  "importlib_resources",
+  "jsone",
+  "nbformat",
+  "packaging",
+  "pytest",
+  "requests_cache",
+  "ruamel.yaml",
+  "tomlkit",
+  "yaml",
+  "configupdater",
 ]
 requires-python = ">=3.7"
 
 [tool.flit.metadata.requires-extra]
+dev = []
 doc = ["jupyter-book"]
 test = [
   "pytest",
