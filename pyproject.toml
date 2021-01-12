@@ -42,15 +42,16 @@ requires = [
   "doit",
   "flit",
   "importlib_resources",
-  "jsone",
+  "json-e",
   "nbformat",
   "packaging",
   "pytest",
   "requests_cache",
   "ruamel.yaml",
   "tomlkit",
-  "yaml",
+  "pyyaml",
   "configupdater",
+  "jsone",
 ]
 requires-python = ">=3.7"
 
@@ -84,6 +85,30 @@ include = []
 
 [tool.flit.entrypoints]
 
+[tool.poetry]
+authors = ["tonyfast <tony.fast@gmail.com>"]
+classifiers = []
+description = "q(uick) p(ubishing) configures python Project and documentaton tools."
+documentation = "https://github.com/deathbeds/dgaf.git"
+exclude = []
+homepage = "https://github.com/deathbeds/dgaf.git"
+include = []
+keywords = []
+license = ""
+maintainers = ["tonyfast <tony.fast@gmail.com>"]
+name = "dgaf"
+packages = []
+readme = ""
+repository = "https://github.com/deathbeds/dgaf.git"
+version = "2021.1.11"
+
+[tool.poetry.dependencies]
+python = "^{sys.version_info.major}.{sys.version_info.minor}"
+
+[tool.poetry.plugins]
+
+[tool.poetry.urls]
+
 [build-system]
 build-backend = "flit_core.buildapi"
-requires = ["flit_core>=2,<4"]
+requires = ["flit_core>=2,<4", "setuptools", "wheel", "poetry_core>=1.0.0"]
