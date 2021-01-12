@@ -77,7 +77,8 @@ def get_repo():
         return git.Repo()
 
 
-def get_name():
+def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
+    is_common = []
     if SRC.exists():
         for x in SRC.iterdir():
             if is_private(x):
@@ -90,6 +91,11 @@ def get_name():
     for directory in [True, False]:
         for x in Path().iterdir():
 
+            if directory:
+                if x in common:
+                    is_common.append(x)
+                    continue
+
             if is_private(x):
                 continue
 
@@ -101,6 +107,9 @@ def get_name():
                     return x.stem
             else:
                 return x.stem
+    else:
+        if is_common:
+            return is_common.pop(0)
     raise Exception
 
 
