@@ -23,6 +23,7 @@ from . import (
     SETUP_PY,
     TOC,
     Chapter,
+    Param,
     Path,
     Repo,
     Task,

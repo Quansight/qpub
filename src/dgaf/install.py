@@ -1,4 +1,4 @@
-"""install packages into conda and python environments."""
+"""build and install packages into conda and python environments."""
 
 import shutil
 import sys
@@ -27,6 +27,8 @@ _DEVELOP = Param(
 _PIP = Param(
     "pip", False, type=bool, help="build with generic standard python packaging tools."
 )
+_MAMBA = Param("mamba", bool(shutil.which("mamba")))
+_CHANNELS = Param("channel", ["-cconda-forge"], type=list, short="c")
 
 
 def task_pip():
@@ -40,30 +42,26 @@ def task_pip():
 def task_conda():
     """install conda requirements"""
 
-    def conda(mamba):
+    def conda(mamba, channel):
         backend = mamba and "mamba" or "conda"
-        # assert not doit.tools.LongRunning(f"{backend} install").execute(sys.stdout, sys.stderr)
+        data = ENVIRONMENT_YAML.load()
+        deps = data.get("dependencies", [])
+        pip = []
+        for dep in deps:
+            if isinstance(dep, dict):
+                pip.extend(dep.pop("pip", []))
 
-    return Task(file_dep=[ENVIRONMENT_YAML], params=[Param("mamba", mamba)])
+        assert not doit.tools.LongRunning(
+            f"""{backend} install {" ".join(deps)}"""
+        ).execute(sys.stdout, sys.stderr)
+        if pip:
+            assert not doit.tools.LongRunning(
+                f"""pip install {" ".join(pip)} --no-deps"""
+            ).execute(sys.stdout, sys.stderr)
 
-
-def build_backend():
-    return (
-        PYPROJECT_TOML.load()
-        .get(BUILDSYSTEM, {})
-        .get("build-backend", None)
-        .partition(".")[0]
+    return Task(
+        actions=[conda], file_dep=[ENVIRONMENT_YAML], params=[_MAMBA, _CHANNELS]
     )
-
-
-def to_whl(dir, name, version):
-    """generate the name of the target wheel."""
-    return dir / DIST / f"{name}-{version}-py3-none-any.whl"
-
-
-def to_sdist(dir, name, version):
-    """generate the name of the target sdist."""
-    return dir / DIST / f"{name}-{version}.tar.gz"
 
 
 def task_build():
@@ -169,7 +167,24 @@ def task_develop():
     return Task(file_dep=[PYPROJECT_TOML], actions=[develop], params=[_DEVELOP, _PIP])
 
 
-conda, mamba = bool(shutil.which("conda")), bool(shutil.which("mamba"))
+def build_backend():
+    return (
+        PYPROJECT_TOML.load()
+        .get(BUILDSYSTEM, {})
+        .get("build-backend", None)
+        .partition(".")[0]
+    )
+
+
+def to_whl(dir, name, version):
+    """generate the name of the target wheel."""
+    return dir / DIST / f"{name}-{version}-py3-none-any.whl"
+
+
+def to_sdist(dir, name, version):
+    """generate the name of the target sdist."""
+    return dir / DIST / f"{name}-{version}.tar.gz"
+
 
 DOIT_CONFIG["default_tasks"] += ["develop"]
 

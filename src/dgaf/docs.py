@@ -25,12 +25,12 @@ def task_mkdocs():
 def task_jupyter_book():
     """build the documentation with jupyter-book"""
 
-    def jb():
-        assert not doit.tools.LongRunning(
+    return Task(
+        actions=[
             "jb build --toc docs/_toc.yml --config docs/_config.yml --builder html ."
-        ).execute(sys.stdout, sys.stderr)
-
-    return Task(actions=[jb], file_dep=[TOC, CONFIG], uptodate=[not TOC.exists()])
+        ],
+        file_dep=[TOC, CONFIG],
+    )
 
 
 if __name__ == "__main__":
