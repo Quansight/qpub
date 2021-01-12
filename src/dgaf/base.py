@@ -104,14 +104,15 @@ def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests
             if is_private(x):
                 continue
 
-            if x not in CONVENTIONS:
+            if x in CONVENTIONS:
                 continue
 
             if directory:
                 if x.is_dir():
                     return x.stem
             else:
-                return x.stem
+                if x.suffix in {".py", ".ipynb"}:
+                    return x.stem
     else:
         if is_common:
             return is_common.pop(0)
@@ -220,10 +221,7 @@ def get_python_version():
 def get_module(name):
     import flit
 
-    try:
-        return flit.common.Module(get_name())
-    except:
-        pass
+    return flit.common.Module(get_name())
 
 
 def get_version():

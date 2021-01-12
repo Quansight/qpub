@@ -123,17 +123,48 @@ def task_pyproject():
             # update the poetry dependencies with the cli
 
         if backend == "setuptools":
-            data = templated_file("setuptools_cfg.json", {})
+            data = templated_file("setuptools_cfg.json", metadata)
 
             SETUP_CFG.write(data)
             data = merge(tool, templated_file("setuptools_toml.json", {}))
             PYPROJECT_TOML.update(data)
+
+    task_dep = []
+    chapter = Chapter()
+
+    if ".py" not in chapter.suffixes:
+        task_dep.append("jupytext")
 
     return Task(
         file_dep=[REQUIREMENTS_TXT],
         actions=[python],
         targets=[PYPROJECT_TOML],
         params=[_BACKEND],
+        task_dep=task_dep,
+    )
+
+
+def task_jupytext():
+    """attach jupytext to the project to render python files.
+
+    we only trigger this if there are no python files.
+
+    jupytext provides a nice general developer affordance for teaching and developing."""
+    chapter = Chapter()
+
+    def jupytext(task):
+        needs("jupytext")
+        not doit.tools.CmdAction(
+            f"""jupytext --set-formats ipynb,py:percent {" ".join(map(str, task.file_dep))}"""
+        ).execute(sys.stdout, sys.stderr)
+
+    notebooks = [x for x in chapter.include if x.suffix == ".ipynb"]
+    targets = [x.with_suffix(".py") for x in notebooks]
+    return Task(
+        file_dep=notebooks,
+        targets=targets,
+        actions=[jupytext],
+        uptodate=[".py" in chapter.suffixes],
     )
 
 
