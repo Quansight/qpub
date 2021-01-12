@@ -87,74 +87,47 @@ def task_pyproject():
     """infer the pyproject.toml configuration for the project"""
 
     def python(backend):
-        repo = Repo(get_repo())
+        chapter = Chapter()
+        repo = Repo()
+        metadata = dict(
+            author=repo.get_author(),
+            classifiers=[],
+            docs_requires=File("requirements-docs.txt").load(),
+            email=repo.get_email(),
+            keywords=[],
+            license=get_license(),
+            name=get_name(),
+            python_version=">=" + get_python_version(),
+            requires=REQUIREMENTS_TXT.load(),
+            test_requires=File("requirements-test.txt").load(),
+            url=repo.get_url(),
+            long_description=None,
+            version=get_version(),
+            description=get_description(),
+            exclude=[str(x / "*") for x in chapter.exclude_directories],
+        )
+        tool = templated_file("pytest.json", metadata)
+        tool = merge(dict(tool=dict(flakehell={})), tool)
 
         if backend == "flit":
-            data = templated_file(
-                "flit.json",
-                dict(
-                    author=repo.get_author(),
-                    classifiers=[],
-                    docs_requires=File("requirements-docs.txt").load(),
-                    email=repo.get_email(),
-                    keywords=[],
-                    license=get_license(),
-                    name=get_name(),
-                    python_version=">=" + get_python_version(),
-                    requires=REQUIREMENTS_TXT.load(),
-                    test_requires=File("requirements-test.txt").load(),
-                    url=repo.get_url(),
-                ),
-            )
+            data = merge(tool, templated_file("flit.json", metadata))
 
             PYPROJECT_TOML.update(data)
 
         if backend == "poetry":
             needs("poetry")
-            data = templated_file(
-                "poetry.json",
-                dict(
-                    author=repo.get_author(),
-                    classifiers=[],
-                    description=get_description(),
-                    email=repo.get_email(),
-                    keywords=[],
-                    license=get_license(),
-                    name=get_name(),
-                    python_version=get_python_version(),
-                    url=repo.get_url(),
-                    version=get_version(),
-                    long_description=None,
-                ),
-            )
+            data = merge(tool, templated_file("poetry.json", metadata))
 
             PYPROJECT_TOML.update(data)
 
             # update the poetry dependencies with the cli
 
         if backend == "setuptools":
-            data = templated_file(
-                "setuptools_cfg.json",
-                dict(
-                    name=get_name(),
-                    requires=REQUIREMENTS_TXT.load(),
-                    version=get_version(),
-                    description=get_description(),
-                    author=repo.get_author(),
-                    email=repo.get_email(),
-                    license=get_license(),
-                    classifiers=[],
-                    keywords=[],
-                    python_version=get_python_version(),
-                    test_requires=File("requirements-test.txt").load(),
-                    docs_requires=File("requirements-docs.txt").load(),
-                    url=repo.get_url(),
-                    long_description=None,
-                ),
-            )
-            SETUP_CFG.write(data)
+            data = templated_file("setuptools_cfg.json", {})
 
-            PYPROJECT_TOML.update(templated_file("setuptools_toml.json", {}))
+            SETUP_CFG.write(data)
+            data = merge(tool, templated_file("setuptools_toml.json", {}))
+            PYPROJECT_TOML.update(data)
 
     return Task(
         file_dep=[REQUIREMENTS_TXT],

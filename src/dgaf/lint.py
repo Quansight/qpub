@@ -20,4 +20,5 @@ def task_lint():
 DOIT_CONFIG["default_tasks"] += ["lint"]
 
 if __name__ == "__main__":
+
     main(globals())

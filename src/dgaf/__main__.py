@@ -14,7 +14,7 @@ parser.add_argument(
 )
 
 
-def load_tasks(a):
+def load_tasks(a="all"):
     all = a == "all"
     object = {}
 
@@ -56,7 +56,7 @@ def main():
 
     if not args:
         args = ["list"]
-
+    print(999, args, ns.actions)
     main(load_tasks(ns.actions), argv=args, raises=True)
 
 

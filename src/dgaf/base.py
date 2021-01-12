@@ -14,19 +14,31 @@ class options:
     cache = Path(__file__).parent / "_data"
 
 
+def get_repo():
+    if GIT.exists():
+        import git
+
+        return git.Repo()
+
+
 @dataclasses.dataclass
 class Repo:
-    repo: object
+    repo: object = dataclasses.field(default_factory=get_repo)
 
     def get_email(self):
-        return self.repo.commit().author.email
+        if self.repo:
+            return self.repo.commit().author.email
+        return ""
 
     def get_author(self):
-        return self.repo.commit().author.name
+        if self.repo:
+            return self.repo.commit().author.name
+        return ""
 
     def get_url(self):
-        if hasattr(self.repo.remotes, "origin"):
-            return self.repo.remotes.origin.url
+        if self.repo:
+            if hasattr(self.repo.remotes, "origin"):
+                return self.repo.remotes.origin.url
         return ""
 
     def get_branch(self):
@@ -70,13 +82,6 @@ class Param(Dict):
     choices: tuple = dataclasses.field(default_factory=tuple)
 
 
-def get_repo():
-    if GIT.exists():
-        import git
-
-        return git.Repo()
-
-
 def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
     is_common = []
     if SRC.exists():
@@ -110,6 +115,7 @@ def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests
     else:
         if is_common:
             return is_common.pop(0)
+
     raise Exception
 
 
@@ -126,6 +132,8 @@ class Chapter:
     exclude_directories: list = dataclasses.field(default_factory=list, repr=False)
 
     def __post_init__(self):
+        if isinstance(self.dir, str):
+            self.dir = Path(self.dir)
         self.get_include_exclude()
         self.directories = sorted(set(x.parent for x in self.include))
         self.include = sorted(set(x for x in self.include if x not in self.directories))
@@ -249,11 +257,35 @@ def get_description():
 
 
 def main(object=None, argv=None, raises=False):
-    """run the main program"""
+    """a generic runner for tasks in process."""
+
     global DOIT_CONFIG
     import sys
 
     import doit
+    from . import __main__
+
+    if object is None:
+
+        object = __main__.load_tasks()
+
+    if callable(object):
+        object = [object]
+
+    if isinstance(object, list):
+        # use a list of callables or strings to define the default tasks
+        default_tasks = [
+            x if isinstance(x, str) else x.__name__[len("task_") :] for x in object
+        ]
+
+        # load the tasks and default tasks
+        object = __main__.load_tasks()
+
+        # override default tasks
+        DOIT_CONFIG["default_tasks"] = default_tasks
+
+        # avoid using the sys args
+        argv = argv or []
 
     if argv is None:
         argv = sys.argv[1:]
@@ -271,9 +303,11 @@ def main(object=None, argv=None, raises=False):
     code = main.run(argv)
     if raises:
         sys.exit(code)
+    return code
 
 
 def needs(*object):
+    """a function designed install packages as needed"""
     import doit
 
     needs = []
@@ -289,6 +323,7 @@ def needs(*object):
 
 
 def where_template(template):
+    """locate the qpub jsone-e templates"""
     try:
         with importlib.resources.path("dgaf.templates", template) as template:
             template = File(template)
@@ -298,6 +333,7 @@ def where_template(template):
 
 
 def templated_file(template, data):
+    """return the templated data based on a template"""
     import jsone
 
     return jsone.render(where_template(template).load(), data)
@@ -326,6 +362,7 @@ def ignore(cache={}):
 
 
 def ignored_by(object):
+    """return the pattern that ignores the object"""
     for k, v in ignore().items():
         try:
             next(v.match([str(object)]))
@@ -335,4 +372,5 @@ def ignored_by(object):
 
 
 def ignored(object):
+    """return True when the object ignored"""
     return bool(ignored_by(object))
