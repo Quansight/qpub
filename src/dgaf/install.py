@@ -51,11 +51,11 @@ def task_conda():
             if isinstance(dep, dict):
                 pip.extend(dep.pop("pip", []))
 
-        assert not doit.tools.LongRunning(
+        assert not doit.tools.CmdAction(
             f"""{backend} install {" ".join(deps)}"""
         ).execute(sys.stdout, sys.stderr)
         if pip:
-            assert not doit.tools.LongRunning(
+            assert not doit.tools.CmdAction(
                 f"""pip install {" ".join(pip)} --no-deps"""
             ).execute(sys.stdout, sys.stderr)
 
@@ -115,16 +115,16 @@ def task_install():
             backend = build_backend()
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.LongRunning("flit install").execute(
+                assert not doit.tools.CmdAction("flit install").execute(
                     sys.stdout, sys.stderr
                 )
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.LongRunning("poetry install").execute(
+                assert not doit.tools.CmdAction("poetry install").execute(
                     sys.stdout, sys.stderr
                 )
             else:
-                assert not doit.tools.LongRunning("pip install . --no-deps").execute(
+                assert not doit.tools.CmdAction("pip install . --no-deps").execute(
                     sys.stdout, sys.stderr
                 )
 
@@ -151,16 +151,16 @@ def task_develop():
             backend = build_backend()
             if backend == "flit_core":
                 needs("flit")
-                assert not doit.tools.LongRunning("flit install -s").execute(
+                assert not doit.tools.CmdAction("flit install -s").execute(
                     sys.stdout, sys.stderr
                 )
             elif backend == "poetry":
                 needs("poetry")
-                assert not doit.tools.LongRunning("poetry install").execute(
+                assert not doit.tools.CmdAction("poetry install").execute(
                     sys.stdout, sys.stderr
                 )
             else:
-                assert not doit.tools.LongRunning("pip install -e. --no-deps").execute(
+                assert not doit.tools.CmdAction("pip install -e. --no-deps").execute(
                     sys.stdout, sys.stderr
                 )
 

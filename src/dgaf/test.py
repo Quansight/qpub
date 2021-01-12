@@ -21,12 +21,12 @@ def task_test():
 
         if monkeytype:
             needs("pytest", "monkeytype")
-            assert not doit.tools.LongRunning(
+            assert not doit.tools.CmdAction(
                 f"""monkeytype pytest {" ".join(extra)}"""
             ).execute(sys.stdout, sys.stderr)
         else:
             needs("pytest")
-            assert not doit.tools.LongRunning(f"""pytest {" ".join(extra)}""").execute(
+            assert not doit.tools.CmdAction(f"""pytest {" ".join(extra)}""").execute(
                 sys.stdout, sys.stderr
             )
 
