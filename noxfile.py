@@ -38,6 +38,7 @@ nox.options.sessions = ["develop"]
 
 @nox.session(python=False)
 def quick(session):
+    """a quick test session to see if things work."""
     session.install(".")
     session.run(*"dgaf test".split())
 

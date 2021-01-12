@@ -31,26 +31,26 @@ maintainer = "tonyfast"
 maintainer-email = "tony.fast@gmail.com"
 module = "dgaf"
 requires = [
-  "nox",
-  "typer",
-  "GitPython",
-  "pathspec",
-  "importlib_metadata",
   "aiofiles",
+  "configupdater",
   "depfinder",
   "doit",
   "flit",
+  "GitPython",
+  "importlib_metadata",
   "importlib_resources",
   "json-e",
+  "json-e",
   "nbformat",
+  "nox",
   "packaging",
+  "pathspec",
   "pytest",
+  "pyyaml",
   "requests_cache",
   "ruamel.yaml",
   "tomlkit",
-  "pyyaml",
-  "configupdater",
-  "jsone",
+  "typer",
 ]
 requires-python = ">=3.7"
 
@@ -58,23 +58,23 @@ requires-python = ">=3.7"
 dev = []
 doc = ["jupyter-book"]
 test = [
-  "pytest",
-  "pytest-sugar",
-  "nbval",
-  "importnb",
-  "pytest",
-  "poetry",
-  "importlib_metadata",
-  "flit",
-  "nbformat",
-  "depfinder",
   "aiofiles",
-  "typer",
+  "depfinder",
+  "doit",
+  "flit",
+  "importlib_metadata",
+  "importnb",
   "json-e",
+  "nbformat",
+  "nbval",
   "poetry",
+  "poetry",
+  "pytest-sugar",
+  "pytest",
+  "pytest",
   "requests-cache",
   "tomlkit",
-  "doit",
+  "typer",
 ]
 
 [tool.flit.metadata.urls]
