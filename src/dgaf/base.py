@@ -5,7 +5,7 @@ import io
 import sys
 
 from . import DOIT_CONFIG
-from .files import CONVENTIONS, GIT, SRC, File, Path
+from .files import CONVENTIONS, GIT, SRC, File, Path, DOCS, File
 
 BUILDSYSTEM = "build-system"
 
@@ -126,15 +126,26 @@ class Chapter:
         self.exclude_directories = sorted(set(x for x in self.exclude if x.is_dir()))
 
     def source_files(self):
+        """filter the source files"""
+        if SRC.exists():
+            return [x for x in self.include if x.is_relative_to(SRC)]
+        name = Path(get_name())
+        if Path(name).exists():
+            return [x for x in self.include if x.is_relative_to(SRC)]
         return self.include
 
     def test_files(self):
-        return self.include
+        """filter the test files"""
+        return [x for x in self.include if x.stem.startswith("test_")]
 
     def docs_files(self):
-        return self.include
+        """filter the documentation files"""
+        if DOCS:
+            return [x for x in self.include if x.is_relative_to(DOCS)]
+        return []
 
     def get_include_exclude(self, dir=None, files=None):
+        """split the included and excluded files"""
         dir = dir or self.dir
         root = files is None
         files = [] if root else files
@@ -172,15 +183,18 @@ class Chapter:
         return self.dump()
 
 
-def is_private(object):
-    return Path(object).stem.startswith(tuple(".-"))
+def is_private(object, chars=".-"):
+    """is the file name hidden or private"""
+    return Path(object).stem.startswith(tuple(chars))
 
 
 def get_license():
+    """get the license"""
     return ""
 
 
 def get_python_version():
+    """get the python version"""
     import sys
 
     return "{sys.version_info.major}.{sys.version_info.minor}"
@@ -196,6 +210,7 @@ def get_module(name):
 
 
 def get_version():
+    """get the project version"""
     import datetime
 
     import flit
@@ -208,6 +223,7 @@ def get_version():
 
 
 def normalize_version(object):
+    """normalize the version number"""
     import contextlib
 
     import packaging.requirements
@@ -217,6 +233,7 @@ def normalize_version(object):
 
 
 def get_description():
+    """get the project description"""
     import flit
 
     return flit.common.get_info_from_module(get_module(get_name())).pop("summary")

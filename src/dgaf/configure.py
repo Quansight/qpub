@@ -17,6 +17,8 @@ from . import (
     DOCS,
     DOIT_CONFIG,
     ENVIRONMENT_YAML,
+    File,
+    PRECOMMITCONFIG_YML,
     PYPROJECT_TOML,
     REQUIREMENTS_TXT,
     SETUP_CFG,
@@ -27,15 +29,27 @@ from . import (
     Path,
     Repo,
     Task,
+    get_description,
     get_license,
     get_name,
     get_python_version,
     get_repo,
+    get_version,
     is_private,
     main,
     merge,
+    needs,
     options,
     templated_file,
+)
+
+_BACKEND = Param(
+    "backend",
+    "flit",
+    short="b",
+    long="backend",
+    type=str,
+    choices=tuple((x, x) for x in ("flit", "poetry", "setuptools")),
 )
 
 
@@ -45,6 +59,10 @@ def task_requirements_txt():
     def requirements():
         chapter = Chapter()
         REQUIREMENTS_TXT.update(pip_requirements(chapter.source_files()))
+        pip = pip_requirements(chapter.test_files())
+        pip and File("requirements-test.txt").update(pip)
+        pip = pip_requirements(chapter.docs_files())
+        pip and File("requirements-docs.txt").update(pip)
 
     return Task(actions=[requirements], targets=[REQUIREMENTS_TXT], clean=True)
 
@@ -75,16 +93,16 @@ def task_pyproject():
             data = templated_file(
                 "flit.json",
                 dict(
-                    name=get_name(),
-                    requires=REQUIREMENTS_TXT.load(),
                     author=repo.get_author(),
-                    email=repo.get_email(),
-                    license=get_license(),
                     classifiers=[],
+                    docs_requires=File("requirements-docs.txt").load(),
+                    email=repo.get_email(),
                     keywords=[],
+                    license=get_license(),
+                    name=get_name(),
                     python_version=">=" + get_python_version(),
-                    test_requires=[],
-                    docs_requires=[],
+                    requires=REQUIREMENTS_TXT.load(),
+                    test_requires=File("requirements-test.txt").load(),
                     url=repo.get_url(),
                 ),
             )
@@ -92,22 +110,57 @@ def task_pyproject():
             PYPROJECT_TOML.update(data)
 
         if backend == "poetry":
-            pass
+            needs("poetry")
+            data = templated_file(
+                "poetry.json",
+                dict(
+                    author=repo.get_author(),
+                    classifiers=[],
+                    description=get_description(),
+                    email=repo.get_email(),
+                    keywords=[],
+                    license=get_license(),
+                    name=get_name(),
+                    python_version=get_python_version(),
+                    url=repo.get_url(),
+                    version=get_version(),
+                    long_description=None,
+                ),
+            )
+
+            PYPROJECT_TOML.update(data)
+
+            # update the poetry dependencies with the cli
 
         if backend == "setuptools":
-            pass
+            data = templated_file(
+                "setuptools_cfg.json",
+                dict(
+                    name=get_name(),
+                    requires=REQUIREMENTS_TXT.load(),
+                    version=get_version(),
+                    description=get_description(),
+                    author=repo.get_author(),
+                    email=repo.get_email(),
+                    license=get_license(),
+                    classifiers=[],
+                    keywords=[],
+                    python_version=get_python_version(),
+                    test_requires=File("requirements-test.txt").load(),
+                    docs_requires=File("requirements-docs.txt").load(),
+                    url=repo.get_url(),
+                    long_description=None,
+                ),
+            )
+            SETUP_CFG.write(data)
+
+            PYPROJECT_TOML.update(templated_file("setuptools_toml.json", {}))
 
     return Task(
         file_dep=[REQUIREMENTS_TXT],
         actions=[python],
         targets=[PYPROJECT_TOML],
-        params=[
-            Param(
-                "backend",
-                "flit",
-                choices=tuple((x, x) for x in ("flit", "poetry", "setuptools")),
-            )
-        ],
+        params=[_BACKEND],
     )
 
 
@@ -144,6 +197,11 @@ def task_config():
         CONFIG.update(data)
 
     return Task(actions=[main], targets=[CONFIG])
+
+
+def task_precommit():
+    # uptodate with suffixes
+    return Task(targets=[PRECOMMITCONFIG_YML])
 
 
 def task_mkdocs_yml():
