@@ -26,9 +26,10 @@ def task_test():
             ).execute(sys.stdout, sys.stderr)
         else:
             needs("pytest")
-            assert not doit.tools.CmdAction(f"""pytest {" ".join(extra)}""").execute(
+            result = doit.tools.CmdAction(f"""pytest {" ".join(extra)}""").execute(
                 sys.stdout, sys.stderr
             )
+            assert not result, "\n".join(result.out) + "\n".join(result.err)
 
     return Task(
         actions=[test],
