@@ -284,23 +284,27 @@ def rough_source(nb):
 
 def _import_depfinder():
     import os
+    import yaml
+
+    if not hasattr(yaml, "CSafeLoader"):
+        yaml.CSafeLoader = yaml.SafeLoader
 
     if os.getenv("CI"):
-        return __import__("depfinder")
+        import depfinder
     else:
         if "depfinder" not in sys.modules:
             import requests_cache
-            import yaml
 
             dir = Path(__file__).parent
             requests_cache.install_cache(str(options.cache / "requests_cache"))
             dir.mkdir(parents=True, exist_ok=True)
-            if not hasattr(yaml, "CSafeLoader"):
-                yaml.CSafeLoader = yaml.SafeLoader
             import depfinder
 
             requests_cache.uninstall_cache()
-    return __import__("depfinder")
+        else:
+            import depfinder
+
+    return depfinder
 
 
 async def infer(file):
