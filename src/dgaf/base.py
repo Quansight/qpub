@@ -148,8 +148,8 @@ class Chapter:
         if SRC.exists():
             return [x for x in self.include if x.is_relative_to(SRC)]
         name = Path(get_name())
-        if Path(name).exists():
-            return [x for x in self.include if x.is_relative_to(SRC)]
+        if name.exists():
+            return [x for x in self.include if x.is_relative_to(name)]
         return self.include
 
     def test_files(self):

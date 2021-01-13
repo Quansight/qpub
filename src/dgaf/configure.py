@@ -128,9 +128,10 @@ def task_pyproject():
             data = merge(tool, templated_file("poetry.json", metadata))
 
             PYPROJECT_TOML.update(data)
-            assert not doit.tools.CmdAction(
-                f"""poetry add {" ".join(metadata["requires"])} --lock"""
-            ).execute(sys.stdout, sys.stderr)
+            if metadata["requires"]:
+                assert not doit.tools.CmdAction(
+                    f"""poetry add {" ".join(metadata["requires"])} --lock"""
+                ).execute(sys.stdout, sys.stderr)
 
         if backend == "setuptools":
             data = templated_file("setuptools_cfg.json", metadata)
