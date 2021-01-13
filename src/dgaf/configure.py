@@ -30,6 +30,7 @@ from . import (
     merge,
     needs,
     options,
+    MKDOCS,
     Param,
     Path,
     PRECOMMITCONFIG_YML,
@@ -105,7 +106,7 @@ def task_pyproject():
             keywords=[],
             license=get_license(),
             name=get_name(),
-            python_version="3.7",  # get_python_version(),
+            python_version="3.7.1",  # get_python_version(),
             requires=REQUIREMENTS_TXT.load(),
             test_requires=REQUIREMENTS_TEST_TXT.load(),
             url=repo.get_url(),
@@ -187,7 +188,7 @@ def task_toc():
     def main():
         TOC.write(get_section(Chapter()))
 
-    return Task(actions=[main], targets=[TOC])
+    return Task(actions=[(doit.tools.create_folder, [DOCS]), main], targets=[TOC])
 
 
 def task_config():
@@ -208,13 +209,35 @@ def task_config():
         )
         CONFIG.update(data)
 
-    return Task(actions=[main], targets=[CONFIG])
+    return Task(actions=[(doit.tools.create_folder, [DOCS]), main], targets=[CONFIG])
 
 
 def task_mkdocs_yml():
     """infer the mkdocs documentation configuration."""
 
-    return Task()
+    def mkdocs():
+        chapter = Chapter()
+        repo = Repo()
+        metadata = dict(
+            author=repo.get_author(),
+            classifiers=[],
+            docs_requires=File("requirements-docs.txt").load(),
+            email=repo.get_email(),
+            keywords=[],
+            license=get_license(),
+            name=get_name(),
+            python_version="3.7.1",  # get_python_version(),
+            requires=REQUIREMENTS_TXT.load(),
+            test_requires=REQUIREMENTS_TEST_TXT.load(),
+            url=repo.get_url(),
+            long_description=None,
+            version=get_version(),
+            description=get_description(),
+            exclude=[str(x / "*") for x in chapter.exclude_directories],
+        )
+        MKDOCS.write(templated_file("mkdocs.json", metadata))
+
+    return Task(actions=[mkdocs], targets=[MKDOCS])
 
 
 def task_blog():
