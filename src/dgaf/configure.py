@@ -11,6 +11,7 @@ import doit
 
 from . import (
     BUILD,
+    Chapter,
     CONF,
     CONFIG,
     CONVENTIONS,
@@ -18,17 +19,6 @@ from . import (
     DOIT_CONFIG,
     ENVIRONMENT_YAML,
     File,
-    PRECOMMITCONFIG_YML,
-    PYPROJECT_TOML,
-    REQUIREMENTS_TXT,
-    SETUP_CFG,
-    SETUP_PY,
-    TOC,
-    Chapter,
-    Param,
-    Path,
-    Repo,
-    Task,
     get_description,
     get_license,
     get_name,
@@ -40,7 +30,19 @@ from . import (
     merge,
     needs,
     options,
+    Param,
+    Path,
+    PRECOMMITCONFIG_YML,
+    PYPROJECT_TOML,
+    Repo,
+    REQUIREMENTS_DOCS_TXT,
+    REQUIREMENTS_TEST_TXT,
+    REQUIREMENTS_TXT,
+    SETUP_CFG,
+    SETUP_PY,
+    Task,
     templated_file,
+    TOC,
 )
 
 _BACKEND = Param(
@@ -59,12 +61,16 @@ def task_requirements_txt():
     def requirements():
         chapter = Chapter()
         REQUIREMENTS_TXT.update(pip_requirements(chapter.source_files()))
-        pip = pip_requirements(chapter.test_files())
-        pip and File("requirements-test.txt").update(pip)
+        pip = pip_requirements(chapter.test_files()) + ["pytest"]
+        pip and REQUIREMENTS_TEST_TXT.update(pip)
         pip = pip_requirements(chapter.docs_files())
-        pip and File("requirements-docs.txt").update(pip)
+        pip and REQUIREMENTS_DOCS_TXT.update(pip)
 
-    return Task(actions=[requirements], targets=[REQUIREMENTS_TXT], clean=True)
+    return Task(
+        actions=[requirements],
+        targets=[REQUIREMENTS_TXT, REQUIREMENTS_TEST_TXT, REQUIREMENTS_DOCS_TXT],
+        clean=True,
+    )
 
 
 def task_environment_yaml():
@@ -79,7 +85,9 @@ def task_environment_yaml():
         )
 
     return Task(
-        actions=[conda], file_dep=[REQUIREMENTS_TXT], targets=[ENVIRONMENT_YAML]
+        actions=[conda],
+        file_dep=[REQUIREMENTS_TXT, REQUIREMENTS_TEST_TXT, REQUIREMENTS_DOCS_TXT],
+        targets=[ENVIRONMENT_YAML],
     )
 
 
@@ -97,9 +105,9 @@ def task_pyproject():
             keywords=[],
             license=get_license(),
             name=get_name(),
-            python_version=">=" + get_python_version(),
+            python_version="3.8",  # get_python_version(),
             requires=REQUIREMENTS_TXT.load(),
-            test_requires=File("requirements-test.txt").load(),
+            test_requires=REQUIREMENTS_TEST_TXT.load(),
             url=repo.get_url(),
             long_description=None,
             version=get_version(),
@@ -119,12 +127,12 @@ def task_pyproject():
             data = merge(tool, templated_file("poetry.json", metadata))
 
             PYPROJECT_TOML.update(data)
-
-            # update the poetry dependencies with the cli
+            assert not doit.tools.CmdAction(
+                f"""poetry add {" ".join(metadata["requires"])} --lock"""
+            ).execute(sys.stdout, sys.stderr)
 
         if backend == "setuptools":
             data = templated_file("setuptools_cfg.json", metadata)
-
             SETUP_CFG.write(data)
             data = merge(tool, templated_file("setuptools_toml.json", {}))
             PYPROJECT_TOML.update(data)
@@ -154,7 +162,7 @@ def task_jupytext():
 
     def jupytext(task):
         needs("jupytext")
-        not doit.tools.CmdAction(
+        assert not doit.tools.CmdAction(
             f"""jupytext --set-formats ipynb,py:percent {" ".join(map(str, task.file_dep))}"""
         ).execute(sys.stdout, sys.stderr)
 
@@ -286,6 +294,7 @@ def _import_depfinder():
     import os
     import yaml
 
+    # https://github.com/ericdill/depfinder/pull/64/
     if not hasattr(yaml, "CSafeLoader"):
         yaml.CSafeLoader = yaml.SafeLoader
 

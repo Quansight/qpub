@@ -87,6 +87,8 @@ DOIT_DB_BAK = DOIT_DB_DAT.with_suffix(".bak")
 PRECOMMITCONFIG_YML = Convention(".pre-commit-config.yaml")
 PYPROJECT_TOML = Convention("pyproject.toml")
 REQUIREMENTS_TXT = Convention("requirements.txt")
+REQUIREMENTS_TEST_TXT = Convention("requirements-test.txt")
+REQUIREMENTS_DOCS_TXT = Convention("requirements-docs.txt")
 SETUP_CFG = Convention("setup.cfg")
 SETUP_PY = Convention("setup.py")
 SRC = Convention("src")
@@ -138,23 +140,32 @@ def dump_txt(object):
 
 
 def load_config(str):
-    import configupdater
+    # import configupdater
 
-    object = configupdater.ConfigUpdater()
+    # if str:
+    #     object = configupdater.ConfigUpdater()
+    #     object = expand_cfg(object)
+    # else:
+    import configparser
+
+    object = configparser.ConfigParser()
     object.read_string(str)
-    return expand_cfg(object)
+
+    return object
 
 
 @ensure_trailing_eol
 def dump_config(object):
+    import configparser
+
     next = io.StringIO()
     object = compact_cfg(object)
-    if isinstance(object, dict):
-        import configparser
 
+    if isinstance(object, dict):
         parser = configparser.ConfigParser(default_section=None)
         parser.read_dict(object)
         object = parser
+
     object.write(next)
     return next.getvalue()
 
@@ -238,10 +249,9 @@ class INI(File):
     _suffixes = ".ini", ".cfg"
 
     def load(self):
-        try:
-            return load_config(self.read_text())
-        except FileNotFoundError:
+        if not self.exists():
             return load_config("")
+        return load_config(self.read_text())
 
     def dump(self, object):
         return dump_config(object)

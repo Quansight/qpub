@@ -215,7 +215,7 @@ def get_python_version():
     """get the python version"""
     import sys
 
-    return "{sys.version_info.major}.{sys.version_info.minor}"
+    return f"{sys.version_info.major}.{sys.version_info.minor}"
 
 
 def get_module(name):
