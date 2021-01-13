@@ -56,7 +56,6 @@ def main():
 
     if not args:
         args = ["list"]
-    print(999, args, ns.actions)
     main(load_tasks(ns.actions), argv=args, raises=True)
 
 

@@ -105,7 +105,7 @@ def task_pyproject():
             keywords=[],
             license=get_license(),
             name=get_name(),
-            python_version="3.8",  # get_python_version(),
+            python_version="3.7",  # get_python_version(),
             requires=REQUIREMENTS_TXT.load(),
             test_requires=REQUIREMENTS_TEST_TXT.load(),
             url=repo.get_url(),
@@ -211,11 +211,6 @@ def task_config():
     return Task(actions=[main], targets=[CONFIG])
 
 
-def task_precommit():
-    # uptodate with suffixes
-    return Task(targets=[PRECOMMITCONFIG_YML])
-
-
 def task_mkdocs_yml():
     """infer the mkdocs documentation configuration."""
 
@@ -226,6 +221,11 @@ def task_blog():
     """infer the nikola blog documentation configuration."""
 
     return Task(targets=[CONF])
+
+
+def task_precommit():
+    # uptodate with suffixes
+    return Task(targets=[PRECOMMITCONFIG_YML])
 
 
 def get_section(chapter, parent=Path(), *done, **section):

@@ -75,7 +75,6 @@ def task_build():
             )
         elif PYPROJECT_TOML.exists():
             backend = build_backend()
-            print(backend)
             if backend == "flit_core":
                 needs("flit")
                 assert not doit.tools.CmdAction("flit build").execute(
