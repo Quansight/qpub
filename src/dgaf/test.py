@@ -29,7 +29,7 @@ def task_test():
             result = doit.tools.CmdAction(f"""pytest {" ".join(extra)}""").execute(
                 sys.stdout, sys.stderr
             )
-            assert not result, "\n".join(result.out) + "\n".join(result.err)
+            assert not result, "\n".join(result.outlines) + "\n".join(result.err)
 
     return Task(
         actions=[test],
