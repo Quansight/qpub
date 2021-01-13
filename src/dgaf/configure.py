@@ -286,7 +286,7 @@ def _import_depfinder():
     import os
 
     if os.getenv("CI"):
-        return return __import__("depfinder")
+        return __import__("depfinder")
     else:
         if "depfinder" not in sys.modules:
             import requests_cache
