@@ -12,7 +12,8 @@ jobs:
       with:
         python-version: 3.7
     - run: pip install nox
-    - run: nox -s quick
+    - run: nox -s install
+    - run: pytest
     # test:
     #   name: ${{ matrix.os }} ${{ matrix.python-version }}
     #   runs-on: ${{ matrix.os }}
