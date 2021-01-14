@@ -223,7 +223,18 @@ def get_python_version():
 def get_module(name):
     import flit
 
-    return flit.common.Module(get_name())
+    return flit.common.Module(name)
+
+
+def is_flit(name=None):
+    """can flit describe the project"""
+    if name is None:
+        name = get_name()
+    try:
+        get_module(name)
+        return True
+    except:
+        return False
 
 
 def get_version():
