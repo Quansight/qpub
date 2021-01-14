@@ -1,3 +1,4 @@
+"""tasks to build documentation"""
 import sys
 
 import doit

@@ -1,3 +1,5 @@
+"""run the linters and formatters"""
+
 import sys
 
 import doit

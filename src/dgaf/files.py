@@ -1,3 +1,10 @@
+"""qpub operations for working with files
+
+* path object with load and dump methods
+* path objects can infer file formats
+
+"""
+
 import collections
 import io
 import textwrap

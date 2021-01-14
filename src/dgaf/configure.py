@@ -11,6 +11,7 @@ import doit
 
 from . import (
     BUILD,
+    BUILD_SYSTEM,
     Chapter,
     CONF,
     CONFIG,
@@ -98,6 +99,8 @@ def task_pyproject():
     def python(backend):
         chapter = Chapter()
         repo = Repo()
+
+        # compose a payload to pass to the templates
         metadata = dict(
             author=repo.get_author(),
             classifiers=[],
@@ -119,29 +122,45 @@ def task_pyproject():
         tool = merge(dict(tool=dict(flakehell={})), tool)
 
         if backend == "flit":
+            # use flit to package thing when it abides the documentation
+            # and version conventions
             data = merge(tool, templated_file("flit.json", metadata))
 
             PYPROJECT_TOML.update(data)
 
         if backend == "poetry":
+            # poetry will likely be a special case.
+            # it makes the most sense to fallback to setuptools
+            # in non flit cases.
             needs("poetry")
             data = merge(tool, templated_file("poetry.json", metadata))
 
             PYPROJECT_TOML.update(data)
             if metadata["requires"]:
+                # poetry determines environments and computes versions
+                # we the poetry cli for that.
+                requires = " ".join(metadata["requires"])
+
+                # poetry separates project and dev dependencies.
+                dev_deps = [
+                    f"-d {x}"
+                    for x in metadata["test_requires"] + metadata["docs_requires"]
+                ]
                 assert not doit.tools.CmdAction(
-                    f"""poetry add {" ".join(metadata["requires"])} --lock"""
+                    f"""poetry add {requires} {dev_deps} --lock"""
                 ).execute(sys.stdout, sys.stderr)
 
         if backend == "setuptools":
-            data = templated_file("setuptools_cfg.json", metadata)
+            data = templated_file("setuptools.cfg.json", metadata)
             SETUP_CFG.write(data)
-            data = merge(tool, templated_file("setuptools_toml.json", {}))
+            data = merge(tool, templated_file("setuptools.toml.json", {}))
             PYPROJECT_TOML.update(data)
 
     task_dep = []
     chapter = Chapter()
 
+    # when we only find notebooks, let's install jupytext
+    # at least on binders and hubs
     if ".py" not in chapter.suffixes:
         task_dep.append("jupytext")
 
@@ -359,11 +378,12 @@ async def infer(file):
 
 
 async def infer_files(files):
+    """use gather_imports to execute this function"""
     return dict(await asyncio.gather(*(infer(file) for file in map(Path, set(files)))))
 
 
 def gather_imports(files):
-    """"""
+    """use gather_imports gather the inferred import dependencies"""
 
     object = infer_files(files)
     try:
@@ -374,6 +394,7 @@ def gather_imports(files):
 
 
 def merged_imports(files):
+    """transform the depfinder payload to only the external imports"""
     results = merge(*gather_imports(files).values())
     return sorted(
         set(list(results.get("required", [])) + list(results.get("questionable", [])))
@@ -381,6 +402,7 @@ def merged_imports(files):
 
 
 def import_to_pypi(list):
+    """convert canonical import names to pypi package names"""
     global IMPORT_TO_PIP
     if not IMPORT_TO_PIP:
         depfinder = _import_depfinder()
@@ -391,6 +413,8 @@ def import_to_pypi(list):
 
 
 def pypi_to_conda(list):
+    """convert pypi package names to conda package names"""
+
     global PIP_TO_CONDA
 
     if not PIP_TO_CONDA:
@@ -402,21 +426,32 @@ def pypi_to_conda(list):
 
 
 def pip_requirements(files):
+    """get the pypi requirements for the project"""
     return import_to_pypi(merged_imports(files))
 
 
 IMPORT_TO_PIP = None
 PIP_TO_CONDA = None
 
+# default tasks for the module
+
 if not REQUIREMENTS_TXT.exists():
     DOIT_CONFIG["default_tasks"] += ["requirements"]
 
 if shutil.which("mamba") or shutil.which("conda") and not ENVIRONMENT_YAML.exists():
+    # generate an environment.yml when we can get to mamba and conda
     DOIT_CONFIG["default_tasks"] += ["environment"]
 
+if PYPROJECT_TOML.exists():
+    if BUILD_SYSTEM not in PYPROJECT_TOML.load():
+        # add the default task if we haven't defined a build system.
+        DOIT_CONFIG["default_tasks"] += ["python"]
+else:
+    # you want this content.
+    DOIT_CONFIG["default_tasks"] += ["python"]
 
-DOIT_CONFIG["default_tasks"] += ["toc"]
-DOIT_CONFIG["default_tasks"] += ["config"]
+
+DOIT_CONFIG["default_tasks"] += ["toc", "config"]
 
 if __name__ == "__main__":
     main(globals())

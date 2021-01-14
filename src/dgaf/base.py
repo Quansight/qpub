@@ -1,3 +1,5 @@
+"""base functions and classes for qpub"""
+
 import collections
 import dataclasses
 import importlib
