@@ -1,16 +1,113 @@
-[entrypoints.console_scripts]
-dgaf = "dgaf:main"
+[tool]
+[tool.pytest]
+[tool.pytest.ini_options]
+addopts = "-s"
+minversion = 6.2
+norecursedirs = "*.egg-info .eggs .gitignore .ipynb_checkpoints .nox .pytest_cache .vscode __pycache__ _build dist docs/_build"
 
 [tool.flakehell]
 base = "https://raw.githubusercontent.com/life4/flakehell/master/pyproject.toml"
+exclude = [".ipynb_checkpoints", "setup.py"]
 format = "grouped"
 max_line_length = 120
 show_source = false
-exclude=[".ipynb_checkpoints", "setup.py"]
 
 [tool.flakehell.plugins]
-# include everything in pyflakes except F401
-pyflakes = ["-F405",]
-pycodestyle = ["-W503", "-E722"]
+pycodestyle = ["-W503", "-E722", "-E999"]
+pyflakes = ["-F405"]
 
-[tool.pytest]
+[tool.flit]
+[tool.flit.scripts]
+dgaf = "dgaf.__main__:main"
+
+[tool.flit.metadata]
+author = "tonyfast"
+author-email = "tony.fast@gmail.com"
+classifiers = []
+home-page = "https://github.com/deathbeds/dgaf"
+keywords = ""
+license = ""
+maintainer = "tonyfast"
+maintainer-email = "tony.fast@gmail.com"
+module = "dgaf"
+requires = [
+  "aiofiles",
+  "configupdater",
+  "depfinder",
+  "doit",
+  "flit",
+  "GitPython",
+  "importlib_metadata",
+  "importlib_resources",
+  "json-e",
+  "json-e",
+  "nbformat",
+  "nox",
+  "packaging",
+  "pathspec",
+  "pytest",
+  "pyyaml",
+  "requests_cache",
+  "ruamel.yaml",
+  "tomlkit",
+  "typer",
+]
+requires-python = ">=3.7"
+
+[tool.flit.metadata.requires-extra]
+dev = []
+doc = ["jupyter-book"]
+test = [
+  "aiofiles",
+  "depfinder",
+  "doit",
+  "flit",
+  "importlib_metadata",
+  "importnb",
+  "json-e",
+  "nbformat",
+  "nbval",
+  "poetry",
+  "poetry",
+  "pytest-sugar",
+  "pytest",
+  "pytest",
+  "requests-cache",
+  "tomlkit",
+  "typer",
+]
+
+[tool.flit.metadata.urls]
+
+[tool.flit.sdist]
+include = []
+
+[tool.flit.entrypoints]
+
+[tool.poetry]
+authors = ["tonyfast <tony.fast@gmail.com>"]
+classifiers = []
+description = "q(uick) p(ubishing) configures python Project and documentaton tools."
+documentation = "https://github.com/deathbeds/dgaf.git"
+exclude = []
+homepage = "https://github.com/deathbeds/dgaf.git"
+include = []
+keywords = []
+license = ""
+maintainers = ["tonyfast <tony.fast@gmail.com>"]
+name = "dgaf"
+packages = []
+readme = ""
+repository = "https://github.com/deathbeds/dgaf.git"
+version = "2021.1.11"
+
+[tool.poetry.dependencies]
+python = "^{sys.version_info.major}.{sys.version_info.minor}"
+
+[tool.poetry.plugins]
+
+[tool.poetry.urls]
+
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core>=2,<4", "setuptools", "wheel", "poetry_core>=1.0.0"]

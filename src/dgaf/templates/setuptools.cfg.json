@@ -1,0 +1,44 @@
+{
+    "metadata": {
+        "$mergeDeep": [
+            {
+                "name": "${name}",
+                "version": "${version}",
+                "url": "${url}",
+                "author": "${author}",
+                "author_email": "${email}",
+                "maintainer": "${author}",
+                "maintainer_email": "${email}",
+                "classifiers": {
+                    "$eval": "classifiers"
+                },
+                "license": "${license}",
+                "description": "${description}",
+                "keywords": {
+                    "$eval": "keywords"
+                },
+                "platforms": [],
+                "requires": {
+                    "$eval": "requires"
+                }
+            },
+            {
+                "$if": "typeof(long_description) == \"null\"",
+                "then": {
+                    "long_description": "file: ${long_description}"
+                },
+                "else": {}
+            }
+        ]
+    },
+    "options": {
+        "zip_safe": false,
+        "python_requires": ">=${python_version}",
+        "scripts": [],
+        "setup_reuires": [],
+        "install_requires": {
+            "$eval": "requires"
+        }
+    },
+    "options.extras_require": {}
+}

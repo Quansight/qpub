@@ -1,0 +1,3 @@
+recursive-include dgaf/templates *.gitignore
+recursive-include dgaf/templates *.json
+recursive-include dgaf *.md

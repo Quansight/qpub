@@ -1,0 +1,58 @@
+{
+    "build-system": {
+        "requires": [
+            "poetry_core>=1.0.0"
+        ],
+        "build-backend": "poetry.core.masonry.api"
+    },
+    "tool": {
+        "poetry": {
+            "$mergeDeep": [{
+                    "name": "${name}",
+                    "version": "${version}",
+                    "homepage": "${url}",
+                    "description": "${description}",
+                    "repository": "${url}",
+                    "documentation": "${url}",
+                    "license": "${license}",
+                    "classifiers": {
+                        "$eval": "classifiers"
+                    },
+                    "keywords": {
+                        "$eval": "keywords"
+                    },
+                    "packages": [],
+                    "include": [],
+                    "exclude": [],
+                    "dependencies": {
+                        "python": "^${python_version}"
+                    },
+                    "plugins": {},
+                    "urls": {}
+                },
+                {
+                    "$if": "typeof(long_description) == \"null\"",
+                    "then": {
+                        "readme": "${long_description}"
+                    },
+                    "else": {}
+                },
+                {
+                    "$if": "len(author) > 0",
+                    "then": {
+                        "authors": [
+                            "${author} <${email}>"
+                        ],
+                        "maintainers": [
+                            "${author} <${email}>"
+                        ]
+                    },
+                    "else": {
+                        "authors": [],
+                        "maintainers": []
+                    }
+                }
+            ]
+        }
+    }
+}

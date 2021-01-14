@@ -1,0 +1,13 @@
+{
+    "tool": {
+        "pytest": {
+            "ini_options": {
+                "addopts": "-s",
+                "norecursedirs": {
+                    "$eval": "join(exclude, \" \")"
+                },
+                "minversion": 6.2
+            }
+        }
+    }
+}

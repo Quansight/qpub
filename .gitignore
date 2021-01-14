@@ -1,15 +1,5 @@
-!.gitignore
-!requirements.txt
-
-_toc.yml
-_config.yml
-
-setup.cfg
-pyproject.toml
-
-environment.yml
-
-tox.ini
+.pre-commit-config.yaml
+setup.py
 
 .doit.*
 _build
@@ -21,3 +11,5 @@ settings.json
 .tox
 poetry.lock
 .pytest_cache
+.nox
+*.sqlite

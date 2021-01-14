@@ -1,0 +1,53 @@
+{
+    "build-system": {
+        "requires": [
+            "flit_core>=2,<4"
+        ],
+        "build-backend": "flit_core.buildapi"
+    },
+    "tool": {
+        "flit": {
+            "metadata": {
+                "$mergeDeep": [{
+                        "module": "${name}",
+                        "author": "${author}",
+                        "maintainer": "${author}",
+                        "requires": {
+                            "$eval": "requires"
+                        },
+                        "license": "${license}",
+                        "classifiers": {
+                            "$eval": "classifiers"
+                        },
+                        "keywords": "${join(keywords, \" \")}",
+                        "author-email": "${email}",
+                        "maintainer-email": "${email}",
+                        "urls": {},
+                        "requires-python": ">=${python_version}",
+                        "requires-extra": {
+                            "test": {
+                                "$eval": "test_requires"
+                            },
+                            "doc": {
+                                "$eval": "docs_requires"
+                            },
+                            "dev": []
+                        }
+                    },
+                    {
+                        "$if": "len(url)>0",
+                        "then": {
+                            "home-page": "${url}"
+                        },
+                        "else": {}
+                    }
+                ]
+            },
+            "scripts": {},
+            "sdist": {
+                "include": []
+            },
+            "entrypoints": {}
+        }
+    }
+}
