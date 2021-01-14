@@ -11,7 +11,7 @@ import doit
 
 from . import (
     BUILD,
-    BUILD_SYSTEM,
+    BUILDSYSTEM,
     Chapter,
     CONF,
     CONFIG,
@@ -443,7 +443,7 @@ if shutil.which("mamba") or shutil.which("conda") and not ENVIRONMENT_YAML.exist
     DOIT_CONFIG["default_tasks"] += ["environment"]
 
 if PYPROJECT_TOML.exists():
-    if BUILD_SYSTEM not in PYPROJECT_TOML.load():
+    if BUILDSYSTEM not in PYPROJECT_TOML.load():
         # add the default task if we haven't defined a build system.
         DOIT_CONFIG["default_tasks"] += ["python"]
 else:
