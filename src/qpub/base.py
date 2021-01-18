@@ -251,6 +251,7 @@ def get_version():
     import flit
 
     module = get_module(get_name())
+    x = None
     if module:
         try:
             x = flit.common.get_info_from_module(module).pop("version")
