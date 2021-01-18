@@ -192,8 +192,8 @@ def uninstall(session):
 def docs(session):
     options.install_backend = "pip"
     session.install(*_core_requirements, "flit", "packaging")
-    if options.dgaf == Path:
-        session_install(session, options.dgaf + "[doc]")
+    if options.qpub == Path:
+        session_install(session, options.qpub + "[doc]")
     if options.watch:
         session.run(
             "doit",
@@ -226,7 +226,7 @@ def init_conda_session(dir, session):
     no_deps = ["--no-deps"]
 
     if not (File(dir) / ENVIRONMENT_YAML).exists():
-        session.run(*f"python -m dgaf.tasks {dir / ENVIRONMENT_YAML}".split())
+        session.run(*f"python -m qpub.tasks {dir / ENVIRONMENT_YAML}".split())
     env = (File(dir) / ENVIRONMENT_YAML).load()
     c, p = [], []
     for dep in env.get("dependencies", []):

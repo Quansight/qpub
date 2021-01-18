@@ -2,7 +2,7 @@ import argparse
 
 from . import DOIT_CONFIG
 
-parser = argparse.ArgumentParser(prog="dgaf")
+parser = argparse.ArgumentParser(prog="qpub")
 parser.add_argument(
     "-a",
     "--actions",

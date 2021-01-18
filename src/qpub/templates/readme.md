@@ -1,12 +1,12 @@
-# `dgaf` templates
+# `qpub` templates
 
-`dgaf` vendors in configuration with the [`json-e`][json-e] (jinja in data structures.) format.
+`qpub` vendors in configuration with the [`json-e`][json-e] (jinja in data structures.) format.
 
-one of the reasons `dgaf` is that across configuration files there is significant overlap information. `dgaf` infers information is passed to json-e for configuration.
+one of the reasons `qpub` is that across configuration files there is significant overlap information. `qpub` infers information is passed to json-e for configuration.
 
 ## packaging
 
-packaging conventions in python are in are flux, `dgaf` helps manage the transition between configurations by encoding multiple standards into its inference engine.
+packaging conventions in python are in are flux, `qpub` helps manage the transition between configurations by encoding multiple standards into its inference engine.
 
 ### pyproject
 
@@ -23,7 +23,7 @@ packaging conventions in python are in are flux, `dgaf` helps manage the transit
 
 ### pyproject
 
-`dgaf` consistently uses `pyproject.toml` for project packaging and configuration when possible
+`qpub` consistently uses `pyproject.toml` for project packaging and configuration when possible
 
 * `pytest.json` - __[pytest]__ is the python testing standard
 * `flakehell.json` - __[flakehell]__ simplifies linting configuration

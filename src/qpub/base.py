@@ -95,29 +95,37 @@ def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests
 
         raise Exception
 
-    for directory in [True, False]:
-        for x in Path().iterdir():
+    for x in Path().iterdir():
+        if not x.is_dir():
+            continue
+        if x in common:
+            is_common.append(x)
+            continue
 
-            if directory:
-                if x in common:
-                    is_common.append(x)
-                    continue
+        if is_private(x):
+            continue
 
-            if is_private(x):
-                continue
+        if x in CONVENTIONS:
+            continue
 
-            if x in CONVENTIONS:
-                continue
+        if x.is_dir():
+            return x.stem
 
-            if directory:
-                if x.is_dir():
-                    return x.stem
-            else:
-                if x.suffix in {".py", ".ipynb"}:
-                    return x.stem
-    else:
-        if is_common:
-            return is_common.pop(0)
+    for x in Path().iterdir():
+        if x.is_dir():
+            continue
+
+        if is_private(x):
+            continue
+
+        if x in CONVENTIONS:
+            continue
+
+        if x.suffix in {".py", ".ipynb"}:
+            return x.stem
+
+    if is_common:
+        return is_common.pop(0)
 
     raise Exception
 
@@ -221,20 +229,19 @@ def get_python_version():
 
 
 def get_module(name):
-    import flit
+    try:
+        import flit
 
-    return flit.common.Module(name)
+        return flit.common.Module(name)
+    except:
+        return
 
 
 def is_flit(name=None):
     """can flit describe the project"""
     if name is None:
         name = get_name()
-    try:
-        get_module(name)
-        return True
-    except:
-        return False
+    return bool(get_module(name))
 
 
 def get_version():
@@ -243,9 +250,13 @@ def get_version():
 
     import flit
 
-    try:
-        x = flit.common.get_info_from_module(get_module(get_name())).pop("version")
-    except:
+    module = get_module(get_name())
+    if module:
+        try:
+            x = flit.common.get_info_from_module(module).pop("version")
+        except:
+            x = None
+    if x is None:
         x = datetime.date.today().strftime("%Y.%m.%d")
     return normalize_version(x)
 
@@ -264,7 +275,15 @@ def get_description():
     """get the project description"""
     import flit
 
-    return flit.common.get_info_from_module(get_module(get_name())).pop("summary")
+    module = get_module(get_name())
+    if module:
+        try:
+            return flit.common.get_info_from_module(module).pop("summary")
+        except:
+            pass
+    # could discover descriptions from readme perhaps
+    # or the first markdown cell.
+    return ""
 
 
 def main(object=None, argv=None, raises=False):
@@ -336,7 +355,7 @@ def needs(*object):
 def where_template(template):
     """locate the qpub jsone-e templates"""
     try:
-        with importlib.resources.path("dgaf.templates", template) as template:
+        with importlib.resources.path("qpub.templates", template) as template:
             template = File(template)
     except:
         template = File(__file__).parent / "templates" / template

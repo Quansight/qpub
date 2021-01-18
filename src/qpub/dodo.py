@@ -248,7 +248,7 @@ class options:
     binder: bool = os.environ.get("BINDER_URL", False)
     confirm: bool = os.environ.get("QPUB_CONFIRM", False)
     posargs: bool = os.environ.get("QPUB_POSARGS", "").split()
-    dgaf: str = os.environ.get("QPUB_ID", "dgaf")
+    qpub: str = os.environ.get("QPUB_ID", "qpub")
     interactive: bool = os.environ.get("QPUB_INTERACTIVE", False)
     monkeytype: bool = os.environ.get("QPUB_INTERACTIVE", False)
     mamba: bool = os.environ.get("QPUB_MAMBA", True)
@@ -714,7 +714,7 @@ class Project(Chapter):
     def get_author(self):
         if self.repo:
             return self.repo.commit().author.name
-        return "dgaf"
+        return "qpub"
 
     @cached
     def get_email(self):
@@ -1546,7 +1546,7 @@ def normalize_version(object):
 
 def where_template(template):
     try:
-        with importlib.resources.path("dgaf.templates", template) as template:
+        with importlib.resources.path("qpub.templates", template) as template:
             template = File(template)
     except:
         template = File(__file__).parent / "templates" / template
