@@ -34,6 +34,10 @@ def load_tasks(a="all"):
         from . import install
 
         object.update(vars(install))
+    if all or a == "lint":
+        from . import lint
+
+        object.update(vars(lint))
 
     import doit
 

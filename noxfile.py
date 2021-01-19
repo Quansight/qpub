@@ -31,16 +31,21 @@ def task_python_gitignore():
 
 
 def task_readme():
-    def template():
+    def template(task):
         import doit
+
+        dep = list(task.file_dep).pop()
+        target = list(task.targets).pop()
 
         action = doit.tools.CmdAction("qpub")
         action.execute()
-        pathlib.Path("README.md").write_text(
-            pathlib.Path("_README_TEMPLATE.md").read_text().format(commands=action.out)
+        pathlib.Path(target).write_text(
+            pathlib.Path(dep).read_text().format(commands=action.out)
         )
 
-    return dict(actions=[template])
+    return dict(
+        file_dep=["_README_TEMPLATE.md"], actions=[template], targets=["README.md"]
+    )
 
 
 try:

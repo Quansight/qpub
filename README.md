@@ -20,6 +20,7 @@ environment_yaml   infer the project dependencies and write them to an environme
 install            install the packages into the sys.packages
 jupyter_book       build the documentation with jupyter-book
 jupytext           attach jupytext to the project to render python files.
+lint               lint and format the project with pre-commit
 mkdocs             build the documentation with mkdocs
 mkdocs_yml         infer the mkdocs documentation configuration.
 nikola             build the documentation with nikola
