@@ -1,6 +1,6 @@
 # qpub - q(uick) publishing of python projects
 
-`qpub` is an opinioned collection of conventional tasks for distributing python packages, tests, and documentation. `qpub` is a consistent CLI for publishing different forms of content in different environments (eg. local develop/install, github actions testing, publishing to github pages, deploying binders). it encodes different opinions for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `qpub` tries to aggregate best present and future practices for publishing different code artifacts.
+`qpub` is an opinioned collection of conventional tasks for distributing python packages, tests, and documentation. `qpub` is a consistent CLI for publishing different forms of content in different environments (e.g. local develop/install, Github Actions testing, publishing to Github Pages, deploying Binders). It encodes different opinions for building, installing, testing, and documenting applications. Tool churn is real challenge for open source python development. `qpub` tries to aggregate best present and future practices for publishing different code artifacts.
 
 `qpub` is good for small project where content is :crown:. for older projects, `qpub` may be a good test for transitioning old build chains to modern python conventions.
 
