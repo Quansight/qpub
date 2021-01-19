@@ -6,7 +6,7 @@
 
 ## what does `qpub` do?
 
-`qpub` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `qpub` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or notebooks.
+`qpub` infers environment conditions using system variables and files in a git repo. From these partial initial conditions, `qpub` expands configuration files to aid in producing different forms of content. Content can include Python, RST, Markdown, or Jupyter Notebooks.
 
 some features of `qpub` are:
 
