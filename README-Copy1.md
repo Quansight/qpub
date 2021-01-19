@@ -4,7 +4,7 @@
 
 `qpub` is good for small project where content is :crown:. for older projects, `qpub` may be a good test for transitioning old build chains to modern python conventions.
 
-## what does `qpub` do?
+## What does `qpub` do?
 
 `qpub` infers environment conditions using system variables and files in a git repo. From these partial initial conditions, `qpub` expands configuration files to aid in producing different forms of content. Content can include Python, RST, Markdown, or Jupyter Notebooks.
 
