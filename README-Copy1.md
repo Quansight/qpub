@@ -20,7 +20,7 @@ some features of `qpub` are:
 
 ### extra configuration
 
-`qpub` will merge and append to existing configurations in smart ways. extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
+`qpub` will merge and append to existing configurations in smart ways. Extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
 
 
 ## requirements
