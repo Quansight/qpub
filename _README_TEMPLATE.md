@@ -10,7 +10,9 @@
 
 some features of `qpub` are:
 
+```bash
 {commands}
+```
 
 ### extra configuration
 

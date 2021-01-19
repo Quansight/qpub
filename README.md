@@ -10,6 +10,7 @@
 
 some features of `qpub` are:
 
+```bash
 blog               infer the nikola blog documentation configuration.
 build              build the python project.
 conda              install conda requirements
@@ -33,6 +34,7 @@ test               test the project with pytest
 toc                infer the table of contents for the jupyter_book documentation.
 uml                generate a uml diagram for the project with pyreverse
 
+```
 
 ### extra configuration
 
