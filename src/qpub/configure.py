@@ -266,6 +266,7 @@ def task_blog():
 
 
 def task_precommit():
+    """configure .pre-commit-config.yml for linting and formatting"""
     # uptodate with suffixes
     return Task(targets=[PRECOMMITCONFIG_YML])
 

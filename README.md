@@ -25,7 +25,7 @@ mkdocs             build the documentation with mkdocs
 mkdocs_yml         infer the mkdocs documentation configuration.
 nikola             build the documentation with nikola
 pip                install pip requirements
-precommit          
+precommit          configure .pre-commit-config.yml for linting and formatting
 pyproject          infer the pyproject.toml configuration for the project
 requirements_txt   infer the project dependencies and write them to a requirements.txt
 setup_cfg          infer the declarative setup.cfg configuration for the project
