@@ -2,7 +2,7 @@
 
 `qpub` vendors in configuration with the [`json-e`][json-e] (jinja in data structures.) format.
 
-one of the reasons `qpub` is that across configuration files there is significant overlap information. `qpub` infers information is passed to json-e for configuration.
+One of the reasons for `qpub` is that across configuration files, there is significant overlap information. `qpub` infers information is passed to `json-e` for configuration.
 
 ## packaging
 
