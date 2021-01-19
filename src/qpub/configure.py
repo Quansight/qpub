@@ -27,6 +27,7 @@ from . import (
     get_repo,
     get_version,
     is_private,
+    is_convention,
     main,
     merge,
     needs,
@@ -271,51 +272,85 @@ def task_precommit():
     return Task(targets=[PRECOMMITCONFIG_YML])
 
 
-def get_section(chapter, parent=Path(), *done, **section):
-    """generate the nested jupyter book table of contents format for the chapter."""
-    files = [
-        x
-        for x in chapter.include
-        if 1 == (len(x.parts) - len(parent.parts))
-        and x.is_relative_to(parent)
-        and x not in CONVENTIONS
-        and not is_private(x)
-    ]
-    index = None
+def get_index_file(files):
+    """each section has an index.
+
+    readme.md and index.md are conventions for index files."""
     for name in "index readme".split():
         for file in files:
             if file.stem.lower() == name:
-                index = file
-                if "file" not in section:
-                    section.update(file=str(file.with_suffix("")), sections=[])
-                else:
-                    section["sections"].append(str(file.with_suffix("")))
+                return file
 
-    if index is None:
+
+def get_section(chapter, parent=Path(), done=None, **section):
+    """generate the nested jupyter book table of contents format for the chapter."""
+    files = []
+    for file in chapter.include:
+        depth = len(file.parts) - len(parent.parts)
+
+        if not file.is_relative_to(parent):
+            continue
+        elif depth > 1:
+            # build each section only for the immediate children
+            continue
+
+        if is_convention(file):
+            # skip conventions
+            continue
+
+        if is_private(file):
+            # skip private files and folders
+            continue
+
+        files.append(file)
+
+    # prioritize find
+    index = get_index_file(files)
+    if index:
+        if "file" not in section:
+            section.update(file=str(index.with_suffix("")), sections=[])
+        else:
+            section["sections"].append(str(index.with_suffix("")))
+    else:
         section = dict(file=None, sections=[])
 
     for file in files:
         if file == index:
             continue
-        if file.suffix in {".py", ".ipynb", ".md", ".rst"}:
+        if file.suffix in {".ipynb", ".md", ".rst"}:
             index = file
             if section["file"] is None:
                 section["file"] = str(file.with_suffix(""))
             else:
                 section["sections"].append(dict(file=str(file.with_suffix(""))))
 
-    for dir in [DOCS] + [
-        x
-        for x in chapter.directories
-        if x.is_relative_to(parent) and x not in CONVENTIONS and not is_private(x)
-    ]:
-        if dir == parent:
+    dirs = []
+    if done is None:
+        done = []
+        if DOCS.exists():
+            done.append(DOCS)
+
+    for dir in chapter.directories:
+
+        depth = len(dir.parts) - len(parent.parts)
+        if depth != 1:
             continue
-        if dir not in done:
-            section["sections"].append(get_section(chapter, dir, *done))
-            if section["sections"][-1]["file"] == None:
-                section["sections"].pop(-1)
-            done += (dir,)
+
+        if dir in done:
+            continue
+
+        if is_convention(dir):
+            continue
+
+        if is_private(dir):
+            continue
+
+        section["sections"].append(get_section(chapter, dir, done))
+
+        if section["sections"][-1]["file"] == None:
+            section["sections"].pop(-1)
+
+        done.append(dir)
 
     return section
 

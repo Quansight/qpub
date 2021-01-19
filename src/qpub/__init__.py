@@ -28,6 +28,7 @@ def load_ipython_extension(shell):
 
     shell.run_line_magic("reload_ext", "doit")
     shell.user_ns.update(__main__.load_tasks("all"))
+    shell.user_ns.update(qpub=__import__(__name__))
 
 
 def unload_ipython_extension(shell):
