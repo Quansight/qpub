@@ -94,67 +94,93 @@ def task_environment_yaml():
     )
 
 
+def generate_metadata():
+    """generate the shared metadata for the project templates."""
+    chapter = Chapter()
+    repo = Repo()
+    metadata = dict(
+        author=repo.get_author(),
+        classifiers=[],
+        docs_requires=File("requirements-docs.txt").load(),
+        email=repo.get_email(),
+        keywords=[],
+        license=get_license(),
+        name=get_name(),
+        python_version="3.7.1",  # get_python_version(),
+        requires=REQUIREMENTS_TXT.load(),
+        test_requires=REQUIREMENTS_TEST_TXT.load(),
+        url=repo.get_url(),
+        long_description=None,
+        version=get_version(),
+        description=get_description(),
+        exclude=[str(x / "*") for x in chapter.exclude_directories],
+    )
+    metadata["tool"] = templated_file("pytest.json", metadata)
+    metadata["tool"] = merge(dict(tool=dict(flakehell={})), metadata["tool"])
+    return metadata
+
+
+def setup_cfg():
+    metadata = generate_metadata()
+    data = templated_file("setuptools.cfg.json", metadata)
+    SETUP_CFG.write(data)
+
+    data = merge(metadata["tool"], templated_file("setuptools.toml.json", {}))
+    PYPROJECT_TOML.update(data)
+
+
+def setup_py():
+    SETUP_PY.write_text("""__import__("setuptools").setup()""")
+
+
+def task_setup():
+
+    actions, targets = [setup_cfg], [SETUP_CFG]
+
+    if not SETUP_PY.exists():
+        actions.append(setup_py)
+        targets.append(SETUP_PY)
+
+    return Task(actions=actions, targets=targets)
+
+
+def poetry():
+    needs("poetry")
+    metadata = generate_metadata()
+    data = merge(metadata["tool"], templated_file("poetry.json", metadata))
+
+    PYPROJECT_TOML.update(data)
+    if metadata["requires"]:
+        # poetry determines environments and computes versions
+        # we the poetry cli for that.
+        requires = " ".join(metadata["requires"])
+
+        # poetry separates project and dev dependencies.
+        dev_deps = [
+            f"-d {x}" for x in metadata["test_requires"] + metadata["docs_requires"]
+        ]
+        assert not doit.tools.CmdAction(
+            f"""poetry add {requires} {dev_deps} --lock"""
+        ).execute(sys.stdout, sys.stderr)
+
+    return Task(actions=[poetry], targets=[PYPROJECT_TOML])
+
+
+def flit():
+    metadata = generate_metadata()
+    data = merge(metadata["tool"], templated_file("flit.json", metadata))
+
+    PYPROJECT_TOML.update(data)
+
+
 def task_pyproject():
-    """infer the pyproject.toml configuration for the project"""
-
-    def python(backend):
-        chapter = Chapter()
-        repo = Repo()
-        # compose a payload to pass to the templates
-        metadata = dict(
-            author=repo.get_author(),
-            classifiers=[],
-            docs_requires=File("requirements-docs.txt").load(),
-            email=repo.get_email(),
-            keywords=[],
-            license=get_license(),
-            name=get_name(),
-            python_version="3.7.1",  # get_python_version(),
-            requires=REQUIREMENTS_TXT.load(),
-            test_requires=REQUIREMENTS_TEST_TXT.load(),
-            url=repo.get_url(),
-            long_description=None,
-            version=get_version(),
-            description=get_description(),
-            exclude=[str(x / "*") for x in chapter.exclude_directories],
-        )
-        tool = templated_file("pytest.json", metadata)
-        tool = merge(dict(tool=dict(flakehell={})), tool)
-
+    def pyproject(backend):
         if backend == "flit":
-            # use flit to package thing when it abides the documentation
-            # and version conventions
-            data = merge(tool, templated_file("flit.json", metadata))
-
-            PYPROJECT_TOML.update(data)
-
-        if backend == "poetry":
-            # poetry will likely be a special case.
-            # it makes the most sense to fallback to setuptools
-            # in non flit cases.
-            needs("poetry")
-            data = merge(tool, templated_file("poetry.json", metadata))
-
-            PYPROJECT_TOML.update(data)
-            if metadata["requires"]:
-                # poetry determines environments and computes versions
-                # we the poetry cli for that.
-                requires = " ".join(metadata["requires"])
-
-                # poetry separates project and dev dependencies.
-                dev_deps = [
-                    f"-d {x}"
-                    for x in metadata["test_requires"] + metadata["docs_requires"]
-                ]
-                assert not doit.tools.CmdAction(
-                    f"""poetry add {requires} {dev_deps} --lock"""
-                ).execute(sys.stdout, sys.stderr)
-
-        if backend == "setuptools":
-            data = templated_file("setuptools.cfg.json", metadata)
-            SETUP_CFG.write(data)
-            data = merge(tool, templated_file("setuptools.toml.json", {}))
-            PYPROJECT_TOML.update(data)
+            flit()
+        elif backend == "poetry":
+            poetry()
+        else:
+            setup_cfg()
 
     task_dep = []
     chapter = Chapter()
@@ -166,11 +192,90 @@ def task_pyproject():
 
     return Task(
         file_dep=[REQUIREMENTS_TXT],
-        actions=[python],
+        actions=[pyproject],
         targets=[PYPROJECT_TOML],
         params=[_BACKEND],
         task_dep=task_dep,
     )
+
+
+# def task_pyproject():
+#     """infer the pyproject.toml configuration for the project"""
+
+#     def python(backend):
+#         chapter = Chapter()
+#         repo = Repo()
+#         # compose a payload to pass to the templates
+#         metadata = dict(
+#             author=repo.get_author(),
+#             classifiers=[],
+#             docs_requires=File("requirements-docs.txt").load(),
+#             email=repo.get_email(),
+#             keywords=[],
+#             license=get_license(),
+#             name=get_name(),
+#             python_version="3.7.1",  # get_python_version(),
+#             requires=REQUIREMENTS_TXT.load(),
+#             test_requires=REQUIREMENTS_TEST_TXT.load(),
+#             url=repo.get_url(),
+#             long_description=None,
+#             version=get_version(),
+#             description=get_description(),
+#             exclude=[str(x / "*") for x in chapter.exclude_directories],
+#         )
+#         metadata["tool"] = templated_file("pytest.json", metadata)
+#         metadata["tool"] = merge(dict(tool=dict(flakehell={})), tool)
+
+#         if backend == "flit":
+#             # use flit to package thing when it abides the documentation
+#             # and version conventions
+#             data = merge(tool, templated_file("flit.json", metadata))
+
+#             PYPROJECT_TOML.update(data)
+
+#         if backend == "poetry":
+#             # poetry will likely be a special case.
+#             # it makes the most sense to fallback to setuptools
+#             # in non flit cases.
+#             needs("poetry")
+#             data = merge(tool, templated_file("poetry.json", metadata))
+
+#             PYPROJECT_TOML.update(data)
+#             if metadata["requires"]:
+#                 # poetry determines environments and computes versions
+#                 # we the poetry cli for that.
+#                 requires = " ".join(metadata["requires"])
+
+#                 # poetry separates project and dev dependencies.
+#                 dev_deps = [
+#                     f"-d {x}"
+#                     for x in metadata["test_requires"] + metadata["docs_requires"]
+#                 ]
+#                 assert not doit.tools.CmdAction(
+#                     f"""poetry add {requires} {dev_deps} --lock"""
+#                 ).execute(sys.stdout, sys.stderr)
+
+#         if backend == "setuptools":
+#             data = templated_file("setuptools.cfg.json", metadata)
+#             SETUP_CFG.write(data)
+#             data = merge(tool, templated_file("setuptools.toml.json", {}))
+#             PYPROJECT_TOML.update(data)
+
+#     task_dep = []
+#     chapter = Chapter()
+
+#     # when we only find notebooks, let's install jupytext
+#     # at least on binders and hubs
+#     if ".py" not in chapter.suffixes:
+#         task_dep.append("jupytext")
+
+#     return Task(
+#         file_dep=[REQUIREMENTS_TXT],
+#         actions=[python],
+#         targets=[PYPROJECT_TOML],
+#         params=[_BACKEND],
+#         task_dep=task_dep,
+#     )
 
 
 def task_jupytext():
@@ -195,11 +300,6 @@ def task_jupytext():
         actions=[jupytext],
         uptodate=[".py" in chapter.suffixes],
     )
-
-
-def task_setup_cfg():
-    """infer the declarative setup.cfg configuration for the project"""
-    return Task(file_dep=[REQUIREMENTS_TXT], targets=[SETUP_CFG, SETUP_PY])
 
 
 def task_toc():
@@ -317,6 +417,7 @@ def get_section(chapter, parent=Path(), done=None, **section):
     for file in files:
         if file == index:
             continue
+
         if file.suffix in {".ipynb", ".md", ".rst"}:
             index = file
             if section["file"] is None:

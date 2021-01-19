@@ -94,6 +94,7 @@ def get_name_from_folder(where=Path()):
     """return a pathlib object from directories that represents the named contents"""
     if (where / SRC).exists():
         return get_name_from_folder(where / SRC)
+    possible = []
     for x in where.iterdir():
         if not x.is_dir():
             continue
@@ -104,11 +105,13 @@ def get_name_from_folder(where=Path()):
         if ignored(x):
             continue
 
-        return x
+        possible.append(x)
+    return possible
 
 
 def get_name_from_files(where=Path()):
     """return a pathlib object from files that represent the named contents"""
+    possible = []
     for x in where.iterdir():
         if x.is_dir():
             continue
@@ -120,7 +123,8 @@ def get_name_from_files(where=Path()):
             continue
 
         if x.suffix in {".py", ".ipynb"}:
-            return x
+            possible.append(x)
+    return possible
 
 
 def is_convention(object):
@@ -134,12 +138,21 @@ def is_convention(object):
     return False
 
 
-def get_name_file():
+def get_name_files():
     return get_name_from_folder() or get_name_from_files()
 
 
-def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
-    file = get_name_file()
+common = (
+    "notebooks scripts catalog docs posts tests examples data config configs".split()
+)
+
+
+def get_name(common=common):
+    files = get_name_files()
+
+    if len(files) > 1:
+        files = [x for x in files if x.stem.lower() not in common]
+    file = files.pop()
     m = post_pattern.match(file.stem)
     if m:
         return m.group(1).replace("-", "_")
