@@ -26,9 +26,9 @@ mkdocs_yml         infer the mkdocs documentation configuration.
 nikola             build the documentation with nikola
 pip                install pip requirements
 precommit          configure .pre-commit-config.yml for linting and formatting
-pyproject          infer the pyproject.toml configuration for the project
+pyproject          generate a pyproject.toml packaging and configuration file
 requirements_txt   infer the project dependencies and write them to a requirements.txt
-setup_cfg          infer the declarative setup.cfg configuration for the project
+setuptools         configure setuptools to package the project
 sphinx             build the documentation with sphinx
 test               test the project with pytest
 toc                infer the table of contents for the jupyter_book documentation.
@@ -87,9 +87,9 @@ mkdocs_yml         infer the mkdocs documentation configuration.
 nikola             build the documentation with nikola
 pip                install pip requirements
 precommit          configure .pre-commit-config.yml for linting and formatting
-pyproject          infer the pyproject.toml configuration for the project
+pyproject          generate a pyproject.toml packaging and configuration file
 requirements_txt   infer the project dependencies and write them to a requirements.txt
-setup_cfg          infer the declarative setup.cfg configuration for the project
+setuptools         configure setuptools to package the project
 sphinx             build the documentation with sphinx
 test               test the project with pytest
 toc                infer the table of contents for the jupyter_book documentation.
