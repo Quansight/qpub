@@ -1,12 +1,12 @@
 # qpub - q(uick) publishing of python projects
 
-`qpub` is an opinioned collection of conventional tasks for distributing python packages, tests, and documentation. `qpub` is a consistent CLI for publishing different forms of content in different environments (eg. local develop/install, github actions testing, publishing to github pages, deploying binders). it encodes different opinions for building, installing, testing, and documenting applications. tool churn is real challenge for open source python development. `qpub` tries to aggregate best present and future practices for publishing different code artifacts.
+`qpub` is an opinioned collection of conventional tasks for distributing python packages, tests, and documentation. `qpub` is a consistent CLI for publishing different forms of content in different environments (e.g. local develop/install, Github Actions testing, publishing to Github Pages, deploying Binders). It encodes different opinions for building, installing, testing, and documenting applications. Tool churn is real challenge for open source python development. `qpub` tries to aggregate best present and future practices for publishing different code artifacts.
 
-`qpub` is good for small project where content is :crown:. for older projects, `qpub` may be a good test for transitioning old build chains to modern python conventions.
+`qpub` is good for small projects where content is :crown:. For existing projects, `qpub` may be a good test for transitioning old build chains to modern python conventions and for unifying testing and build frameworks across projects.
 
-## what does `qpub` do?
+## What does `qpub` do?
 
-`qpub` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `qpub` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or notebooks.
+`qpub` infers environment conditions using system variables and files in a git repo. From these partial initial conditions, `qpub` expands configuration files to aid in producing different forms of content. Content can include Python, RST, Markdown, or Jupyter Notebooks.
 
 some features of `qpub` are:
 
@@ -20,7 +20,7 @@ some features of `qpub` are:
 
 ### extra configuration
 
-`qpub` will merge and append to existing configurations in smart ways. extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
+`qpub` will merge and append to existing configurations in smart ways. Extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
 
 
 ## requirements
