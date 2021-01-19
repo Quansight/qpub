@@ -6,7 +6,7 @@ One of the reasons for `qpub` is that across configuration files, there is signi
 
 ## packaging
 
-packaging conventions in python are in are flux, `qpub` helps manage the transition between configurations by encoding multiple standards into its inference engine.
+Packaging conventions in python are in are flux, `qpub` helps manage the transition between configurations by encoding multiple standards into its inference engine.
 
 ### pyproject
 
