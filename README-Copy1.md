@@ -2,7 +2,7 @@
 
 `qpub` is an opinioned collection of conventional tasks for distributing python packages, tests, and documentation. `qpub` is a consistent CLI for publishing different forms of content in different environments (e.g. local develop/install, Github Actions testing, publishing to Github Pages, deploying Binders). It encodes different opinions for building, installing, testing, and documenting applications. Tool churn is real challenge for open source python development. `qpub` tries to aggregate best present and future practices for publishing different code artifacts.
 
-`qpub` is good for small project where content is :crown:. for older projects, `qpub` may be a good test for transitioning old build chains to modern python conventions.
+`qpub` is good for small projects where content is :crown:. For existing projects, `qpub` may be a good test for transitioning old build chains to modern python conventions and for unifying testing and build frameworks across projects.
 
 ## What does `qpub` do?
 
