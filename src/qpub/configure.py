@@ -325,14 +325,22 @@ def get_section(chapter, parent=Path(), done=None, **section):
                 section["sections"].append(dict(file=str(file.with_suffix(""))))
 
     dirs = []
+
+    # add directories to the table of contents after the files
+    # docs folder goes first into the docs.
     if done is None:
         done = []
         if DOCS.exists():
+            section["sections"].append(get_section(chapter, DOCS, done))
             done.append(DOCS)
 
     for dir in chapter.directories:
 
+        if not dir.is_relative_to(parent):
+            continue
+
         depth = len(dir.parts) - len(parent.parts)
+
         if depth != 1:
             continue
 
@@ -345,12 +353,20 @@ def get_section(chapter, parent=Path(), done=None, **section):
         if is_private(dir):
             continue
 
-        section["sections"].append(get_section(chapter, dir, done))
-
-        if section["sections"][-1]["file"] == None:
-            section["sections"].pop(-1)
+        # generate a section for the dir
+        next = get_section(chapter, dir, done)
+        if next["file"]:
+            section["sections"].append(next)
 
         done.append(dir)
+
+    if section["file"] is None:
+        # hoist sections if an index isn't defined
+        if section.get("sections"):
+            next = section["sections"].pop(0)
+            if section.get("sections"):
+                next["sessions"] += section["sections"]
+            return next
 
     return section
 
