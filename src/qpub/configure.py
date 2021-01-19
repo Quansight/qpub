@@ -99,7 +99,6 @@ def task_pyproject():
     def python(backend):
         chapter = Chapter()
         repo = Repo()
-
         # compose a payload to pass to the templates
         metadata = dict(
             author=repo.get_author(),

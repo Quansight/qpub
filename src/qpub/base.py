@@ -2,8 +2,10 @@
 
 import collections
 import dataclasses
+import fnmatch
 import importlib
 import io
+import re
 import sys
 
 from . import DOIT_CONFIG
@@ -21,6 +23,10 @@ def get_repo():
         import git
 
         return git.Repo()
+
+
+post_pattern = re.compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(\S+)")
+test_pattern = re.compile("^test_")
 
 
 @dataclasses.dataclass
@@ -84,50 +90,51 @@ class Param(Dict):
     choices: tuple = dataclasses.field(default_factory=tuple)
 
 
-def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
-    is_common = []
-    if SRC.exists():
-        for x in SRC.iterdir():
-            if is_private(x):
-                continue
-            if x.is_dir():
-                return x.stem
-
-        raise Exception
-
-    for x in Path().iterdir():
+def get_name_from_folder(where=Path()):
+    """return a pathlib object from directories that represents the named contents"""
+    if (where / SRC).exists():
+        return get_name_from_folder(where / SRC)
+    for x in where.iterdir():
         if not x.is_dir():
             continue
-        if x in common:
-            is_common.append(x)
+
+        if is_private(x) or is_convention(x):
             continue
 
-        if is_private(x):
-            continue
+        return x
 
-        if x in CONVENTIONS:
-            continue
 
-        if x.is_dir():
-            return x.stem
-
-    for x in Path().iterdir():
+def get_name_from_files(where=Path()):
+    """return a pathlib object from files that represent the named contents"""
+    for x in where.iterdir():
         if x.is_dir():
             continue
 
-        if is_private(x):
-            continue
-
-        if x in CONVENTIONS:
+        if is_private(x) or is_convention(x):
             continue
 
         if x.suffix in {".py", ".ipynb"}:
-            return x.stem
+            return x
 
-    if is_common:
-        return is_common.pop(0)
 
-    raise Exception
+def is_convention(object):
+    """is the object a common convention"""
+    return object in CONVENTIONS
+
+
+def get_name_file():
+    return get_name_from_folder() or get_name_from_files()
+
+
+def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
+    file = get_name_file()
+    m = post_pattern.match(file.stem)
+    if m:
+        return m.group(1).replace("-", "_")
+    m = test_pattern.match(file.stem)
+    if m:
+        return file.stem.lstrip("test_")
+    return file and file.stem
 
 
 @dataclasses.dataclass
