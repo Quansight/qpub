@@ -101,6 +101,9 @@ def get_name_from_folder(where=Path()):
         if is_private(x) or is_convention(x):
             continue
 
+        if ignored(x):
+            continue
+
         return x
 
 
@@ -113,13 +116,22 @@ def get_name_from_files(where=Path()):
         if is_private(x) or is_convention(x):
             continue
 
+        if ignored(x):
+            continue
+
         if x.suffix in {".py", ".ipynb"}:
             return x
 
 
 def is_convention(object):
     """is the object a common convention"""
-    return object in CONVENTIONS
+    if object in CONVENTIONS:
+        return True
+
+    if Path(Path(object).parts[-1]) in CONVENTIONS:
+        return True
+
+    return False
 
 
 def get_name_file():

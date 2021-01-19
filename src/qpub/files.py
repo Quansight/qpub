@@ -121,6 +121,7 @@ WORKFLOWS = GITHUB / "workflows"
 BUILDTESTRELEASE = WORKFLOWS / "build_test_release.yml"
 READTHEDOCS = Convention(".readthedocs.yml")
 PYCACHE = Convention("__pycache__")
+
 CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
 

@@ -8,35 +8,17 @@
 
 `qpub` infers environment conditions using system variables and files in a git repo. from these partial initial conditions `qpub` expands configuration files for different publishing to aid produces different forms of content. content can include python, rst, markdown, or notebooks.
 
-the collected features of `qpub` are:
+some features of `qpub` are:
 
-```bash
-blog               infer the nikola blog documentation configuration.
-build              build the python project.
-conda              install conda requirements
-config             infer the jupyter_book documentation configuration.
-develop            install the project in development mode.
-environment_yaml   infer the project dependencies and write them to an environment.yaml
-install            install the packages into the sys.packages
-jupyter_book       build the documentation with jupyter-book
-jupytext           attach jupytext to the project to render python files.
-lint               lint and format the project with pre-commit
-mkdocs             build the documentation with mkdocs
-mkdocs_yml         infer the mkdocs documentation configuration.
-nikola             build the documentation with nikola
-pip                install pip requirements
-precommit          configure .pre-commit-config.yml for linting and formatting
-pyproject          infer the pyproject.toml configuration for the project
-requirements_txt   infer the project dependencies and write them to a requirements.txt
-setup_cfg          infer the declarative setup.cfg configuration for the project
-sphinx             build the documentation with sphinx
-test               test the project with pytest
-toc                infer the table of contents for the jupyter_book documentation.
-uml                generate a uml diagram for the project with pyreverse
+* `qpub infer` discovers dependencies and updates the requirements in different configuration files.
+* `qpub setup` installs the environment dependencies
+* `qpub develop` makes a development package of the project
+* `qpub install` installs the project.
+* `qpub test` run the tests
+* `qpub docs` generates a table of contents and builds the docs with jupyter book
+* `qpub postbuild` builds a development version of the package for binder
 
-```
-
-### partial configuration
+### extra configuration
 
 `qpub` will merge and append to existing configurations in smart ways. extra configuration can be provided to any tool by seeding the correct configuration file with partial information.
 
