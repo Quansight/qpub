@@ -99,7 +99,6 @@ def task_pyproject():
     def python(backend):
         chapter = Chapter()
         repo = Repo()
-
         # compose a payload to pass to the templates
         metadata = dict(
             author=repo.get_author(),
@@ -267,6 +266,7 @@ def task_blog():
 
 
 def task_precommit():
+    """configure .pre-commit-config.yml for linting and formatting"""
     # uptodate with suffixes
     return Task(targets=[PRECOMMITCONFIG_YML])
 

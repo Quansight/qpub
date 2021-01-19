@@ -1,4 +1,4 @@
-# `dgaf` documentation
+# `qpub` documentation
 
 ## python backends
 

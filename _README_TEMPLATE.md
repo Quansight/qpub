@@ -10,29 +10,7 @@
 
 some features of `qpub` are:
 
-blog               infer the nikola blog documentation configuration.
-build              build the python project.
-conda              install conda requirements
-config             infer the jupyter_book documentation configuration.
-develop            install the project in development mode.
-environment_yaml   infer the project dependencies and write them to an environment.yaml
-install            install the packages into the sys.packages
-jupyter_book       build the documentation with jupyter-book
-jupytext           attach jupytext to the project to render python files.
-lint               lint and format the project with pre-commit
-mkdocs             build the documentation with mkdocs
-mkdocs_yml         infer the mkdocs documentation configuration.
-nikola             build the documentation with nikola
-pip                install pip requirements
-precommit          configure .pre-commit-config.yml for linting and formatting
-pyproject          infer the pyproject.toml configuration for the project
-requirements_txt   infer the project dependencies and write them to a requirements.txt
-setup_cfg          infer the declarative setup.cfg configuration for the project
-sphinx             build the documentation with sphinx
-test               test the project with pytest
-toc                infer the table of contents for the jupyter_book documentation.
-uml                generate a uml diagram for the project with pyreverse
-
+{commands}
 
 ### extra configuration
 
@@ -70,29 +48,7 @@ should we pre install a bunch of different pytest opinions?
 the collected features of `qpub` are:
 
 ```bash
-blog               infer the nikola blog documentation configuration.
-build              build the python project.
-conda              install conda requirements
-config             infer the jupyter_book documentation configuration.
-develop            install the project in development mode.
-environment_yaml   infer the project dependencies and write them to an environment.yaml
-install            install the packages into the sys.packages
-jupyter_book       build the documentation with jupyter-book
-jupytext           attach jupytext to the project to render python files.
-lint               lint and format the project with pre-commit
-mkdocs             build the documentation with mkdocs
-mkdocs_yml         infer the mkdocs documentation configuration.
-nikola             build the documentation with nikola
-pip                install pip requirements
-precommit          configure .pre-commit-config.yml for linting and formatting
-pyproject          infer the pyproject.toml configuration for the project
-requirements_txt   infer the project dependencies and write them to a requirements.txt
-setup_cfg          infer the declarative setup.cfg configuration for the project
-sphinx             build the documentation with sphinx
-test               test the project with pytest
-toc                infer the table of contents for the jupyter_book documentation.
-uml                generate a uml diagram for the project with pyreverse
-
+{commands}
 ```
 
 ### partial configuration

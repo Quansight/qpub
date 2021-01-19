@@ -18,18 +18,18 @@ pyflakes = ["-F405"]
 
 [tool.flit]
 [tool.flit.scripts]
-dgaf = "dgaf.__main__:main"
+qpub = "qpub.__main__:main"
 
 [tool.flit.metadata]
 author = "tonyfast"
 author-email = "tony.fast@gmail.com"
 classifiers = []
-home-page = "https://github.com/deathbeds/dgaf"
+home-page = "https://github.com/deathbeds/qpub"
 keywords = ""
 license = ""
 maintainer = "tonyfast"
 maintainer-email = "tony.fast@gmail.com"
-module = "dgaf"
+module = "qpub"
 requires = [
   "aiofiles",
   "configupdater",
@@ -88,17 +88,17 @@ include = []
 authors = ["tonyfast <tony.fast@gmail.com>"]
 classifiers = []
 description = "q(uick) p(ubishing) configures python Project and documentaton tools."
-documentation = "https://github.com/deathbeds/dgaf.git"
+documentation = "https://github.com/deathbeds/qpub.git"
 exclude = []
-homepage = "https://github.com/deathbeds/dgaf.git"
+homepage = "https://github.com/deathbeds/qpub.git"
 include = []
 keywords = []
 license = ""
 maintainers = ["tonyfast <tony.fast@gmail.com>"]
-name = "dgaf"
+name = "qpub"
 packages = []
 readme = ""
-repository = "https://github.com/deathbeds/dgaf.git"
+repository = "https://github.com/deathbeds/qpub.git"
 version = "2021.1.11"
 
 [tool.poetry.dependencies]

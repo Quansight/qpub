@@ -2,8 +2,10 @@
 
 import collections
 import dataclasses
+import fnmatch
 import importlib
 import io
+import re
 import sys
 
 from . import DOIT_CONFIG
@@ -21,6 +23,10 @@ def get_repo():
         import git
 
         return git.Repo()
+
+
+post_pattern = re.compile("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-(\S+)")
+test_pattern = re.compile("^test_")
 
 
 @dataclasses.dataclass
@@ -84,42 +90,63 @@ class Param(Dict):
     choices: tuple = dataclasses.field(default_factory=tuple)
 
 
+def get_name_from_folder(where=Path()):
+    """return a pathlib object from directories that represents the named contents"""
+    if (where / SRC).exists():
+        return get_name_from_folder(where / SRC)
+    for x in where.iterdir():
+        if not x.is_dir():
+            continue
+
+        if is_private(x) or is_convention(x):
+            continue
+
+        if ignored(x):
+            continue
+
+        return x
+
+
+def get_name_from_files(where=Path()):
+    """return a pathlib object from files that represent the named contents"""
+    for x in where.iterdir():
+        if x.is_dir():
+            continue
+
+        if is_private(x) or is_convention(x):
+            continue
+
+        if ignored(x):
+            continue
+
+        if x.suffix in {".py", ".ipynb"}:
+            return x
+
+
+def is_convention(object):
+    """is the object a common convention"""
+    if object in CONVENTIONS:
+        return True
+
+    if Path(Path(object).parts[-1]) in CONVENTIONS:
+        return True
+
+    return False
+
+
+def get_name_file():
+    return get_name_from_folder() or get_name_from_files()
+
+
 def get_name(common={File("notebooks"), File("docs"), File("posts"), File("tests")}):
-    is_common = []
-    if SRC.exists():
-        for x in SRC.iterdir():
-            if is_private(x):
-                continue
-            if x.is_dir():
-                return x.stem
-
-        raise Exception
-
-    for directory in [True, False]:
-        for x in Path().iterdir():
-
-            if directory:
-                if x in common:
-                    is_common.append(x)
-                    continue
-
-            if is_private(x):
-                continue
-
-            if x in CONVENTIONS:
-                continue
-
-            if directory:
-                if x.is_dir():
-                    return x.stem
-            else:
-                if x.suffix in {".py", ".ipynb"}:
-                    return x.stem
-    else:
-        if is_common:
-            return is_common.pop(0)
-
-    raise Exception
+    file = get_name_file()
+    m = post_pattern.match(file.stem)
+    if m:
+        return m.group(1).replace("-", "_")
+    m = test_pattern.match(file.stem)
+    if m:
+        return file.stem.lstrip("test_")
+    return file and file.stem
 
 
 @dataclasses.dataclass
@@ -221,20 +248,19 @@ def get_python_version():
 
 
 def get_module(name):
-    import flit
+    try:
+        import flit
 
-    return flit.common.Module(name)
+        return flit.common.Module(name)
+    except:
+        return
 
 
 def is_flit(name=None):
     """can flit describe the project"""
     if name is None:
         name = get_name()
-    try:
-        get_module(name)
-        return True
-    except:
-        return False
+    return bool(get_module(name))
 
 
 def get_version():
@@ -243,9 +269,14 @@ def get_version():
 
     import flit
 
-    try:
-        x = flit.common.get_info_from_module(get_module(get_name())).pop("version")
-    except:
+    module = get_module(get_name())
+    x = None
+    if module:
+        try:
+            x = flit.common.get_info_from_module(module).pop("version")
+        except:
+            x = None
+    if x is None:
         x = datetime.date.today().strftime("%Y.%m.%d")
     return normalize_version(x)
 
@@ -264,7 +295,15 @@ def get_description():
     """get the project description"""
     import flit
 
-    return flit.common.get_info_from_module(get_module(get_name())).pop("summary")
+    module = get_module(get_name())
+    if module:
+        try:
+            return flit.common.get_info_from_module(module).pop("summary")
+        except:
+            pass
+    # could discover descriptions from readme perhaps
+    # or the first markdown cell.
+    return ""
 
 
 def main(object=None, argv=None, raises=False):
@@ -336,7 +375,7 @@ def needs(*object):
 def where_template(template):
     """locate the qpub jsone-e templates"""
     try:
-        with importlib.resources.path("dgaf.templates", template) as template:
+        with importlib.resources.path("qpub.templates", template) as template:
             template = File(template)
     except:
         template = File(__file__).parent / "templates" / template
