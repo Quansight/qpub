@@ -4,11 +4,13 @@
 
 the top-level nox file bootstraps qpub for development and ci.
 """
+import pathlib
+
+DOIT_CONFIG = dict(verbosity=2)
 
 
 def task_python_gitignore():
     """download the gitignore file for excluding python content."""
-    import pathlib
 
     qpub = pathlib.Path("qpub")
     targets = [
@@ -26,6 +28,19 @@ def task_python_gitignore():
         targets=targets,
         uptodate=list(map(pathlib.Path.exists, targets)),
     )
+
+
+def task_readme():
+    def template():
+        import doit
+
+        action = doit.tools.CmdAction("qpub")
+        action.execute()
+        pathlib.Path("README.md").write_text(
+            pathlib.Path("_README_TEMPLATE.md").read_text().format(commands=action.out)
+        )
+
+    return dict(actions=[template])
 
 
 try:
