@@ -1,6 +1,7 @@
 """configure packages, documentation, and tests."""
 
 import asyncio
+import itertools
 import json
 import pathlib
 import shutil
@@ -20,13 +21,17 @@ from . import (
     DOIT_CONFIG,
     ENVIRONMENT_YAML,
     File,
+    GITIGNORE,
+    REVER,
     get_description,
     get_license,
     get_name,
     get_python_version,
     get_repo,
     get_version,
+    ignored_by,
     is_private,
+    is_convention,
     main,
     merge,
     needs,
@@ -93,67 +98,96 @@ def task_environment_yaml():
     )
 
 
+def generate_metadata():
+    """generate the shared metadata for the project templates."""
+    chapter = Chapter()
+    repo = Repo()
+    metadata = dict(
+        author=repo.get_author(),
+        classifiers=[],
+        docs_requires=File("requirements-docs.txt").load(),
+        email=repo.get_email(),
+        keywords=[],
+        license=get_license(),
+        name=get_name(),
+        python_version="3.7.1",  # get_python_version(),
+        requires=REQUIREMENTS_TXT.load(),
+        test_requires=REQUIREMENTS_TEST_TXT.load(),
+        url=repo.get_url(),
+        long_description=None,
+        version=get_version(),
+        description=get_description(),
+        exclude=[str(x / "*") for x in chapter.exclude_directories],
+    )
+    metadata["tool"] = templated_file("pytest.json", metadata)
+    metadata["tool"] = merge(dict(tool=dict(flakehell={})), metadata["tool"])
+    return metadata
+
+
+def setup_cfg():
+    metadata = generate_metadata()
+    data = templated_file("setuptools.cfg.json", metadata)
+    SETUP_CFG.write(data)
+
+    data = merge(metadata["tool"], templated_file("setuptools.toml.json", {}))
+    PYPROJECT_TOML.update(data)
+
+
+def setup_py():
+    SETUP_PY.write_text("""__import__("setuptools").setup()""")
+
+
+def task_setuptools():
+    """configure setuptools to package the project"""
+
+    actions, targets = [setup_cfg], [SETUP_CFG]
+
+    if not SETUP_PY.exists():
+        actions.append(setup_py)
+        targets.append(SETUP_PY)
+
+    return Task(actions=actions, targets=targets)
+
+
+def poetry():
+    needs("poetry")
+    metadata = generate_metadata()
+    data = merge(metadata["tool"], templated_file("poetry.json", metadata))
+
+    PYPROJECT_TOML.update(data)
+    if metadata["requires"]:
+        # poetry determines environments and computes versions
+        # we the poetry cli for that.
+        requires = " ".join(metadata["requires"])
+
+        # poetry separates project and dev dependencies.
+        dev_deps = [
+            f"-d {x}" for x in metadata["test_requires"] + metadata["docs_requires"]
+        ]
+        assert not doit.tools.CmdAction(
+            f"""poetry add {requires} {dev_deps} --lock"""
+        ).execute(sys.stdout, sys.stderr)
+
+    return Task(actions=[poetry], targets=[PYPROJECT_TOML])
+
+
+def flit():
+    metadata = generate_metadata()
+    data = merge(metadata["tool"], templated_file("flit.json", metadata))
+
+    PYPROJECT_TOML.update(data)
+
+
 def task_pyproject():
-    """infer the pyproject.toml configuration for the project"""
+    """generate a pyproject.toml packaging and configuration file"""
 
-    def python(backend):
-        chapter = Chapter()
-        repo = Repo()
-        # compose a payload to pass to the templates
-        metadata = dict(
-            author=repo.get_author(),
-            classifiers=[],
-            docs_requires=File("requirements-docs.txt").load(),
-            email=repo.get_email(),
-            keywords=[],
-            license=get_license(),
-            name=get_name(),
-            python_version="3.7.1",  # get_python_version(),
-            requires=REQUIREMENTS_TXT.load(),
-            test_requires=REQUIREMENTS_TEST_TXT.load(),
-            url=repo.get_url(),
-            long_description=None,
-            version=get_version(),
-            description=get_description(),
-            exclude=[str(x / "*") for x in chapter.exclude_directories],
-        )
-        tool = templated_file("pytest.json", metadata)
-        tool = merge(dict(tool=dict(flakehell={})), tool)
-
+    def pyproject(backend):
         if backend == "flit":
-            # use flit to package thing when it abides the documentation
-            # and version conventions
-            data = merge(tool, templated_file("flit.json", metadata))
-
-            PYPROJECT_TOML.update(data)
-
-        if backend == "poetry":
-            # poetry will likely be a special case.
-            # it makes the most sense to fallback to setuptools
-            # in non flit cases.
-            needs("poetry")
-            data = merge(tool, templated_file("poetry.json", metadata))
-
-            PYPROJECT_TOML.update(data)
-            if metadata["requires"]:
-                # poetry determines environments and computes versions
-                # we the poetry cli for that.
-                requires = " ".join(metadata["requires"])
-
-                # poetry separates project and dev dependencies.
-                dev_deps = [
-                    f"-d {x}"
-                    for x in metadata["test_requires"] + metadata["docs_requires"]
-                ]
-                assert not doit.tools.CmdAction(
-                    f"""poetry add {requires} {dev_deps} --lock"""
-                ).execute(sys.stdout, sys.stderr)
-
-        if backend == "setuptools":
-            data = templated_file("setuptools.cfg.json", metadata)
-            SETUP_CFG.write(data)
-            data = merge(tool, templated_file("setuptools.toml.json", {}))
-            PYPROJECT_TOML.update(data)
+            flit()
+        elif backend == "poetry":
+            poetry()
+        else:
+            setup_cfg()
 
     task_dep = []
     chapter = Chapter()
@@ -165,10 +199,24 @@ def task_pyproject():
 
     return Task(
         file_dep=[REQUIREMENTS_TXT],
-        actions=[python],
+        actions=[pyproject],
         targets=[PYPROJECT_TOML],
         params=[_BACKEND],
         task_dep=task_dep,
+    )
+
+def rever():
+    """template the rever configuration file"""
+    metadata = generate_metadata()
+    # the template name is hard coded into qpub
+    REVER.write_text(templated_file("rever.xsh.tpl", metadata))
+
+def task_rever():
+    """configure a rever.xsh file to manage versioning."""
+    return Task(
+        file_dep=[],
+        actions=[rever],
+        targets=[REVER]
     )
 
 
@@ -194,11 +242,6 @@ def task_jupytext():
         actions=[jupytext],
         uptodate=[".py" in chapter.suffixes],
     )
-
-
-def task_setup_cfg():
-    """infer the declarative setup.cfg configuration for the project"""
-    return Task(file_dep=[REQUIREMENTS_TXT], targets=[SETUP_CFG, SETUP_PY])
 
 
 def task_toc():
@@ -271,51 +314,123 @@ def task_precommit():
     return Task(targets=[PRECOMMITCONFIG_YML])
 
 
-def get_section(chapter, parent=Path(), *done, **section):
-    """generate the nested jupyter book table of contents format for the chapter."""
-    files = [
-        x
-        for x in chapter.include
-        if 1 == (len(x.parts) - len(parent.parts))
-        and x.is_relative_to(parent)
-        and x not in CONVENTIONS
-        and not is_private(x)
-    ]
-    index = None
+def gitignore(files):
+    ignores = []
+    before = GITIGNORE.read_text().splitlines() if GITIGNORE.exists() else []
+    for file in itertools.chain(Path().iterdir(), files):
+        if file in files:
+            ignores.append(str(file))
+            continue
+
+        ignored = ignored_by(file)
+
+        if ignored and (ignored not in (before + ignores)):
+            ignores.append(ignored)
+
+    GITIGNORE.write_text(("\n".join(before + ignores)).rstrip() + "\n")
+
+
+def task_ignores():
+    """update the files in the gitignore"""
+    return Task(actions=[gitignore], targets=[GITIGNORE], pos_arg="files")
+
+
+def get_index_file(files):
+    """each section has an index.
+
+    readme.md and index.md are conventions for index files."""
     for name in "index readme".split():
         for file in files:
             if file.stem.lower() == name:
-                index = file
-                if "file" not in section:
-                    section.update(file=str(file.with_suffix("")), sections=[])
-                else:
-                    section["sections"].append(str(file.with_suffix("")))
+                return file
 
-    if index is None:
+
+def get_section(chapter, parent=Path(), done=None, **section):
+    """generate the nested jupyter book table of contents format for the chapter."""
+    files = []
+    for file in chapter.include:
+        depth = len(file.parts) - len(parent.parts)
+
+        if not file.is_relative_to(parent):
+            continue
+        elif depth > 1:
+            # build each section only for the immediate children
+            continue
+
+        if is_convention(file):
+            # skip conventions
+            continue
+
+        if is_private(file):
+            # skip private files and folders
+            continue
+
+        files.append(file)
+
+    # prioritize find
+    index = get_index_file(files)
+    if index:
+        if "file" not in section:
+            section.update(file=str(index.with_suffix("")), sections=[])
+        else:
+            section["sections"].append(str(index.with_suffix("")))
+    else:
         section = dict(file=None, sections=[])
 
     for file in files:
         if file == index:
             continue
-        if file.suffix in {".py", ".ipynb", ".md", ".rst"}:
+
+        if file.suffix in {".ipynb", ".md", ".rst"}:
             index = file
             if section["file"] is None:
                 section["file"] = str(file.with_suffix(""))
             else:
                 section["sections"].append(dict(file=str(file.with_suffix(""))))
 
-    for dir in [DOCS] + [
-        x
-        for x in chapter.directories
-        if x.is_relative_to(parent) and x not in CONVENTIONS and not is_private(x)
-    ]:
-        if dir == parent:
+    dirs = []
+
+    # add directories to the table of contents after the files
+    # docs folder goes first into the docs.
+    if done is None:
+        done = []
+        if DOCS.exists():
+            section["sections"].append(get_section(chapter, DOCS, done))
+            done.append(DOCS)
+
+    for dir in chapter.directories:
+
+        if not dir.is_relative_to(parent):
             continue
-        if dir not in done:
-            section["sections"].append(get_section(chapter, dir, *done))
-            if section["sections"][-1]["file"] == None:
-                section["sections"].pop(-1)
-            done += (dir,)
+
+        depth = len(dir.parts) - len(parent.parts)
+
+        if depth != 1:
+            continue
+
+        if dir in done:
+            continue
+
+        if is_convention(dir):
+            continue
+
+        if is_private(dir):
+            continue
+
+        # generate a section for the dir
+        next = get_section(chapter, dir, done)
+        if next["file"]:
+            section["sections"].append(next)
+
+        done.append(dir)
+
+    if section["file"] is None:
+        # hoist sections if an index isn't defined
+        if section.get("sections"):
+            next = section["sections"].pop(0)
+            if section.get("sections"):
+                next["sessions"] += section["sections"]
+            return next
 
     return section
 
