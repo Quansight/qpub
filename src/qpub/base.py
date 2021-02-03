@@ -397,9 +397,13 @@ def where_template(template):
 
 def templated_file(template, data):
     """return the templated data based on a template"""
-    import jsone
-
-    return jsone.render(where_template(template).load(), data)
+    tpl = Path(template)
+    if tpl.suffix == ".json":
+        import jsone
+        return jsone.render(where_template(template).load(), data)
+    if tpl.suffix == ".tpl":
+        return where_template(template).load().render(data)
+    raise BaseException
 
 
 def ignore(cache={}):
@@ -415,7 +419,7 @@ def ignore(cache={}):
         file = where_template(file)
         for pattern in (
             file.read_text().splitlines()
-            + ".local .vscode _build .gitignore .git .doit.db* .benchmarks".split()
+            + ".local .vscode _build .doit.db.* .benchmarks".split()
         ):
             if bool(pattern):
                 match = pathspec.patterns.GitWildMatchPattern(pattern)

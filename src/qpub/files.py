@@ -122,6 +122,7 @@ BUILDTESTRELEASE = WORKFLOWS / "build_test_release.yml"
 READTHEDOCS = Convention(".readthedocs.yml")
 PYCACHE = Convention("__pycache__")
 CONDA_RECIPE = Convention("conda.recipe")
+REVER = Convention("rever.xsh")
 
 CONVENTIONS = [x for x in locals().values() if isinstance(x, Convention)]
 
@@ -309,7 +310,23 @@ class JSON(File):
 
         return json.dumps(object)
 
+class TPL(File):
+    _suffixes = (".tpl",)
 
+    def load(self):
+        import jinja2
+
+        return jinja2.Template(self.read_text())
+
+    def dump(self, object):
+        # expect text
+        return self.write_text(object)
+
+class XSH(File):
+    _suffixes = (".xsh",)
+
+    load = Path.read_text
+    dump = Path.write_text
 class YML(File):
     """dump and load yml files in place."""
 

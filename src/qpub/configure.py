@@ -1,6 +1,7 @@
 """configure packages, documentation, and tests."""
 
 import asyncio
+import itertools
 import json
 import pathlib
 import shutil
@@ -20,12 +21,15 @@ from . import (
     DOIT_CONFIG,
     ENVIRONMENT_YAML,
     File,
+    GITIGNORE,
+    REVER,
     get_description,
     get_license,
     get_name,
     get_python_version,
     get_repo,
     get_version,
+    ignored_by,
     is_private,
     is_convention,
     main,
@@ -201,6 +205,20 @@ def task_pyproject():
         task_dep=task_dep,
     )
 
+def rever():
+    """template the rever configuration file"""
+    metadata = generate_metadata()
+    # the template name is hard coded into qpub
+    REVER.write_text(templated_file("rever.xsh.tpl", metadata))
+
+def task_rever():
+    """configure a rever.xsh file to manage versioning."""
+    return Task(
+        file_dep=[],
+        actions=[rever],
+        targets=[REVER]
+    )
+
 
 def task_jupytext():
     """attach jupytext to the project to render python files.
@@ -294,6 +312,27 @@ def task_precommit():
     """configure .pre-commit-config.yml for linting and formatting"""
     # uptodate with suffixes
     return Task(targets=[PRECOMMITCONFIG_YML])
+
+
+def gitignore(files):
+    ignores = []
+    before = GITIGNORE.read_text().splitlines() if GITIGNORE.exists() else []
+    for file in itertools.chain(Path().iterdir(), files):
+        if file in files:
+            ignores.append(str(file))
+            continue
+
+        ignored = ignored_by(file)
+
+        if ignored and (ignored not in (before + ignores)):
+            ignores.append(ignored)
+
+    GITIGNORE.write_text(("\n".join(before + ignores)).rstrip() + "\n")
+
+
+def task_ignores():
+    """update the files in the gitignore"""
+    return Task(actions=[gitignore], targets=[GITIGNORE], pos_arg="files")
 
 
 def get_index_file(files):
